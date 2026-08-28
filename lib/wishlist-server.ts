@@ -1,5 +1,6 @@
 import fixture from '@/fixtures/steam-wishlist.sample.json';
 import {
+  hasExpectedSteamAppId,
   normalizeSteamWishlistResponse,
   type SteamWishlistResponse,
   type WishlistDashboardData,
@@ -114,11 +115,21 @@ async function fetchSteamDate(key: string, appId: number, date: string): Promise
     throw new WishlistConnectorError('STEAM_ERROR', `Steamworks returned HTTP ${response.status}.`, 502);
   }
 
+  let payload: SteamWishlistResponse;
   try {
-    return (await response.json()) as SteamWishlistResponse;
+    payload = (await response.json()) as SteamWishlistResponse;
   } catch {
     throw new WishlistConnectorError('INVALID_STEAM_RESPONSE', 'Steamworks returned a response that was not valid JSON.', 502);
   }
+
+  if (!hasExpectedSteamAppId(payload, appId)) {
+    throw new WishlistConnectorError(
+      'STEAM_APP_MISMATCH',
+      'Steamworks returned wishlist data for an unexpected App ID.',
+      502,
+    );
+  }
+  return payload;
 }
 
 function requireAppId(): number {

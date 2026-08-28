@@ -46,6 +46,16 @@ export type SteamWishlistResponse = {
   };
 };
 
+export function hasExpectedSteamAppId(payload: SteamWishlistResponse, expectedAppId: number): boolean {
+  const response = payload.response;
+  if (!response) return true;
+
+  const hasWishlistData = Boolean(response.wishlist_summary);
+  if (!hasWishlistData && response.appid === undefined) return true;
+
+  return response.appid === expectedAppId;
+}
+
 export function normalizeSteamWishlistResponse(payload: SteamWishlistResponse): WishlistDay | null {
   const response = payload.response;
   if (!response?.date || !response.wishlist_summary) return null;
