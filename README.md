@@ -1,6 +1,6 @@
 # Wishline MVP
 
-Wishline is a local, English-language Phase 1 acceptance build for the Studio Wishlist Tracker PRD. It is a mobile-responsive Progressive Web App with two interchangeable data sources: a committed anonymous fixture and a server-only connection to Steamworks `GetAppWishlistReporting`.
+Wishline is an English-language Phase 1 acceptance build for the Studio Wishlist Tracker PRD. It is a mobile-responsive Progressive Web App with two interchangeable data sources: a committed anonymous fixture and an authenticated, server-only connection to Steamworks `GetAppWishlistReporting`.
 
 ## Technology stack
 
@@ -9,6 +9,9 @@ Wishline is a local, English-language Phase 1 acceptance build for the Studio Wi
 | Application framework | Next.js 16.3.3 | App Router structure, metadata, and React application shell |
 | Server connector | Next.js Route Handler | Normalizes Steamworks responses without exposing the Financial API key |
 | UI runtime | React 19.2.8 | Interactive onboarding, navigation, settings, refresh, and token flows |
+| Identity | Sites / Sign in with ChatGPT | Passwordless owner identity locally and when hosted |
+| Persistence | Cloudflare D1 | Durable owner workspace and encrypted Steam connection metadata |
+| Secret protection | Web Crypto AES-256-GCM | API keys are encrypted before D1 storage and never returned to clients |
 | Language | TypeScript 5.9.3 | Typed application source and build-time checks |
 | Styling | Tailwind CSS 4.2.1 + project CSS | Responsive layout, design system, charts, and mobile presentation |
 | Development/build | Vinext 1.0 beta + Vite 8 | Local development server and production bundle |
@@ -24,6 +27,12 @@ The scaffold also includes the Cloudflare Vite plugin, Workers type definitions,
 ```text
 Browser / installed PWA
         |
+        +-- Sign in with ChatGPT (passwordless platform identity)
+        +-- POST /api/setup (one-time Steam validation)
+        |            |
+        |            +-- AES-256-GCM encryption
+        |            +-- D1 owner workspace + encrypted connection
+        |
         +-- GET /api/wishlist (read, never cached by the PWA)
         +-- POST /api/wishlist (authenticated manual refresh)
                      |
@@ -31,17 +40,17 @@ Browser / installed PWA
                      |     +-- anonymous response contract
                      |
                      +-- steam mode
-                           +-- key read from .env.local
+                           +-- key decrypted only in the server runtime
                            +-- partner.steam-api.com
                            +-- response normalization
-                           +-- throttled in-memory cache
+                           +-- workspace-scoped throttled cache
         |
         +-- Service worker cache
         |     +-- application shell
         |     +-- offline fallback
 ```
 
-The server connector and live Steamworks path are implemented. Live data is loopback-only during local development and requires a platform-authenticated, allowlisted user in production. There is not yet a database, Redis cache, Stripe integration, scheduled worker, production secrets vault, or real app-token service.
+The server connector, passwordless identity, D1 workspace, and encrypted live Steamworks connection are implemented. Legacy environment-driven live mode remains loopback-only during local development and requires an allowlisted user in production. There is not yet a durable polling cache, Stripe integration, scheduled worker, managed encryption-key rotation, or real app-token service.
 
 ## Project structure
 
@@ -51,14 +60,24 @@ app/
   page.tsx          MVP screens, normalized data rendering, and interactions
   globals.css       Responsive visual system and component styles
   api/wishlist/     Private, no-store server endpoint
+  api/setup/        Authenticated account and encrypted connection endpoint
 lib/
   wishlist-contract.ts  Shared response contract and normalizer
   wishlist-server.ts    Fixture/live adapter, Steam client, and server cache
+  wishline-auth.ts      Platform identity extraction
+  wishline-store.ts     D1 workspace and connection persistence
+  secret-crypto.ts      AES-256-GCM secret envelope
+db/
+  schema.ts             Durable data model reference
+drizzle/
+  0000_wishline_accounts.sql  Hosted D1 migration
 fixtures/
   steam-wishlist.sample.json  Anonymous contract fixture
 scripts/
   validate-fixture.mjs        Offline fixture validation
   capture-steam-wishlist.mjs  Sanitized real-response capture
+  ensure-local-encryption-key.mjs  Safe ignored local wrapping-key setup
+  verify-local-onboarding.mjs      Redacted end-to-end acceptance check
 public/
   manifest.webmanifest
   sw.js             Service worker and offline cache behavior
@@ -101,12 +120,22 @@ npm run dev
 
 Keep `WISHLIST_DATA_SOURCE=fixture`. The dashboard will label every surface as **Anonymous fixture** so it cannot be mistaken for live data.
 
-## Connect a real Steamworks project
+## Connect a real Steamworks project through the app
 
-> **Warning:** a Financial API key is account-wide and must be treated like a password. Never paste it into the Wishline browser UI, a chat message, source code, or a Git commit.
+> **Warning:** a Financial API key is account-wide and must be treated like a password. Enter it only in Wishline's private connection form; never paste it into chat, source code, or a Git commit.
 
-1. Copy `.env.example` to `.env.local`.
-2. Set the following values directly on the machine that will run Wishline:
+1. Copy `.env.example` to `.env.local` if it does not exist.
+2. Generate the ignored local AES-256-GCM wrapping key and start Wishline:
+
+```bash
+npm run setup:local
+npm run dev
+```
+
+3. Select **Continue to demo**, then **Sign in with ChatGPT**. Local development uses the stable simulated identity `local_seedy`; a hosted private Site uses the authenticated platform identity.
+4. Enter the Steam App ID and Financial API key in **Connect Steam**. Wishline validates them against Steam before encrypting the key and storing the connection in the owner's D1 workspace.
+
+The older environment-driven connector remains available for diagnostics. To use it instead, set:
 
 ```dotenv
 WISHLIST_DATA_SOURCE=steam
@@ -117,16 +146,16 @@ STEAM_LOOKBACK_DAYS=30
 STEAM_CACHE_SECONDS=1800
 ```
 
-3. Optionally provide the current wishlist snapshot shown in Steamworks. The wishlist reporting API exposes activity by date, not an authoritative current-balance field:
+Optionally provide the current wishlist snapshot shown in Steamworks. The wishlist reporting API exposes activity by date, not an authoritative current-balance field:
 
 ```dotenv
 STEAM_CURRENT_WISHLIST_TOTAL=12847
 STEAM_CURRENT_WISHLIST_TOTAL_AS_OF=2026-08-27T21:00:00Z
 ```
 
-4. Restart `npm run dev`, complete the connection check, and compare the generated timestamp and latest daily metrics with Steamworks.
+Restart `npm run dev` after changing environment values.
 
-For any hosted live environment, configure `WISHLIST_ALLOWED_USER_IDS` with the stable IDs of the authenticated owners who may access the dashboard, keep the Site private, and IP-allowlist the server address in the Steamworks Financial API Group. The live API fails closed in production when the user allowlist is absent.
+For a hosted environment, keep the Site private, configure `WISHLIST_ENCRYPTION_KEY` as a server secret, and IP-allowlist the deployed server address in the Steamworks Financial API Group. `WISHLIST_ALLOWED_USER_IDS` is still required only when using the legacy environment-driven Steam connection instead of an authenticated D1 workspace.
 
 The key is sent to Steamworks in the `x-webapi-key` request header, never in the URL. Browser responses contain only the configured App ID, project label, timestamps, and normalized aggregate metrics. Manual refreshes use an authenticated POST action, cannot bypass the server more than once per minute, and normal responses use the configured server cache.
 
@@ -144,9 +173,9 @@ To capture another number of days, set `STEAM_CAPTURE_DAYS` in `.env.local` betw
 
 ## Suggested demo walkthrough
 
-1. Select **Continue to demo**.
-2. Confirm the server-side data source and continue.
-3. Confirm the configured project and finish setup.
+1. Select **Continue to demo** and sign in.
+2. Enter the App ID and Financial API key in the private connection form.
+3. Let Wishline validate, encrypt, and save the connection, then open the dashboard.
 4. Explore Overview, Projects, Widget, Security, and Settings.
 5. In Security, issue, copy, and revoke a scoped demo token.
 6. Use Refresh to exercise the throttled server cache.
@@ -155,13 +184,12 @@ To capture another number of days, set `STEAM_CAPTURE_DAYS` in `.env.local` betw
 ## What remains simulated
 
 - Read-only app token issuance and revocation
-- Durable user/workspace records beyond the production allowlist
 - Durable scheduled polling and last-known-good storage
-- Production encryption and key-vault management
+- Managed production rotation for the server-side encryption key
 - Push notifications and native Android widget delivery
 
 The generated demo app token remains only in browser memory. The project has no Stripe integration because billing belongs to Phase 2 of the PRD.
 
 ## Production seams
 
-The UI is organized around the production boundaries described by the PRD: secure server-side credential storage, a per-App-ID poller/cache, scoped client tokens, and a reader-only mobile experience. The live Steamworks adapter now proves the server/client boundary. Supabase Auth/Postgres, an encrypted secrets vault, a durable scheduler/cache, and a native Android widget remain production follow-up work.
+The UI is organized around the production boundaries described by the PRD: passwordless platform identity, a durable owner workspace in D1, AES-256-GCM credential storage, a per-App-ID poller/cache, scoped client tokens, and a reader-only mobile experience. A managed encryption-key rotation policy, durable scheduler/cache, and native Android widget remain production follow-up work.

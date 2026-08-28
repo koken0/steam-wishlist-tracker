@@ -8,10 +8,24 @@ import {
 } from '@/lib/wishlist-contract';
 
 const STEAM_ENDPOINT = 'https://partner.steam-api.com/IPartnerFinancialsService/GetAppWishlistReporting/v001/';
+const STEAM_STORE_ENDPOINT = 'https://store.steampowered.com/api/appdetails';
 const MIN_FORCE_REFRESH_MS = 60_000;
+
+type SteamStoreAppDetailsResponse = Record<
+  string,
+  { success?: boolean; data?: { name?: unknown } }
+>;
 
 type CacheEntry = { key: string; expiresAt: number; fetchedAtMs: number; data: WishlistDashboardData };
 let cache: CacheEntry | null = null;
+
+export type SteamConnection = {
+  apiKey: string;
+  appId: number;
+  projectName?: string;
+  cacheScope?: string;
+  useEnvironmentMetadata?: boolean;
+};
 
 export class WishlistConnectorError extends Error {
   constructor(public code: string, message: string, public status = 500) {
@@ -19,11 +33,14 @@ export class WishlistConnectorError extends Error {
   }
 }
 
-export async function getWishlistDashboardData(force = false): Promise<WishlistDashboardData> {
-  const source = process.env.WISHLIST_DATA_SOURCE === 'steam' ? 'steam' : 'fixture';
+export async function getWishlistDashboardData(
+  force = false,
+  connection?: SteamConnection,
+): Promise<WishlistDashboardData> {
+  const source = connection || process.env.WISHLIST_DATA_SOURCE === 'steam' ? 'steam' : 'fixture';
   const cacheSeconds = clampInteger(process.env.STEAM_CACHE_SECONDS, 1800, 60, 86400);
-  const appId = source === 'steam' ? requireAppId() : fixture.project.appId;
-  const cacheKey = `${source}:${appId}`;
+  const appId = connection?.appId ?? (source === 'steam' ? requireAppId() : fixture.project.appId);
+  const cacheKey = `${source}:${connection?.cacheScope || 'environment'}:${appId}`;
   const now = Date.now();
 
   if (cache?.key === cacheKey) {
@@ -33,7 +50,13 @@ export async function getWishlistDashboardData(force = false): Promise<WishlistD
     }
   }
 
-  const data = source === 'steam' ? await loadSteamData(appId) : loadFixtureData();
+  const data = source === 'steam' ? await loadSteamData({
+    apiKey: connection?.apiKey ?? requireSteamKey(),
+    appId,
+    projectName: connection?.projectName,
+    cacheScope: connection?.cacheScope,
+    useEnvironmentMetadata: connection ? connection.useEnvironmentMetadata : true,
+  }) : loadFixtureData();
   cache = { key: cacheKey, expiresAt: now + cacheSeconds * 1000, fetchedAtMs: now, data };
   return data;
 }
@@ -57,15 +80,14 @@ function loadFixtureData(): WishlistDashboardData {
   };
 }
 
-async function loadSteamData(appId: number): Promise<WishlistDashboardData> {
-  const key = process.env.STEAM_FINANCIAL_API_KEY?.trim();
-  if (!key) {
-    throw new WishlistConnectorError('MISSING_STEAM_KEY', 'Live mode is enabled, but the server has no Steam Financial API key.', 503);
-  }
-
+async function loadSteamData(connection: SteamConnection): Promise<WishlistDashboardData> {
+  const { apiKey: key, appId } = connection;
   const lookbackDays = clampInteger(process.env.STEAM_LOOKBACK_DAYS, 30, 1, 90);
   const dates = utcDatesEndingToday(lookbackDays);
-  const payloads = await mapWithConcurrency(dates, 4, (date) => fetchSteamDate(key, appId, date));
+  const [payloads, storeProjectName] = await Promise.all([
+    mapWithConcurrency(dates, 4, (date) => fetchSteamDate(key, appId, date)),
+    fetchSteamProjectName(appId),
+  ]);
   const daily = payloads
     .map(normalizeSteamWishlistResponse)
     .filter((record): record is WishlistDay => Boolean(record))
@@ -78,15 +100,58 @@ async function loadSteamData(appId: number): Promise<WishlistDashboardData> {
   return {
     source: 'steam',
     appId,
-    projectName: process.env.STEAM_PROJECT_NAME?.trim() || `Steam App ${appId}`,
+    projectName: connection.projectName?.trim()
+      || (connection.useEnvironmentMetadata ? process.env.STEAM_PROJECT_NAME?.trim() : '')
+      || storeProjectName
+      || `Steam App ${appId}`,
     releaseState: 'Steamworks project',
-    currentWishlists: optionalNonNegativeInteger(process.env.STEAM_CURRENT_WISHLIST_TOTAL),
-    currentWishlistsAsOf: optionalIsoDate(process.env.STEAM_CURRENT_WISHLIST_TOTAL_AS_OF),
+    currentWishlists: connection.useEnvironmentMetadata
+      ? optionalNonNegativeInteger(process.env.STEAM_CURRENT_WISHLIST_TOTAL)
+      : null,
+    currentWishlistsAsOf: connection.useEnvironmentMetadata
+      ? optionalIsoDate(process.env.STEAM_CURRENT_WISHLIST_TOTAL_AS_OF)
+      : null,
     generatedAt: latestGeneratedAt(daily),
     fetchedAt: new Date().toISOString(),
     cacheHit: false,
     daily,
   };
+}
+
+export async function validateSteamConnection(connection: SteamConnection): Promise<{ projectName: string; records: number }> {
+  const dates = utcDatesEndingToday(Math.min(7, clampInteger(process.env.STEAM_LOOKBACK_DAYS, 7, 1, 90)));
+  const [payloads, storeProjectName] = await Promise.all([
+    mapWithConcurrency(dates, 3, (date) => fetchSteamDate(connection.apiKey, connection.appId, date)),
+    fetchSteamProjectName(connection.appId),
+  ]);
+  const records = payloads.map(normalizeSteamWishlistResponse).filter(Boolean).length;
+  return {
+    projectName: connection.projectName?.trim() || storeProjectName || `Steam App ${connection.appId}`,
+    records,
+  };
+}
+
+async function fetchSteamProjectName(appId: number): Promise<string | null> {
+  const url = new URL(STEAM_STORE_ENDPOINT);
+  url.searchParams.set('appids', String(appId));
+  url.searchParams.set('l', 'english');
+
+  try {
+    const response = await fetch(url, {
+      headers: { Accept: 'application/json' },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) return null;
+
+    const payload = (await response.json()) as SteamStoreAppDetailsResponse;
+    const app = payload[String(appId)];
+    const name = app?.success ? app.data?.name : null;
+    return typeof name === 'string' && name.trim() ? name.trim() : null;
+  } catch {
+    // Store metadata is optional; wishlist reporting should still work if it is unavailable.
+    return null;
+  }
 }
 
 async function fetchSteamDate(key: string, appId: number, date: string): Promise<SteamWishlistResponse> {
@@ -138,6 +203,14 @@ function requireAppId(): number {
     throw new WishlistConnectorError('INVALID_APP_ID', 'Live mode requires a positive numeric STEAM_APP_ID.', 503);
   }
   return value;
+}
+
+function requireSteamKey(): string {
+  const key = process.env.STEAM_FINANCIAL_API_KEY?.trim();
+  if (!key) {
+    throw new WishlistConnectorError('MISSING_STEAM_KEY', 'Live mode is enabled, but the server has no Steam Financial API key.', 503);
+  }
+  return key;
 }
 
 function utcDatesEndingToday(days: number): string[] {

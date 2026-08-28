@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { authorizeWishlistRequest } from '@/lib/wishlist-access';
+import { getWishlineUser } from '@/lib/wishline-auth';
+import { getSteamConnection } from '@/lib/wishline-store';
 import { getWishlistDashboardData, WishlistConnectorError } from '@/lib/wishlist-server';
 
 export const dynamic = 'force-dynamic';
@@ -19,16 +21,24 @@ export async function POST(request: Request) {
 }
 
 async function wishlistResponse(request: Request, force: boolean) {
-  const access = authorizeWishlistRequest(request);
-  if (!access.allowed) {
-    return NextResponse.json(
-      { error: { code: access.code, message: access.message } },
-      { status: access.status, headers: privateHeaders() },
-    );
-  }
-
   try {
-    const data = await getWishlistDashboardData(force);
+    const user = getWishlineUser(request);
+    const savedConnection = user ? await getSteamConnection(user) : null;
+    if (!savedConnection) {
+      const access = authorizeWishlistRequest(request);
+      if (!access.allowed) {
+        return NextResponse.json(
+          { error: { code: access.code, message: access.message } },
+          { status: access.status, headers: privateHeaders() },
+        );
+      }
+    }
+    const data = await getWishlistDashboardData(force, savedConnection ? {
+      apiKey: savedConnection.apiKey,
+      appId: savedConnection.appId,
+      projectName: savedConnection.projectName,
+      cacheScope: savedConnection.workspaceId,
+    } : undefined);
     return NextResponse.json(data, {
       headers: privateHeaders(),
     });

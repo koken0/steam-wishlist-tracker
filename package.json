@@ -10,7 +10,9 @@
     "build": "vinext build",
     "start": "vinext start",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
+    "setup:local": "node scripts/ensure-local-encryption-key.mjs",
     "test:fixture": "node scripts/validate-fixture.mjs",
+    "test:onboarding": "node --env-file-if-exists=.env.local scripts/verify-local-onboarding.mjs",
     "steam:capture": "node --env-file-if-exists=.env.local scripts/capture-steam-wishlist.mjs"
   },
   "dependencies": {

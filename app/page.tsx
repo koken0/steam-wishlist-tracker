@@ -6,6 +6,18 @@ import type { WishlistDashboardData } from '@/lib/wishlist-contract';
 type View = 'overview' | 'projects' | 'widget' | 'security' | 'settings';
 type Screen = 'welcome' | 'onboarding' | 'app';
 
+type SetupState = {
+  user: { email: string | null; name: string | null };
+  workspace: {
+    workspaceId: string;
+    workspaceName: string;
+    appId: number | null;
+    projectName: string | null;
+    connected: boolean;
+    updatedAt: string | null;
+  };
+};
+
 const previewPoints = [32, 40, 37, 55, 51, 72];
 
 const nav: { id: View; label: string; icon: string }[] = [
@@ -26,7 +38,30 @@ async function fetchWishlistDashboard(force = false): Promise<WishlistDashboardD
   if (!response.ok || 'error' in payload) {
     throw new Error('error' in payload ? payload.error?.message || 'Wishlist data could not be loaded.' : 'Wishlist data could not be loaded.');
   }
-  return payload;
+  return payload as WishlistDashboardData;
+}
+
+async function fetchSetup(): Promise<SetupState> {
+  const response = await fetch('/api/setup', { cache: 'no-store' });
+  const payload = await response.json() as SetupState | { error?: { message?: string } };
+  if (!response.ok || 'error' in payload) {
+    throw new Error('error' in payload ? payload.error?.message || 'Workspace could not be loaded.' : 'Workspace could not be loaded.');
+  }
+  return payload as SetupState;
+}
+
+async function connectSteam(input: { appId: string; apiKey: string; projectName: string }): Promise<SetupState> {
+  const response = await fetch('/api/setup', {
+    method: 'POST',
+    cache: 'no-store',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  const payload = await response.json() as SetupState | { error?: { message?: string } };
+  if (!response.ok || 'error' in payload) {
+    throw new Error('error' in payload ? payload.error?.message || 'Steam connection could not be saved.' : 'Steam connection could not be saved.');
+  }
+  return payload as SetupState;
 }
 
 export default function Home() {
@@ -39,12 +74,16 @@ export default function Home() {
   const [milestone, setMilestone] = useState('15000');
   const [wishlistData, setWishlistData] = useState<WishlistDashboardData | null>(null);
   const [dataError, setDataError] = useState('');
+  const [setup, setSetup] = useState<SetupState | null>(null);
+  const [setupLoading, setSetupLoading] = useState(false);
+  const [setupError, setSetupError] = useState('');
 
   useEffect(() => {
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => undefined);
     fetchWishlistDashboard()
       .then((data) => { setWishlistData(data); setDataError(''); })
       .catch((error: Error) => setDataError(error.message));
+    fetchSetup().then(setSetup).catch(() => undefined);
   }, []);
 
   const progress = useMemo(() => {
@@ -79,8 +118,40 @@ export default function Home() {
     notify(wishlistData?.source === 'steam' ? 'Live Steam workspace is ready' : 'Fixture workspace is ready');
   }
 
+  async function openOnboarding() {
+    setScreen('onboarding');
+    setSetupLoading(true);
+    try {
+      const value = await fetchSetup();
+      setSetup(value);
+      setSetupError('');
+      setOnboardingStep(value.workspace.connected ? 3 : 1);
+    } catch (error) {
+      setSetupError(error instanceof Error ? error.message : 'Sign in is required.');
+    } finally {
+      setSetupLoading(false);
+    }
+  }
+
+  async function saveConnection(input: { appId: string; apiKey: string; projectName: string }) {
+    setSetupLoading(true);
+    setSetupError('');
+    try {
+      const value = await connectSteam(input);
+      setSetup(value);
+      const data = await fetchWishlistDashboard(true);
+      setWishlistData(data);
+      setDataError('');
+      setOnboardingStep(3);
+    } catch (error) {
+      setSetupError(error instanceof Error ? error.message : 'Steam connection could not be saved.');
+    } finally {
+      setSetupLoading(false);
+    }
+  }
+
   if (screen === 'welcome') {
-    return <Welcome onContinue={() => setScreen('onboarding')} />;
+    return <Welcome onContinue={openOnboarding} />;
   }
 
   if (screen === 'onboarding') {
@@ -88,9 +159,10 @@ export default function Home() {
       <Onboarding
         step={onboardingStep}
         data={wishlistData}
-        error={dataError}
-        refreshing={refreshing}
-        retry={refreshData}
+        setup={setup}
+        error={setupError}
+        loading={setupLoading}
+        connect={saveConnection}
         next={() => setOnboardingStep((step) => Math.min(3, step + 1))}
         back={() => onboardingStep === 1 ? setScreen('welcome') : setOnboardingStep((step) => step - 1)}
         finish={finishOnboarding}
@@ -126,7 +198,7 @@ export default function Home() {
           {view === 'projects' && wishlistData && <Projects data={wishlistData} onOpen={() => setView('overview')} notify={notify} />}
           {view === 'widget' && wishlistData && <WidgetPreview data={wishlistData} refreshing={refreshing} onRefresh={refreshData} />}
           {view === 'security' && <Security data={wishlistData} token={token} setToken={setToken} notify={notify} />}
-          {view === 'settings' && <Settings data={wishlistData} milestone={milestone} setMilestone={setMilestone} notify={notify} reset={() => { setScreen('welcome'); setOnboardingStep(1); }} />}
+          {view === 'settings' && <Settings data={wishlistData} milestone={milestone} setMilestone={setMilestone} notify={notify} reset={() => { setScreen('onboarding'); setOnboardingStep(2); setSetupError(''); }} />}
         </div>
       </section>
       {toast && <div className="toast" role="status"><span>✓</span>{toast}</div>}
@@ -169,31 +241,41 @@ function Welcome({ onContinue }: { onContinue: () => void }) {
   );
 }
 
-function Onboarding({ step, data, error, refreshing, retry, next, back, finish }: { step:number; data:WishlistDashboardData|null; error:string; refreshing:boolean; retry:()=>void; next:()=>void; back:()=>void; finish:()=>void }) {
+function Onboarding({ step, data, setup, error, loading, connect, next, back, finish }: { step:number; data:WishlistDashboardData|null; setup:SetupState|null; error:string; loading:boolean; connect:(input:{appId:string;apiKey:string;projectName:string})=>void; next:()=>void; back:()=>void; finish:()=>void }) {
+  const [appId, setAppId] = useState(setup?.workspace.appId ? String(setup.workspace.appId) : '');
+  const [apiKey, setApiKey] = useState('');
+  const [projectName, setProjectName] = useState(setup?.workspace.projectName || '');
+
   return (
     <main className="onboarding-screen">
       <header className="onboarding-header"><div className="brand"><span className="brand-mark">W</span><span>Wishline</span></div><span>Secure local setup</span></header>
       <div className="onboarding-layout">
         <aside className="steps">
-          {[['1','Check connection'],['2','Confirm project'],['3','Finish setup']].map(([n,label],i) => <div className={`step ${step === i+1 ? 'current' : ''} ${step > i+1 ? 'complete' : ''}`} key={n}><span>{step > i+1 ? '✓' : n}</span><div><b>{label}</b><small>{['Verify the server-side source','Review the configured App ID','Open your workspace'][i]}</small></div></div>)}
+          {[['1','Create account'],['2','Connect Steam'],['3','Finish setup']].map(([n,label],i) => <div className={`step ${step === i+1 ? 'current' : ''} ${step > i+1 ? 'complete' : ''}`} key={n}><span>{step > i+1 ? '✓' : n}</span><div><b>{label}</b><small>{['Use your private Wishline identity','Validate and protect your API key','Open your workspace'][i]}</small></div></div>)}
         </aside>
         <section className="setup-card">
           {step === 1 && <>
-            <span className="setup-icon">⌁</span><p className="eyebrow">STEP 1 OF 3</p><h1>Check the data source</h1><p className="setup-lead">Financial credentials are configured only in the local server environment. Wishline never asks for or sends a key through this screen.</p>
-            <div className={`connection-card ${data?.source === 'steam' ? 'connected' : ''}`}><span>{data ? '✓' : error ? '!' : '…'}</span><p><small>SERVER-SIDE SOURCE</small><b>{data?.source === 'steam' ? 'Live Steamworks connection' : data ? 'Anonymous validation fixture' : error ? 'Connection unavailable' : 'Checking configuration…'}</b>{data && <em>App ID {data.appId} · {data.daily.length} records</em>}</p><strong>{data?.source === 'steam' ? 'LIVE' : data ? 'FIXTURE' : 'WAIT'}</strong></div>
-            {error && <div className="inline-error"><b>Could not validate the source.</b><span>{error}</span><button onClick={retry}>{refreshing ? 'Retrying…' : 'Retry connection'}</button></div>}
-            <div className="security-callout"><span>◆</span><p><b>Never paste a Financial API key into the browser.</b><br/>Live mode reads it from an ignored <code>.env.local</code> file and sends requests directly from the server.</p></div>
+            <span className="setup-icon">◎</span><p className="eyebrow">STEP 1 OF 3</p><h1>Create your private workspace</h1><p className="setup-lead">Wishline uses passwordless platform sign-in. Your identity owns one isolated workspace; Wishline does not create or store a password.</p>
+            <div className={`connection-card ${setup ? 'connected' : ''}`}><span>{setup ? '✓' : '◎'}</span><p><small>WISHLINE ACCOUNT</small><b>{setup ? setup.user.name || setup.user.email || 'Authenticated owner' : 'Sign in to continue'}</b><em>{setup ? setup.workspace.workspaceName : 'Local testing uses a stable simulated account'}</em></p><strong>{setup ? 'READY' : 'SIGN IN'}</strong></div>
+            {error && <div className="inline-error"><b>Account required.</b><span>{error}</span></div>}
+            <div className="security-callout"><span>◆</span><p><b>No Wishline password to manage.</b><br/>Local sign-in is simulated; a hosted private Site uses your authenticated platform identity.</p></div>
           </>}
           {step === 2 && <>
-            <span className="setup-icon project-icon">{data?.projectName.charAt(0) || 'W'}</span><p className="eyebrow">STEP 2 OF 3</p><h1>Confirm your project</h1><p className="setup-lead">Wishline will track the single App ID configured for this private MVP workspace.</p>
-            <button className="detected-project selected"><span className="game-cover">{data?.projectName.charAt(0) || 'W'}</span><span><b>{data?.projectName || 'Project unavailable'}</b><small>App ID {data?.appId || '—'} · {data?.releaseState || 'Unknown state'}</small></span><span className="selected-check">✓</span></button>
-            <div className="sync-detail"><span>Intraday checks</span><b>Server cache · manual refresh</b></div>
+            <span className="setup-icon project-icon">S</span><p className="eyebrow">STEP 2 OF 3</p><h1>Connect your Steam project</h1><p className="setup-lead">The browser sends these details once over the private setup request. The server validates the App ID, protects the key, and never returns it.</p>
+            <form className="connection-form" onSubmit={(event)=>{event.preventDefault();connect({appId,apiKey,projectName});}}>
+              <label><span>Steam App ID</span><input inputMode="numeric" autoComplete="off" required value={appId} onChange={(event)=>setAppId(event.target.value.replace(/\D/g,''))} placeholder="1234567" /></label>
+              <label><span>Financial API key</span><input type="password" autoComplete="off" required value={apiKey} onChange={(event)=>setApiKey(event.target.value)} placeholder="Paste your key for this secure connection" /></label>
+              <label><span>Project name <em>optional</em></span><input autoComplete="off" maxLength={120} value={projectName} onChange={(event)=>setProjectName(event.target.value)} placeholder="Detected from Steam Store when available" /></label>
+              {error && <div className="inline-error"><b>Connection failed.</b><span>{error}</span></div>}
+              <button className="primary-button compact setup-submit" disabled={loading || !appId || !apiKey}>{loading ? 'Validating with Steam…' : 'Validate and save securely →'}</button>
+            </form>
+            <div className="security-callout"><span>◆</span><p><b>Your key is never shown again.</b><br/>Wishline keeps it protected on the server and inaccessible to the browser.</p></div>
           </>}
           {step === 3 && <>
-            <span className="setup-icon ready-icon">✓</span><p className="eyebrow">STEP 3 OF 3</p><h1>Ready to track momentum</h1><p className="setup-lead">Your {data?.source === 'steam' ? 'live local connection' : 'anonymous contract fixture'} is configured. Financial credentials remain outside the browser.</p>
-            <div className="review-list"><div><span className="game-tile">{data?.projectName.charAt(0) || 'W'}</span><p><small>TRACKING</small><b>{data?.projectName || 'Configured project'}</b></p><em>{data?.source === 'steam' ? 'Live' : 'Fixture'}</em></div><div><span>↻</span><p><small>SYNC SCHEDULE</small><b>Cached intraday + manual refresh</b></p></div><div><span>◆</span><p><small>CREDENTIAL BOUNDARY</small><b>Server-side only</b></p></div></div>
+            <span className="setup-icon ready-icon">✓</span><p className="eyebrow">STEP 3 OF 3</p><h1>Ready to track momentum</h1><p className="setup-lead">Your authenticated workspace and live Steam connection are ready. The Financial API key remains protected on the server.</p>
+            <div className="review-list"><div><span className="game-tile">{setup?.workspace.projectName?.charAt(0) || 'W'}</span><p><small>TRACKING</small><b>{setup?.workspace.projectName || data?.projectName || 'Configured project'}</b></p><em>Live</em></div><div><span>◎</span><p><small>OWNER</small><b>{setup?.user.email || setup?.user.name || 'Authenticated account'}</b></p></div><div><span>◆</span><p><small>CREDENTIAL PROTECTION</small><b>Server-side only</b></p></div></div>
           </>}
-          <div className="setup-actions"><button className="secondary-button" onClick={back}>← Back</button>{step < 3 ? <button className="primary-button compact" disabled={!data} onClick={next}>Continue →</button> : <button className="primary-button compact" onClick={finish}>Open dashboard →</button>}</div>
+          <div className="setup-actions"><button className="secondary-button" onClick={back}>← Back</button>{step === 1 ? setup ? <button className="primary-button compact" disabled={loading} onClick={next}>Continue →</button> : <a className="primary-button compact" href="/signin-with-chatgpt?return_to=/">Sign in with ChatGPT →</a> : step === 3 ? <button className="primary-button compact" disabled={!setup?.workspace.connected} onClick={finish}>Open dashboard →</button> : null}</div>
         </section>
       </div>
     </main>
@@ -290,11 +372,11 @@ function WidgetPreview({ data, refreshing, onRefresh }: { data:WishlistDashboard
 function Security({ data, token, setToken, notify }: { data:WishlistDashboardData|null; token:string; setToken:(s:string)=>void; notify:(s:string)=>void }) {
   function issue(){ setToken(`wln_demo_${crypto.randomUUID().replaceAll('-','').slice(0,24)}`); }
   function revoke(){ setToken(''); notify('Demo token revoked'); }
-  return <><PageHeading eyebrow="SECURITY CENTER" title="Access without exposing keys" copy="Verify the local credential boundary and simulate companion access." /><div className="security-grid"><article className="panel security-main"><div className="security-hero"><span>◆</span><div><h2>Financial key isolation</h2><p>The current connector reads the key only from the local server environment. The browser receives normalized wishlist aggregates and never receives the credential.</p></div><em>{data?.source === 'steam' ? 'LIVE BOUNDARY' : 'FIXTURE MODE'}</em></div><div className="token-section"><div><p className="panel-title">Demo app token</p><p className="panel-subtitle">Token issuance remains simulated until authentication is added.</p></div>{token ? <><div className="token-value"><code>{token}</code><button onClick={()=>{navigator.clipboard?.writeText(token);notify('Token copied')}}>Copy</button></div><div className="token-actions"><span>Issued just now · Read-only · {data?.projectName || 'configured project'}</span><button className="danger-button" onClick={revoke}>Revoke token</button></div></> : <div className="empty-token"><span>⌁</span><p><b>No active demo token</b><small>Issue one to simulate mobile companion access.</small></p><button className="primary-button compact" onClick={issue}>Issue token</button></div>}</div></article><aside className="panel audit-panel"><p className="panel-title">Connection facts</p><p className="panel-subtitle">Safe local verification</p><div className="audit-list"><div><span className="audit-dot green-dot"/><p><b>Browser API cache disabled</b><small>Private responses are never stored offline</small></p></div><div><span className="audit-dot purple-dot"/><p><b>Credential server-side</b><small>No NEXT_PUBLIC_ exposure</small></p></div><div><span className="audit-dot"/><p><b>Source: {data?.source || 'checking'}</b><small>App ID {data?.appId || '—'}</small></p></div></div></aside></div><div className="security-principles"><div><span>01</span><b>Local acceptance test</b><p>The ignored environment file is suitable only for private testing.</p></div><div><span>02</span><b>Production vault next</b><p>AES-256-GCM and managed key material are still required before deployment.</p></div><div><span>03</span><b>Scoped clients next</b><p>Real revocable tokens require authentication and persistent storage.</p></div></div></>;
+  return <><PageHeading eyebrow="SECURITY CENTER" title="Access without exposing keys" copy="Verify the protected credential boundary and simulate companion access." /><div className="security-grid"><article className="panel security-main"><div className="security-hero"><span>◆</span><div><h2>Financial key isolation</h2><p>The authenticated setup endpoint validates and protects the key before storage. The browser receives normalized wishlist aggregates and never receives the credential again.</p></div><em>{data?.source === 'steam' ? 'LIVE BOUNDARY' : 'FIXTURE MODE'}</em></div><div className="token-section"><div><p className="panel-title">Demo app token</p><p className="panel-subtitle">Companion-token issuance remains simulated; account authentication is active.</p></div>{token ? <><div className="token-value"><code>{token}</code><button onClick={()=>{navigator.clipboard?.writeText(token);notify('Token copied')}}>Copy</button></div><div className="token-actions"><span>Issued just now · Read-only · {data?.projectName || 'configured project'}</span><button className="danger-button" onClick={revoke}>Revoke token</button></div></> : <div className="empty-token"><span>⌁</span><p><b>No active demo token</b><small>Issue one to simulate mobile companion access.</small></p><button className="primary-button compact" onClick={issue}>Issue token</button></div>}</div></article><aside className="panel audit-panel"><p className="panel-title">Connection facts</p><p className="panel-subtitle">Safe local verification</p><div className="audit-list"><div><span className="audit-dot green-dot"/><p><b>Browser API cache disabled</b><small>Private responses are never stored offline</small></p></div><div><span className="audit-dot purple-dot"/><p><b>Protected credential storage</b><small>No plaintext key in storage or client responses</small></p></div><div><span className="audit-dot"/><p><b>Source: {data?.source || 'checking'}</b><small>App ID {data?.appId || '—'}</small></p></div></div></aside></div><div className="security-principles"><div><span>01</span><b>Passwordless owner identity</b><p>Each authenticated user receives an isolated workspace.</p></div><div><span>02</span><b>Protected connection</b><p>The stored credential is available only to the server runtime.</p></div><div><span>03</span><b>Scoped clients next</b><p>Real revocable companion tokens still require a durable token service.</p></div></div></>;
 }
 
 function Settings({ data, milestone, setMilestone, notify, reset }: { data:WishlistDashboardData|null; milestone:string; setMilestone:(s:string)=>void; notify:(s:string)=>void; reset:()=>void }) {
-  return <><PageHeading eyebrow="PREFERENCES" title="Workspace settings" copy={`Configure the local experience for ${data?.projectName || 'the current project'}.`} /><div className="settings-layout"><article className="panel settings-panel"><div className="settings-section"><div><h2>Milestone target</h2><p>Choose the next round-number goal shown on the dashboard.</p></div><select value={milestone} onChange={(e)=>setMilestone(e.target.value)} aria-label="Milestone target"><option value="15000">15,000 wishlists</option><option value="25000">25,000 wishlists</option><option value="50000">50,000 wishlists</option><option value="100000">100,000 wishlists</option></select></div><div className="settings-section"><div><h2>Data source</h2><p>{data?.source === 'steam' ? 'Live server-side Steamworks adapter with a protected key.' : 'Deterministic anonymous data for contract validation.'}</p></div><span className={`demo-badge ${data?.source === 'steam' ? 'live' : ''}`}>{data?.source === 'steam' ? 'LIVE STEAM' : 'FIXTURE'}</span></div><div className="settings-section"><div><h2>Intraday sync</h2><p>Server caching prevents excessive requests; manual refresh is throttled.</p></div><label className="toggle"><input type="checkbox" defaultChecked/><span/></label></div><div className="settings-actions"><button className="primary-button compact" onClick={()=>notify('Settings saved locally')}>Save changes</button></div></article><aside className="panel about-card"><span className="brand-mark">W</span><h2>Wishline MVP</h2><p>Local real-data acceptance build<br/>Version 0.2.0</p><hr/><p>{data?.source === 'steam' ? `Connected to App ID ${data.appId}.` : 'Ready to switch to a real Steamworks project using .env.local.'}</p><button className="danger-text" onClick={reset}>Reset onboarding</button></aside></div></>;
+  return <><PageHeading eyebrow="PREFERENCES" title="Workspace settings" copy={`Configure the local experience for ${data?.projectName || 'the current project'}.`} /><div className="settings-layout"><article className="panel settings-panel"><div className="settings-section"><div><h2>Milestone target</h2><p>Choose the next round-number goal shown on the dashboard.</p></div><select value={milestone} onChange={(e)=>setMilestone(e.target.value)} aria-label="Milestone target"><option value="15000">15,000 wishlists</option><option value="25000">25,000 wishlists</option><option value="50000">50,000 wishlists</option><option value="100000">100,000 wishlists</option></select></div><div className="settings-section"><div><h2>Data source</h2><p>{data?.source === 'steam' ? 'Live server-side Steamworks adapter with a protected key.' : 'Deterministic anonymous data for contract validation.'}</p></div><span className={`demo-badge ${data?.source === 'steam' ? 'live' : ''}`}>{data?.source === 'steam' ? 'LIVE STEAM' : 'FIXTURE'}</span></div><div className="settings-section"><div><h2>Intraday sync</h2><p>Server caching prevents excessive requests; manual refresh is throttled.</p></div><label className="toggle"><input type="checkbox" defaultChecked/><span/></label></div><div className="settings-actions"><button className="primary-button compact" onClick={()=>notify('Settings saved locally')}>Save changes</button></div></article><aside className="panel about-card"><span className="brand-mark">W</span><h2>Wishline MVP</h2><p>Local real-data acceptance build<br/>Version 0.2.0</p><hr/><p>{data?.source === 'steam' ? `Connected to App ID ${data.appId}.` : 'Ready to connect a Steamworks project through onboarding.'}</p><button className="danger-text" onClick={reset}>Update Steam connection</button></aside></div></>;
 }
 
 function averageOf(values: number[]): number {
