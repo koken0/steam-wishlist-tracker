@@ -22,6 +22,15 @@ Wishline is an English-language Phase 1 acceptance build for the Studio Wishlist
 
 The scaffold also includes the Cloudflare Vite plugin, Workers type definitions, Wrangler, and OpenAI Sites configuration. They provide a deployment path, but this delivery is intentionally local and does not require a Cloudflare account. Security-sensitive dependencies are pinned to versions that pass the production dependency audit.
 
+## Project documentation
+
+- [Documentation index](docs/README.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Operations](docs/OPERATIONS.md)
+- [Roadmap](docs/ROADMAP.md)
+- [Security policy](SECURITY.md)
+- [Contributing](CONTRIBUTING.md)
+
 ## Current architecture
 
 ```text
