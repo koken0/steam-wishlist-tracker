@@ -205,30 +205,75 @@ function PageHeading({ eyebrow, title, copy, action }: { eyebrow:string; title:s
 }
 
 function Overview({ data, progress, milestone }: { data:WishlistDashboardData; progress:number; milestone:number }) {
+  const firstDate = data.daily.at(0)?.date || '';
+  const lastDate = data.daily.at(-1)?.date || '';
+  const [fromDate, setFromDate] = useState(firstDate);
+  const [toDate, setToDate] = useState(lastDate);
   const recent = data.daily.slice(-7);
   const previous = data.daily.slice(-14, -7);
   const today = recent.at(-1);
   const average = averageOf(recent.map((day) => day.net));
   const previousAverage = averageOf(previous.map((day) => day.net));
   const pace = previousAverage ? ((average - previousAverage) / previousAverage) * 100 : 0;
-  const chartMax = Math.max(1, ...recent.map((day) => day.net), ...previous.map((day) => day.net));
   const toGo = data.currentWishlists == null ? null : Math.max(0, milestone - data.currentWishlists);
   const estimatedDays = average > 0 && toGo != null ? Math.ceil(toGo / average) : null;
 
+  const history = useMemo(() => {
+    let runningTotal = data.currentWishlists;
+    const totals = new Map<string, number>();
+    for (let index = data.daily.length - 1; index >= 0; index--) {
+      const day = data.daily[index];
+      if (runningTotal != null) {
+        totals.set(day.date, runningTotal);
+        runningTotal -= day.net;
+      }
+    }
+    return data.daily.map((day) => ({ ...day, total: totals.get(day.date) ?? null }));
+  }, [data]);
+
+  const selected = history.filter((day) => (!fromDate || day.date >= fromDate) && (!toDate || day.date <= toDate));
+  const selectedNet = selected.reduce((sum, day) => sum + day.net, 0);
+  const selectedAdds = selected.reduce((sum, day) => sum + day.adds, 0);
+  const selectedDeletes = selected.reduce((sum, day) => sum + day.deletes, 0);
+
   return <>
-    <PageHeading eyebrow={formatHeadingDate(today?.date)} title="Your wishlists are moving." copy={`${data.projectName}'s latest Steam-generated data is ${Math.abs(pace).toFixed(0)}% ${pace >= 0 ? 'above' : 'below'} the previous weekly pace.`} action={<button className="period">Last {data.daily.length} days <span>⌄</span></button>} />
+    <PageHeading eyebrow={formatHeadingDate(today?.date)} title="Your wishlists are moving." copy={`${data.projectName}'s latest Steam-generated data is ${Math.abs(pace).toFixed(0)}% ${pace >= 0 ? 'above' : 'below'} the previous weekly pace.`} />
     <div className="source-strip"><span className={data.source === 'steam' ? 'live' : ''}>{data.source === 'steam' ? '● LIVE STEAMWORKS' : '◇ ANONYMOUS FIXTURE'}</span><p>Steam generated {formatTimestamp(data.generatedAt)} · Server fetched {formatTimestamp(data.fetchedAt)}{data.cacheHit ? ' · cached response' : ''}</p></div>
     <div className="stat-grid">
       <article className="stat-card hero-stat"><p>Current wishlist snapshot <span className="info">i</span></p><strong>{formatCount(data.currentWishlists)}</strong><div className="delta positive">↗ {formatCount(today?.adds ?? 0)} <span>latest adds</span></div><div className="ghost-ring">{compactCount(data.currentWishlists)}</div></article>
       <article className="stat-card"><p>Latest net movement</p><strong>{signedCount(today?.net ?? 0)}</strong><div className="metric-row"><span><i className="add" />{formatCount(today?.adds ?? 0)} adds</span><span><i className="delete" />{formatCount(today?.deletes ?? 0)} deletes</span></div></article>
       <article className="stat-card"><p>7-day net average</p><strong>{formatCount(Math.round(average))}</strong><div className={`delta ${pace >= 0 ? 'positive' : 'negative'}`}>{pace >= 0 ? '↗' : '↘'} {Math.abs(pace).toFixed(1)}% <span>vs previous week</span></div></article>
     </div>
+    <article className="panel range-panel">
+      <div className="range-head"><div><p className="panel-title">Histórico entre fechas</p><p className="panel-subtitle">Movimiento neto diario y evolución estimada del total</p></div><div className="date-range"><label>Desde<input type="date" min={firstDate} max={toDate || lastDate} value={fromDate} onChange={(event)=>setFromDate(event.target.value)} /></label><span>→</span><label>Hasta<input type="date" min={fromDate || firstDate} max={lastDate} value={toDate} onChange={(event)=>setToDate(event.target.value)} /></label></div></div>
+      {selected.length ? <><div className="range-summary"><div><small>PERÍODO</small><b>{selected.length} {selected.length === 1 ? 'día' : 'días'}</b></div><div><small>ALTAS</small><b className="green">+{formatCount(selectedAdds)}</b></div><div><small>BAJAS</small><b>-{formatCount(selectedDeletes)}</b></div><div><small>CRECIMIENTO NETO</small><b className={selectedNet >= 0 ? 'green' : ''}>{signedCount(selectedNet)}</b></div></div><WishlistRangeChart days={selected} /></> : <div className="empty-range">No hay registros en este rango. Elegí fechas dentro del histórico disponible.</div>}
+    </article>
     <div className="dashboard-grid">
-      <article className="panel trend-panel"><div className="panel-head"><div><p className="panel-title">Wishlist momentum</p><p className="panel-subtitle">Adds minus deletes per reported date</p></div><div className="legend"><span><i className="legend-now" />Recent</span><span><i className="legend-before" />Previous</span></div></div><div className="chart-wrap"><div className="y-labels"><span>{chartMax}</span><span>{Math.round(chartMax*.66)}</span><span>{Math.round(chartMax*.33)}</span><span>0</span></div><div className="chart"><div className="grid-line one"/><div className="grid-line two"/><div className="grid-line three"/><div className="grid-line four"/><div className="bars">{recent.map((day,index)=><div className="bar-pair" key={day.date}><span className="bar previous" style={{height:`${Math.max(4,((previous[index]?.net || 0)/chartMax)*100)}%`}}/><span className="bar current" style={{height:`${Math.max(4,(day.net/chartMax)*100)}%`}}/><small>{formatDay(day.date)}</small></div>)}</div></div></div></article>
+      <article className="panel trend-panel"><div className="panel-head"><div><p className="panel-title">Últimos 7 días</p><p className="panel-subtitle">Altas, bajas y neto reportado por Steam</p></div><div className="legend"><span><i className="legend-now" />Neto</span></div></div><div className="daily-table">{recent.slice().reverse().map(day=><div key={day.date}><time>{formatShortDate(day.date)}</time><span className="daily-adds">+{formatCount(day.adds)}</span><span className="daily-deletes">-{formatCount(day.deletes)}</span><b>{signedCount(day.net)}</b></div>)}</div></article>
       <article className="panel milestone-panel"><div className="panel-head"><div><p className="panel-title">Next milestone</p><p className="panel-subtitle">Based on the configured snapshot</p></div><span className="spark">✦</span></div><div className="milestone-number"><strong>{compactCount(milestone)}</strong><span>{toGo == null ? 'Add total snapshot in .env.local' : `${formatCount(toGo)} to go`}</span></div><div className="progress"><span style={{width:`${progress}%`}} /></div><p className="prediction"><b>{estimatedDays ? `Estimated in ${estimatedDays} days` : 'Estimate unavailable'}</b><br/>{data.currentWishlistsAsOf ? `Snapshot captured ${formatTimestamp(data.currentWishlistsAsOf)}` : 'Set STEAM_CURRENT_WISHLIST_TOTAL for live mode'}</p></article>
     </div>
     <div className="activity-row"><article className="panel compact-panel"><div className="panel-head"><div><p className="panel-title">Latest Steam record</p><p className="panel-subtitle">All values come from the normalized response</p></div></div><div className="activity-list"><div><span className="activity-icon purple">↗</span><p><b>{formatCount(today?.adds ?? 0)} wishlist additions</b><small>{formatCount(today?.addsWindows ?? 0)} Windows · {formatCount(today?.addsMac ?? 0)} Mac · {formatCount(today?.addsLinux ?? 0)} Linux</small></p><time>{today?.date}</time></div><div><span className="activity-icon lime">✓</span><p><b>{formatCount(today?.purchases ?? 0)} purchases · {formatCount(today?.gifts ?? 0)} gifts</b><small>{formatCount(today?.deletes ?? 0)} wishlist deletions</small></p><time>{formatRelativeTime(today?.generatedAt)}</time></div></div></article><article className="panel compact-panel health"><p className="panel-title">Data health</p><div className="health-status"><span>✓</span><p><b>{data.source === 'steam' ? 'Steam connector is responding' : 'Contract fixture is valid'}</b><small>Browser API caching is disabled</small></p></div><dl><div><dt>Source</dt><dd>{data.source === 'steam' ? 'Steamworks partner API' : 'Anonymous fixture'}</dd></div><div><dt>Records</dt><dd>{data.daily.length} normalized days</dd></div></dl></article></div>
   </>;
+}
+
+function WishlistRangeChart({ days }: { days: Array<WishlistDashboardData['daily'][number] & { total:number|null }> }) {
+  const width = 900;
+  const height = 250;
+  const padding = 28;
+  const values = days.map((day) => day.total ?? day.net);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = Math.max(1, max - min);
+  const points = days.map((day, index) => {
+    const x = days.length === 1 ? width / 2 : padding + index * ((width - padding * 2) / (days.length - 1));
+    const y = height - padding - (((day.total ?? day.net) - min) / span) * (height - padding * 2);
+    return { ...day, x, y };
+  });
+  const path = points.map((point, index) => `${index ? 'L' : 'M'} ${point.x} ${point.y}`).join(' ');
+  const area = `${path} L ${points.at(-1)?.x} ${height-padding} L ${points[0]?.x} ${height-padding} Z`;
+  const labelEvery = Math.max(1, Math.ceil(days.length / 6));
+
+  return <div className="history-chart"><div className="history-scale"><span>{formatCount(max)}</span><span>{formatCount(min)}</span></div><svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Evolución de wishlists en el período seleccionado"><defs><linearGradient id="historyFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#6755e7" stopOpacity=".28"/><stop offset="1" stopColor="#6755e7" stopOpacity=".02"/></linearGradient></defs><line x1={padding} y1={padding} x2={width-padding} y2={padding}/><line x1={padding} y1={height/2} x2={width-padding} y2={height/2}/><line x1={padding} y1={height-padding} x2={width-padding} y2={height-padding}/><path className="history-area" d={area}/><path className="history-line" d={path}/>{points.map((point)=><circle key={point.date} cx={point.x} cy={point.y} r="4"><title>{formatShortDate(point.date)} · {formatCount(point.total)} total · {signedCount(point.net)} neto</title></circle>)}</svg><div className="history-dates">{points.map((point,index)=><span key={point.date} style={{left:`${(point.x/width)*100}%`}}>{index % labelEvery === 0 || index === points.length-1 ? formatChartDate(point.date) : ''}</span>)}</div><p className="chart-note">La línea de total es una reconstrucción desde el snapshot actual usando el neto diario de Steam. Pasá el cursor por cada punto para ver el detalle.</p></div>;
 }
 
 function Projects({ data, onOpen, notify }: { data:WishlistDashboardData; onOpen:()=>void; notify:(s:string)=>void }) {
@@ -294,4 +339,12 @@ function formatHeadingDate(value: string | undefined): string {
 function formatDay(value: string | undefined): string {
   if (!value) return '—';
   return new Date(`${value}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'short' });
+}
+
+function formatShortDate(value: string): string {
+  return new Date(`${value}T12:00:00Z`).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function formatChartDate(value: string): string {
+  return new Date(`${value}T12:00:00Z`).toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
 }
