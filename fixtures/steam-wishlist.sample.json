@@ -1,0 +1,25 @@
+{
+  "project": {
+    "appId": 2847190,
+    "name": "Starfall Harbor",
+    "releaseState": "Pre-release",
+    "currentWishlistTotal": 12847,
+    "currentWishlistTotalAsOf": "2026-08-27T21:00:00Z"
+  },
+  "records": [
+    { "response": { "appid": 2847190, "date": "2026-08-14", "wishlist_summary": { "wishlist_adds": 151, "wishlist_deletes": 17, "wishlist_purchases": 0, "wishlist_gifts": 0, "wishlist_adds_windows": 121, "wishlist_adds_mac": 18, "wishlist_adds_linux": 12 }, "time_generated": 1786744800 } },
+    { "response": { "appid": 2847190, "date": "2026-08-15", "wishlist_summary": { "wishlist_adds": 162, "wishlist_deletes": 18, "wishlist_purchases": 0, "wishlist_gifts": 0, "wishlist_adds_windows": 130, "wishlist_adds_mac": 19, "wishlist_adds_linux": 13 }, "time_generated": 1786831200 } },
+    { "response": { "appid": 2847190, "date": "2026-08-16", "wishlist_summary": { "wishlist_adds": 170, "wishlist_deletes": 19, "wishlist_purchases": 0, "wishlist_gifts": 0, "wishlist_adds_windows": 137, "wishlist_adds_mac": 20, "wishlist_adds_linux": 13 }, "time_generated": 1786917600 } },
+    { "response": { "appid": 2847190, "date": "2026-08-17", "wishlist_summary": { "wishlist_adds": 188, "wishlist_deletes": 20, "wishlist_purchases": 0, "wishlist_gifts": 0, "wishlist_adds_windows": 152, "wishlist_adds_mac": 22, "wishlist_adds_linux": 14 }, "time_generated": 1787004000 } },
+    { "response": { "appid": 2847190, "date": "2026-08-18", "wishlist_summary": { "wishlist_adds": 179, "wishlist_deletes": 21, "wishlist_purchases": 0, "wishlist_gifts": 0, "wishlist_adds_windows": 144, "wishlist_adds_mac": 21, "wishlist_adds_linux": 14 }, "time_generated": 1787090400 } },
+    { "response": { "appid": 2847190, "date": "2026-08-19", "wishlist_summary": { "wishlist_adds": 205, "wishlist_deletes": 20, "wishlist_purchases": 0, "wishlist_gifts": 0, "wishlist_adds_windows": 166, "wishlist_adds_mac": 23, "wishlist_adds_linux": 16 }, "time_generated": 1787176800 } },
+    { "response": { "appid": 2847190, "date": "2026-08-20", "wishlist_summary": { "wishlist_adds": 217, "wishlist_deletes": 22, "wishlist_purchases": 0, "wishlist_gifts": 0, "wishlist_adds_windows": 175, "wishlist_adds_mac": 25, "wishlist_adds_linux": 17 }, "time_generated": 1787263200 } },
+    { "response": { "appid": 2847190, "date": "2026-08-21", "wishlist_summary": { "wishlist_adds": 200, "wishlist_deletes": 20, "wishlist_purchases": 0, "wishlist_gifts": 0, "wishlist_adds_windows": 161, "wishlist_adds_mac": 23, "wishlist_adds_linux": 16 }, "time_generated": 1787349600 } },
+    { "response": { "appid": 2847190, "date": "2026-08-22", "wishlist_summary": { "wishlist_adds": 230, "wishlist_deletes": 24, "wishlist_purchases": 0, "wishlist_gifts": 0, "wishlist_adds_windows": 186, "wishlist_adds_mac": 27, "wishlist_adds_linux": 17 }, "time_generated": 1787436000 } },
+    { "response": { "appid": 2847190, "date": "2026-08-23", "wishlist_summary": { "wishlist_adds": 221, "wishlist_deletes": 21, "wishlist_purchases": 0, "wishlist_gifts": 0, "wishlist_adds_windows": 178, "wishlist_adds_mac": 26, "wishlist_adds_linux": 17 }, "time_generated": 1787522400 } },
+    { "response": { "appid": 2847190, "date": "2026-08-24", "wishlist_summary": { "wishlist_adds": 248, "wishlist_deletes": 22, "wishlist_purchases": 0, "wishlist_gifts": 0, "wishlist_adds_windows": 201, "wishlist_adds_mac": 28, "wishlist_adds_linux": 19 }, "time_generated": 1787608800 } },
+    { "response": { "appid": 2847190, "date": "2026-08-25", "wishlist_summary": { "wishlist_adds": 239, "wishlist_deletes": 23, "wishlist_purchases": 0, "wishlist_gifts": 0, "wishlist_adds_windows": 193, "wishlist_adds_mac": 28, "wishlist_adds_linux": 18 }, "time_generated": 1787695200 } },
+    { "response": { "appid": 2847190, "date": "2026-08-26", "wishlist_summary": { "wishlist_adds": 267, "wishlist_deletes": 21, "wishlist_purchases": 0, "wishlist_gifts": 0, "wishlist_adds_windows": 216, "wishlist_adds_mac": 31, "wishlist_adds_linux": 20 }, "time_generated": 1787781600 } },
+    { "response": { "appid": 2847190, "date": "2026-08-27", "wishlist_summary": { "wishlist_adds": 284, "wishlist_deletes": 23, "wishlist_purchases": 0, "wishlist_gifts": 0, "wishlist_adds_windows": 230, "wishlist_adds_mac": 32, "wishlist_adds_linux": 22 }, "time_generated": 1787864400 } }
+  ]
+}
