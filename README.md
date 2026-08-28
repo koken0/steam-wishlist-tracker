@@ -6,9 +6,9 @@ Wishline is a local, English-language Phase 1 acceptance build for the Studio Wi
 
 | Layer | Technology | Purpose |
 | --- | --- | --- |
-| Application framework | Next.js 16.2.6 | App Router structure, metadata, and React application shell |
+| Application framework | Next.js 16.3.3 | App Router structure, metadata, and React application shell |
 | Server connector | Next.js Route Handler | Normalizes Steamworks responses without exposing the Financial API key |
-| UI runtime | React 19.2.6 | Interactive onboarding, navigation, settings, refresh, and token flows |
+| UI runtime | React 19.2.8 | Interactive onboarding, navigation, settings, refresh, and token flows |
 | Language | TypeScript 5.9.3 | Typed application source and build-time checks |
 | Styling | Tailwind CSS 4.2.1 + project CSS | Responsive layout, design system, charts, and mobile presentation |
 | Development/build | Vinext 1.0 beta + Vite 8 | Local development server and production bundle |
@@ -17,14 +17,15 @@ Wishline is a local, English-language Phase 1 acceptance build for the Studio Wi
 | Runtime target | Node.js 22.13 or newer | Local development and build runtime |
 | Package manager | npm | Dependency and script management |
 
-The scaffold also includes the Cloudflare Vite plugin, Workers type definitions, Wrangler, and OpenAI Sites configuration. They provide a deployment path, but this delivery is intentionally local and does not require a Cloudflare account.
+The scaffold also includes the Cloudflare Vite plugin, Workers type definitions, Wrangler, and OpenAI Sites configuration. They provide a deployment path, but this delivery is intentionally local and does not require a Cloudflare account. Security-sensitive dependencies are pinned to versions that pass the production dependency audit.
 
 ## Current architecture
 
 ```text
 Browser / installed PWA
         |
-        +-- GET /api/wishlist (never cached by the PWA)
+        +-- GET /api/wishlist (read, never cached by the PWA)
+        +-- POST /api/wishlist (authenticated manual refresh)
                      |
                      +-- fixture mode
                      |     +-- anonymous response contract
@@ -40,7 +41,7 @@ Browser / installed PWA
         |     +-- offline fallback
 ```
 
-The server connector and live Steamworks path are implemented. There is not yet a database, external authentication, Redis cache, Stripe integration, scheduled worker, production secrets vault, or real app-token service.
+The server connector and live Steamworks path are implemented. Live data is loopback-only during local development and requires a platform-authenticated, allowlisted user in production. There is not yet a database, Redis cache, Stripe integration, scheduled worker, production secrets vault, or real app-token service.
 
 ## Project structure
 
@@ -76,6 +77,8 @@ npm run dev
 ```
 
 Open `http://localhost:3000`.
+
+The development server binds to `127.0.0.1` so live financial data is not exposed to other devices on the local network.
 
 Other useful commands:
 
@@ -123,7 +126,9 @@ STEAM_CURRENT_WISHLIST_TOTAL_AS_OF=2026-08-27T21:00:00Z
 
 4. Restart `npm run dev`, complete the connection check, and compare the generated timestamp and latest daily metrics with Steamworks.
 
-The key is sent to Steamworks in the `x-webapi-key` request header, never in the URL. Browser responses contain only the configured App ID, project label, timestamps, and normalized aggregate metrics. Manual refreshes cannot bypass the server more than once per minute, and normal responses use the configured server cache.
+For any hosted live environment, configure `WISHLIST_ALLOWED_USER_IDS` with the stable IDs of the authenticated owners who may access the dashboard, keep the Site private, and IP-allowlist the server address in the Steamworks Financial API Group. The live API fails closed in production when the user allowlist is absent.
+
+The key is sent to Steamworks in the `x-webapi-key` request header, never in the URL. Browser responses contain only the configured App ID, project label, timestamps, and normalized aggregate metrics. Manual refreshes use an authenticated POST action, cannot bypass the server more than once per minute, and normal responses use the configured server cache.
 
 ## Capture a sanitized real response
 
@@ -150,7 +155,7 @@ To capture another number of days, set `STEAM_CAPTURE_DAYS` in `.env.local` betw
 ## What remains simulated
 
 - Read-only app token issuance and revocation
-- User authentication and workspace ownership
+- Durable user/workspace records beyond the production allowlist
 - Durable scheduled polling and last-known-good storage
 - Production encryption and key-vault management
 - Push notifications and native Android widget delivery

@@ -17,7 +17,11 @@ const nav: { id: View; label: string; icon: string }[] = [
 ];
 
 async function fetchWishlistDashboard(force = false): Promise<WishlistDashboardData> {
-  const response = await fetch(`/api/wishlist${force ? '?refresh=1' : ''}`, { cache: 'no-store' });
+  const response = await fetch('/api/wishlist', {
+    method: force ? 'POST' : 'GET',
+    cache: 'no-store',
+    headers: force ? { 'X-Wishline-Action': 'refresh' } : undefined,
+  });
   const payload = await response.json() as WishlistDashboardData | { error?: { message?: string } };
   if (!response.ok || 'error' in payload) {
     throw new Error('error' in payload ? payload.error?.message || 'Wishlist data could not be loaded.' : 'Wishlist data could not be loaded.');
