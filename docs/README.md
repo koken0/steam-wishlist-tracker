@@ -9,6 +9,9 @@ This directory contains the durable project documentation. Keep the root
   implementation constraints.
 - [Operations](OPERATIONS.md): local operation, hosted-environment checklist,
   secret rotation, and troubleshooting.
+- [Steamworks compliance and monetization](STEAM-COMPLIANCE.md): durable legal
+  and API-policy research, commercial launch gate, and safer integration
+  alternatives. Read this before changing Steam access, hosting, or billing.
 - [Roadmap](ROADMAP.md): prioritized work, acceptance criteria, and deferred
   scope.
 - [Security policy](../SECURITY.md): credential rules, threat boundaries, and
@@ -25,6 +28,7 @@ Update documentation in the same change that alters its subject:
 | Runtime, route, persistence, or data-flow change | `ARCHITECTURE.md` |
 | Environment variable, deployment, or recovery change | `OPERATIONS.md` and `.env.example` |
 | Security boundary or credential-handling change | `SECURITY.md` |
+| Steam API, Steam data, branding, hosting, or monetization change | `STEAM-COMPLIANCE.md` |
 | Scope, priority, or milestone change | `ROADMAP.md` |
 | Developer workflow or required check change | `CONTRIBUTING.md` |
 

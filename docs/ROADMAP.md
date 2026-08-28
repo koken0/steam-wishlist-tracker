@@ -19,6 +19,17 @@ criteria are verified.
 
 ## Now: production-ready hosted pilot
 
+### 0. Resolve the Steamworks commercial integration gate
+
+Acceptance criteria:
+
+- Valve confirms in writing whether a paid hosted B2B service may receive,
+  store, and use customer Financial Web API keys for wishlist reporting.
+- The non-sensitive decision is recorded in `docs/STEAM-COMPLIANCE.md`.
+- If hosted key custody is not approved, the pilot uses a customer-hosted/local
+  connector or CSV import instead.
+- Billing remains disabled until the complete compliance launch gate is met.
+
 ### 1. Deploy a private staging environment
 
 Acceptance criteria:
@@ -76,7 +87,7 @@ Acceptance criteria:
 
 ## Explicitly deferred
 
-- Stripe and billing
+- Stripe and billing, blocked on the Steamworks commercial integration gate
 - Public sharing
 - Steamworks write operations
 - Broad financial or store-performance analytics

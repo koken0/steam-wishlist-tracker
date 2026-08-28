@@ -27,6 +27,7 @@ The scaffold also includes the Cloudflare Vite plugin, Workers type definitions,
 - [Documentation index](docs/README.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Operations](docs/OPERATIONS.md)
+- [Steamworks compliance and monetization](docs/STEAM-COMPLIANCE.md)
 - [Roadmap](docs/ROADMAP.md)
 - [Security policy](SECURITY.md)
 - [Contributing](CONTRIBUTING.md)
@@ -60,6 +61,11 @@ Browser / installed PWA
 ```
 
 The server connector, passwordless identity, D1 workspace, and encrypted live Steamworks connection are implemented. Legacy environment-driven live mode remains loopback-only during local development and requires an allowlisted user in production. There is not yet a durable polling cache, Stripe integration, scheduled worker, managed encryption-key rotation, or real app-token service.
+
+> **Commercial launch gate:** do not enable billing or accept customer Financial
+> Web API keys in paid production until Valve has confirmed the hosted SaaS
+> model in writing and the requirements in
+> [Steamworks compliance and monetization](docs/STEAM-COMPLIANCE.md) are met.
 
 ## Project structure
 

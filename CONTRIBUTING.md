@@ -39,6 +39,8 @@ available and the change affects authentication, storage, or the connector.
 - Schema changes include an inspected migration.
 - Error responses do not expose secrets or raw upstream payloads.
 - Workspace-scoped data cannot cross account boundaries.
+- Changes involving Steam access, hosting, data use, branding, or billing follow
+  the decision and maintenance rules in `docs/STEAM-COMPLIANCE.md`.
 - Relevant documentation and roadmap status are updated.
 - Manual verification uses sanitized data and records no credentials.
 
