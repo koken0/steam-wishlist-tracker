@@ -10,7 +10,7 @@ Wishline is an English-language Phase 1 acceptance build for the Studio Wishlist
 | Server connector | Next.js Route Handler | Normalizes Steamworks responses without exposing the Financial API key |
 | UI runtime | React 19.2.8 | Interactive onboarding, navigation, settings, refresh, and token flows |
 | Identity | Sites / Sign in with ChatGPT | Passwordless owner identity locally and when hosted |
-| Persistence | Cloudflare D1 | Durable owner workspace and encrypted Steam connection metadata |
+| Persistence | Cloudflare D1 | Durable owner workspace, encrypted Steam connection, and normalized daily wishlist history |
 | Secret protection | Web Crypto AES-256-GCM | API keys are encrypted before D1 storage and never returned to clients |
 | Language | TypeScript 5.9.3 | Typed application source and build-time checks |
 | Styling | Tailwind CSS 4.2.1 + project CSS | Responsive layout, design system, charts, and mobile presentation |
@@ -60,7 +60,7 @@ Browser / installed PWA
         |     +-- offline fallback
 ```
 
-The server connector, passwordless identity, D1 workspace, and encrypted live Steamworks connection are implemented. Legacy environment-driven live mode remains loopback-only during local development and requires an allowlisted user in production. There is not yet a durable polling cache, Stripe integration, scheduled worker, managed encryption-key rotation, or real app-token service.
+The server connector, passwordless identity, D1 workspace, encrypted live Steamworks connection, durable daily history, stored-total reconstruction, freshness states, and last-known-good fallback are implemented. Legacy environment-driven live mode remains loopback-only during local development and requires an allowlisted user in production. There is not yet a scheduled worker, Stripe integration, managed encryption-key rotation, or real app-token service.
 
 > **Commercial launch gate:** do not enable billing or accept customer Financial
 > Web API keys in paid production until Valve has confirmed the hosted SaaS
@@ -81,6 +81,7 @@ lib/
   wishlist-server.ts    Fixture/live adapter, Steam client, and server cache
   wishline-auth.ts      Platform identity extraction
   wishline-store.ts     D1 workspace and connection persistence
+  wishlist-history-store.ts  D1 daily wishlist history
   secret-crypto.ts      AES-256-GCM secret envelope
 db/
   schema.ts             Durable data model reference
@@ -121,6 +122,7 @@ npm run build   # Create a production bundle
 npm run lint    # Run static code-quality checks
 npm run start   # Serve a completed production build
 npm run test:fixture  # Validate the anonymous Steam response contract
+npm run test:contract # Validate totals, normalization, and freshness boundaries
 ```
 
 ## Validate with the anonymous fixture
@@ -161,13 +163,6 @@ STEAM_LOOKBACK_DAYS=30
 STEAM_CACHE_SECONDS=1800
 ```
 
-Optionally provide the current wishlist snapshot shown in Steamworks. The wishlist reporting API exposes activity by date, not an authoritative current-balance field:
-
-```dotenv
-STEAM_CURRENT_WISHLIST_TOTAL=12847
-STEAM_CURRENT_WISHLIST_TOTAL_AS_OF=2026-08-27T21:00:00Z
-```
-
 Restart `npm run dev` after changing environment values.
 
 For a hosted environment, keep the Site private, configure `WISHLIST_ENCRYPTION_KEY` as a server secret, and IP-allowlist the deployed server address in the Steamworks Financial API Group. `WISHLIST_ALLOWED_USER_IDS` is still required only when using the legacy environment-driven Steam connection instead of an authenticated D1 workspace.
@@ -199,7 +194,7 @@ To capture another number of days, set `STEAM_CAPTURE_DAYS` in `.env.local` betw
 ## What remains simulated
 
 - Read-only app token issuance and revocation
-- Durable scheduled polling and last-known-good storage
+- Durable scheduled polling (manual refresh already persists last-known-good history)
 - Managed production rotation for the server-side encryption key
 - Push notifications and native Android widget delivery
 
@@ -207,4 +202,4 @@ The generated demo app token remains only in browser memory. The project has no 
 
 ## Production seams
 
-The UI is organized around the production boundaries described by the PRD: passwordless platform identity, a durable owner workspace in D1, AES-256-GCM credential storage, a per-App-ID poller/cache, scoped client tokens, and a reader-only mobile experience. A managed encryption-key rotation policy, durable scheduler/cache, and native Android widget remain production follow-up work.
+The UI is organized around the production boundaries described by the PRD: passwordless platform identity, a durable owner workspace and per-date history in D1, AES-256-GCM credential storage, a per-App-ID response cache, scoped client tokens, and a reader-only mobile experience. A managed encryption-key rotation policy, scheduled poller, and native Android widget remain production follow-up work.

@@ -2,6 +2,7 @@ import { env } from 'cloudflare:workers';
 import { decryptSecret, encryptSecret } from '@/lib/secret-crypto';
 import type { WishlineUser } from '@/lib/wishline-auth';
 import { WishlistConnectorError } from '@/lib/wishlist-server';
+import { workspaceIdForUser } from '@/lib/wishline-workspace-id';
 
 export type StoredSteamConnection = {
   workspaceId: string;
@@ -81,7 +82,7 @@ export async function saveSteamConnection(
 async function getOrCreateWorkspace(user: WishlineUser): Promise<WorkspaceRow> {
   const db = await database();
   const now = new Date().toISOString();
-  const workspaceId = `ws_${await stableId(user.id)}`;
+  const workspaceId = await workspaceIdForUser(user.id);
   const ownerLabel = user.name || user.email?.split('@')[0] || 'Owner';
 
   await db.prepare(
@@ -139,9 +140,4 @@ async function initializeSchema(db: D1Database): Promise<void> {
     db.prepare('CREATE INDEX IF NOT EXISTS idx_steam_connections_app_id ON steam_connections(app_id)'),
   ]);
   await db.prepare('PRAGMA optimize').run();
-}
-
-async function stableId(value: string): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
-  return Array.from(new Uint8Array(digest).slice(0, 12), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }

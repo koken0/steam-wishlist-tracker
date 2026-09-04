@@ -5,6 +5,12 @@ This directory contains the durable project documentation. Keep the root
 
 ## Documents
 
+- [Product requirements - Version 0.2 Vision Draft](PRD-V0.2.md): current
+  requirements baseline for the local PWA prototype, definitive data rules,
+  acceptance criteria, and later-phase boundaries.
+- [MVP acceptance audit](MVP-ACCEPTANCE-AUDIT.md): evidence-based comparison of
+  the current prototype with the PRD v0.2 acceptance criteria and prioritized
+  closure backlog.
 - [Architecture](ARCHITECTURE.md): system boundaries, data flow, storage, and
   implementation constraints.
 - [Operations](OPERATIONS.md): local operation, hosted-environment checklist,

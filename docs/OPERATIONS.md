@@ -29,6 +29,7 @@ Run before merging a change:
 ```bash
 npm run lint
 npx tsc --noEmit
+npm run test:contract
 npm run test:fixture
 npm run build
 ```
@@ -64,6 +65,8 @@ Before the first hosted real-data test:
 - Configure `WISHLIST_ENCRYPTION_KEY` as a server secret, never as a public
   build variable.
 - Apply and inspect the D1 migration.
+- Confirm both `0000_wishline_accounts.sql` and
+  `0001_wishlist_history.sql` have been applied in order.
 - Confirm the deployed egress IP can be allowlisted in Steamworks, or document
   why the Steam account does not use an IP restriction.
 - Connect a non-critical test App ID first.
@@ -98,6 +101,8 @@ and source control during the migration.
 | App ID mismatch | Confirm the key is authorized for the exact configured App ID |
 | No wishlist records | Try a valid recent date range and confirm the app has reporting data |
 | Refresh returns cached data | Wait for the one-minute refresh safety window |
+| Dashboard says `Showing last stored data` | Steam refresh failed; inspect the safe error and freshness while preserving the stored history |
+| Stored total looks lower than Steamworks | Check the displayed coverage start; Wishline does not infer activity before its first stored date |
 | Local workspace disappeared | Confirm the project-local `.wrangler/` state still exists |
 
 ## Incident rule

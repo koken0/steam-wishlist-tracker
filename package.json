@@ -12,6 +12,7 @@
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "setup:local": "node scripts/ensure-local-encryption-key.mjs",
     "test:fixture": "node scripts/validate-fixture.mjs",
+    "test:contract": "node --experimental-strip-types --test lib/*.test.ts",
     "test:onboarding": "node --env-file-if-exists=.env.local scripts/verify-local-onboarding.mjs",
     "steam:capture": "node --env-file-if-exists=.env.local scripts/capture-steam-wishlist.mjs"
   },

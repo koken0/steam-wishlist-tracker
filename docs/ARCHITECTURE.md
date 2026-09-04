@@ -18,7 +18,8 @@ Browser / installed PWA
   `-- GET/POST /api/wishlist --> workspace lookup
                                   |-- server-only Steam request
                                   |-- response validation/normalization
-                                  `-- workspace-scoped in-memory cache
+                                  |-- durable per-date D1 snapshots
+                                  `-- workspace-scoped in-memory response cache
 ```
 
 The browser receives aggregate wishlist activity, project metadata, and
@@ -33,6 +34,7 @@ timestamps. It never receives the saved Financial API key.
 | `app/api/wishlist/route.ts` | Private normalized dashboard endpoint and refresh action |
 | `lib/wishline-auth.ts` | Reads the platform-provided authenticated identity |
 | `lib/wishline-store.ts` | Creates owner workspaces and reads/writes Steam connections in D1 |
+| `lib/wishlist-history-store.ts` | Upserts normalized daily snapshots and reads durable project history |
 | `lib/secret-crypto.ts` | Protects and restores credentials within the server runtime |
 | `lib/wishlist-server.ts` | Steam client, fixture adapter, metadata lookup, throttling, and cache |
 | `lib/wishlist-contract.ts` | Shared response types, App ID validation, and normalization |
@@ -41,8 +43,11 @@ timestamps. It never receives the saved Financial API key.
 
 `workspaces` owns the stable relationship between one platform user and one
 Wishline workspace. `steam_connections` stores one Steam App ID and connection
-per workspace. The committed schema reference is in `db/schema.ts`; the hosted
-D1 migration is in `drizzle/0000_wishline_accounts.sql`.
+per workspace. `wishlist_daily_snapshots` stores one normalized row per
+workspace, App ID, and Steam reporting date. A repeated date is updated, so
+late Steam corrections recalculate the stored history. The committed schema
+reference is in `db/schema.ts`; forward-only D1 migrations are under
+`drizzle/`.
 
 The Financial API key is never stored as plaintext in D1. The server requires
 `WISHLIST_ENCRYPTION_KEY` to read or update a saved connection.
@@ -66,18 +71,22 @@ Wishline calls the fixed Steamworks partner endpoint with the key in the
 range. Responses are rejected when Steam returns an unexpected App ID.
 
 Steam wishlist reporting provides dated activity, not a guaranteed current
-all-time wishlist balance. Current totals therefore remain optional metadata
-until Wishline gains a durable snapshot workflow.
+all-time wishlist balance. Wishline therefore shows a stored wishlist total
+reconstructed from the retained reporting dates and always exposes the coverage
+start and end. It does not claim that partial coverage is the game's lifetime
+Steam total.
 
 ## Caching and freshness
 
-The current cache is process memory, scoped by workspace and App ID. Normal
-responses use `STEAM_CACHE_SECONDS`; forced refreshes cannot bypass the
-one-minute safety window. A restart clears the cache.
+Normalized Steam dates are upserted into D1 before a live workspace response is
+returned. When Steam cannot refresh, Wishline serves the durable last-known-good
+history with a safe warning. The response cache remains process memory, scoped
+by workspace and App ID. Normal responses use `STEAM_CACHE_SECONDS`; forced
+refreshes cannot bypass the one-minute safety window. A restart clears only the
+response cache, not the normalized daily snapshots.
 
-This is sufficient for local acceptance but not for reliable scheduled
-production polling. The roadmap tracks a durable last-known-good snapshot and
-polling job.
+Scheduled polling and bounded retry orchestration remain production follow-up
+work.
 
 ## PWA boundary
 

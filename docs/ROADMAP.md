@@ -49,13 +49,17 @@ Acceptance criteria:
 - The dashboard distinguishes Steam generation time, fetch time, and stale data.
 - Retries use bounded backoff and respect rate limits.
 
-### 3. Make the current wishlist total a product workflow
+### 3. Make the stored wishlist total a product workflow
 
 Acceptance criteria:
 
-- The owner can record or update an authoritative total and effective date.
-- The total belongs to the workspace/project, not global environment values.
-- Historical reconstruction clearly labels estimated versus reported values.
+- Wishline reconstructs a stored total from the daily records it retains and
+  displays the first covered reporting date.
+- The total belongs to the workspace/project and is calculated only from its
+  retained daily records, not global environment values.
+- The UI never presents a partial stored history as the game's complete
+  lifetime Steam total.
+- Historical reconstruction clearly labels stored values and their coverage.
 
 ### 4. Expand automated coverage
 
@@ -65,6 +69,8 @@ Acceptance criteria:
   App-ID-mismatch Steam responses.
 - Integration tests cover account isolation and saved-connection replacement.
 - A browser smoke test covers sign-in, onboarding, refresh, and reconnect.
+- Data tests cover missing dates, corrected dates, stored-total
+  reconstruction, and freshness boundaries.
 - CI runs lint, TypeScript, fixture tests, and build on every pull request.
 
 ## Next: reliable private beta

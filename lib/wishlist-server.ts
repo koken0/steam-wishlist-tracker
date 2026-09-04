@@ -1,13 +1,17 @@
 import fixture from '@/fixtures/steam-wishlist.sample.json';
 import {
-  hasExpectedSteamAppId,
-  normalizeSteamWishlistResponse,
-  type SteamWishlistResponse,
+  classifyWishlistFreshness,
+  storedWishlistTotal,
   type WishlistDashboardData,
   type WishlistDay,
 } from '@/lib/wishlist-contract';
+import {
+  readWishlistHistory,
+  saveWishlistHistory,
+} from '@/lib/wishlist-history-store';
+import { WishlistConnectorError } from '@/lib/wishlist-errors';
+import { fetchSteamWishlistDate, requireUsableWishlistDays } from '@/lib/wishlist-steam-client';
 
-const STEAM_ENDPOINT = 'https://partner.steam-api.com/IPartnerFinancialsService/GetAppWishlistReporting/v001/';
 const STEAM_STORE_ENDPOINT = 'https://store.steampowered.com/api/appdetails';
 const MIN_FORCE_REFRESH_MS = 60_000;
 
@@ -27,11 +31,7 @@ export type SteamConnection = {
   useEnvironmentMetadata?: boolean;
 };
 
-export class WishlistConnectorError extends Error {
-  constructor(public code: string, message: string, public status = 500) {
-    super(message);
-  }
-}
+export { WishlistConnectorError } from '@/lib/wishlist-errors';
 
 export async function getWishlistDashboardData(
   force = false,
@@ -63,19 +63,24 @@ export async function getWishlistDashboardData(
 
 function loadFixtureData(): WishlistDashboardData {
   const daily = fixture.records
-    .map((record) => normalizeSteamWishlistResponse(record as SteamWishlistResponse))
-    .filter((record): record is WishlistDay => Boolean(record));
+    .map((record) => requireUsableWishlistDays([record])[0]);
 
   return {
     source: 'fixture',
     appId: fixture.project.appId,
     projectName: fixture.project.name,
     releaseState: fixture.project.releaseState,
-    currentWishlists: fixture.project.currentWishlistTotal,
-    currentWishlistsAsOf: fixture.project.currentWishlistTotalAsOf,
+    currentWishlists: storedWishlistTotal(daily),
+    currentWishlistsAsOf: daily.at(-1)?.date ? `${daily.at(-1)?.date}T00:00:00.000Z` : null,
+    totalKind: daily.length ? 'stored' : 'unavailable',
+    coverageStart: daily.at(0)?.date || null,
+    coverageEnd: daily.at(-1)?.date || null,
+    coverageComplete: false,
     generatedAt: latestGeneratedAt(daily),
     fetchedAt: new Date().toISOString(),
+    freshness: classifyWishlistFreshness(latestGeneratedAt(daily), new Date().toISOString()),
     cacheHit: false,
+    syncWarning: null,
     daily,
   };
 }
@@ -84,36 +89,73 @@ async function loadSteamData(connection: SteamConnection): Promise<WishlistDashb
   const { apiKey: key, appId } = connection;
   const lookbackDays = clampInteger(process.env.STEAM_LOOKBACK_DAYS, 30, 1, 90);
   const dates = utcDatesEndingToday(lookbackDays);
-  const [payloads, storeProjectName] = await Promise.all([
-    mapWithConcurrency(dates, 4, (date) => fetchSteamDate(key, appId, date)),
-    fetchSteamProjectName(appId),
-  ]);
-  const daily = payloads
-    .map(normalizeSteamWishlistResponse)
-    .filter((record): record is WishlistDay => Boolean(record))
-    .sort((a, b) => a.date.localeCompare(b.date));
+  const fetchedAt = new Date().toISOString();
+  let storeProjectName: string | null = null;
 
-  if (!daily.length) {
-    throw new WishlistConnectorError('NO_WISHLIST_DATA', 'Steam accepted the request but returned no wishlist records for the configured period.', 502);
+  try {
+    const [payloads, fetchedProjectName] = await Promise.all([
+      mapWithConcurrency(dates, 4, (date) => fetchSteamWishlistDate(key, appId, date)),
+      fetchSteamProjectName(appId),
+    ]);
+    storeProjectName = fetchedProjectName;
+    const fetchedDaily = requireUsableWishlistDays(payloads);
+
+    if (connection.cacheScope) {
+      await saveWishlistHistory(connection.cacheScope, appId, fetchedDaily, fetchedAt);
+      const history = await readWishlistHistory(connection.cacheScope, appId);
+      return buildSteamDashboard(connection, history.daily, history.fetchedAt || fetchedAt, storeProjectName, null);
+    }
+
+    return buildSteamDashboard(connection, fetchedDaily, fetchedAt, storeProjectName, null);
+  } catch (error) {
+    if (!connection.cacheScope) throw error;
+    const history = await readWishlistHistory(connection.cacheScope, appId);
+    if (!history.daily.length || !history.fetchedAt) throw error;
+    const connectorError = error instanceof WishlistConnectorError
+      ? error
+      : new WishlistConnectorError('HISTORY_WRITE_FAILED', 'Wishline could not update its stored wishlist history.', 500);
+    return buildSteamDashboard(
+      connection,
+      history.daily,
+      history.fetchedAt,
+      null,
+      { code: connectorError.code, message: `${connectorError.message} Showing the last stored data.` },
+    );
   }
+}
+
+function buildSteamDashboard(
+  connection: SteamConnection,
+  daily: WishlistDay[],
+  fetchedAt: string,
+  storeProjectName: string | null,
+  syncWarning: { code: string; message: string } | null,
+): WishlistDashboardData {
+  const coverageStart = daily.at(0)?.date || null;
+  const coverageEnd = daily.at(-1)?.date || null;
+  const currentWishlists = storedWishlistTotal(daily);
+  const currentWishlistsAsOf = coverageEnd ? `${coverageEnd}T00:00:00.000Z` : null;
+  const generatedAt = latestGeneratedAt(daily);
 
   return {
     source: 'steam',
-    appId,
+    appId: connection.appId,
     projectName: connection.projectName?.trim()
       || (connection.useEnvironmentMetadata ? process.env.STEAM_PROJECT_NAME?.trim() : '')
       || storeProjectName
-      || `Steam App ${appId}`,
+      || `Steam App ${connection.appId}`,
     releaseState: 'Steamworks project',
-    currentWishlists: connection.useEnvironmentMetadata
-      ? optionalNonNegativeInteger(process.env.STEAM_CURRENT_WISHLIST_TOTAL)
-      : null,
-    currentWishlistsAsOf: connection.useEnvironmentMetadata
-      ? optionalIsoDate(process.env.STEAM_CURRENT_WISHLIST_TOTAL_AS_OF)
-      : null,
-    generatedAt: latestGeneratedAt(daily),
-    fetchedAt: new Date().toISOString(),
+    currentWishlists,
+    currentWishlistsAsOf,
+    totalKind: currentWishlists == null ? 'unavailable' : 'stored',
+    coverageStart,
+    coverageEnd,
+    coverageComplete: false,
+    generatedAt,
+    fetchedAt,
+    freshness: classifyWishlistFreshness(generatedAt, fetchedAt),
     cacheHit: false,
+    syncWarning,
     daily,
   };
 }
@@ -121,10 +163,10 @@ async function loadSteamData(connection: SteamConnection): Promise<WishlistDashb
 export async function validateSteamConnection(connection: SteamConnection): Promise<{ projectName: string; records: number }> {
   const dates = utcDatesEndingToday(Math.min(7, clampInteger(process.env.STEAM_LOOKBACK_DAYS, 7, 1, 90)));
   const [payloads, storeProjectName] = await Promise.all([
-    mapWithConcurrency(dates, 3, (date) => fetchSteamDate(connection.apiKey, connection.appId, date)),
+    mapWithConcurrency(dates, 3, (date) => fetchSteamWishlistDate(connection.apiKey, connection.appId, date)),
     fetchSteamProjectName(connection.appId),
   ]);
-  const records = payloads.map(normalizeSteamWishlistResponse).filter(Boolean).length;
+  const records = requireUsableWishlistDays(payloads).length;
   return {
     projectName: connection.projectName?.trim() || storeProjectName || `Steam App ${connection.appId}`,
     records,
@@ -152,49 +194,6 @@ async function fetchSteamProjectName(appId: number): Promise<string | null> {
     // Store metadata is optional; wishlist reporting should still work if it is unavailable.
     return null;
   }
-}
-
-async function fetchSteamDate(key: string, appId: number, date: string): Promise<SteamWishlistResponse> {
-  const url = new URL(STEAM_ENDPOINT);
-  url.searchParams.set('appid', String(appId));
-  url.searchParams.set('date', date);
-
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      headers: { Accept: 'application/json', 'x-webapi-key': key },
-      cache: 'no-store',
-      signal: AbortSignal.timeout(15_000),
-    });
-  } catch {
-    throw new WishlistConnectorError('STEAM_UNREACHABLE', 'The server could not reach the Steamworks partner API.', 502);
-  }
-
-  if (response.status === 401 || response.status === 403) {
-    throw new WishlistConnectorError('STEAM_ACCESS_DENIED', 'Steamworks rejected the key, permission, App ID, or IP allowlist.', 502);
-  }
-  if (response.status === 429) {
-    throw new WishlistConnectorError('STEAM_RATE_LIMITED', 'Steamworks rate-limited the connector. Wait before refreshing again.', 429);
-  }
-  if (!response.ok) {
-    throw new WishlistConnectorError('STEAM_ERROR', `Steamworks returned HTTP ${response.status}.`, 502);
-  }
-
-  let payload: SteamWishlistResponse;
-  try {
-    payload = (await response.json()) as SteamWishlistResponse;
-  } catch {
-    throw new WishlistConnectorError('INVALID_STEAM_RESPONSE', 'Steamworks returned a response that was not valid JSON.', 502);
-  }
-
-  if (!hasExpectedSteamAppId(payload, appId)) {
-    throw new WishlistConnectorError(
-      'STEAM_APP_MISMATCH',
-      'Steamworks returned wishlist data for an unexpected App ID.',
-      502,
-    );
-  }
-  return payload;
 }
 
 function requireAppId(): number {
@@ -239,16 +238,4 @@ function latestGeneratedAt(daily: WishlistDay[]): string | null {
 function clampInteger(raw: string | undefined, fallback: number, min: number, max: number): number {
   const value = Number(raw);
   return Number.isInteger(value) ? Math.min(max, Math.max(min, value)) : fallback;
-}
-
-function optionalNonNegativeInteger(raw: string | undefined): number | null {
-  if (!raw?.trim()) return null;
-  const value = Number(raw);
-  return Number.isInteger(value) && value >= 0 ? value : null;
-}
-
-function optionalIsoDate(raw: string | undefined): string | null {
-  if (!raw?.trim()) return null;
-  const date = new Date(raw);
-  return Number.isNaN(date.valueOf()) ? null : date.toISOString();
 }

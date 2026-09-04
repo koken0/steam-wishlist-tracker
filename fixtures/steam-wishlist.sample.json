@@ -2,9 +2,7 @@
   "project": {
     "appId": 2847190,
     "name": "Starfall Harbor",
-    "releaseState": "Pre-release",
-    "currentWishlistTotal": 12847,
-    "currentWishlistTotalAsOf": "2026-08-27T21:00:00Z"
+    "releaseState": "Pre-release"
   },
   "records": [
     { "response": { "appid": 2847190, "date": "2026-08-14", "wishlist_summary": { "wishlist_adds": 151, "wishlist_deletes": 17, "wishlist_purchases": 0, "wishlist_gifts": 0, "wishlist_adds_windows": 121, "wishlist_adds_mac": 18, "wishlist_adds_linux": 12 }, "time_generated": 1786744800 } },

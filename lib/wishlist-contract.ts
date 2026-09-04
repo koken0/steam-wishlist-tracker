@@ -1,4 +1,6 @@
 export type WishlistDataSource = 'fixture' | 'steam';
+export type WishlistFreshness = 'fresh' | 'delayed' | 'stale' | 'unknown';
+export type WishlistTotalKind = 'stored' | 'unavailable';
 
 export type WishlistDay = {
   date: string;
@@ -20,9 +22,15 @@ export type WishlistDashboardData = {
   releaseState: string;
   currentWishlists: number | null;
   currentWishlistsAsOf: string | null;
+  totalKind: WishlistTotalKind;
+  coverageStart: string | null;
+  coverageEnd: string | null;
+  coverageComplete: boolean;
   generatedAt: string | null;
   fetchedAt: string;
+  freshness: WishlistFreshness;
   cacheHit: boolean;
+  syncWarning: { code: string; message: string } | null;
   daily: WishlistDay[];
 };
 
@@ -78,6 +86,25 @@ export function normalizeSteamWishlistResponse(payload: SteamWishlistResponse): 
       ? new Date(response.time_generated * 1000).toISOString()
       : null,
   };
+}
+
+export function classifyWishlistFreshness(
+  generatedAt: string | null,
+  fetchedAt: string | null,
+  nowMs = Date.now(),
+): WishlistFreshness {
+  const timestamp = generatedAt || fetchedAt;
+  if (!timestamp) return 'unknown';
+  const value = new Date(timestamp).valueOf();
+  if (!Number.isFinite(value)) return 'unknown';
+  const ageHours = Math.max(0, nowMs - value) / 3_600_000;
+  if (ageHours <= 24) return 'fresh';
+  if (ageHours <= 48) return 'delayed';
+  return 'stale';
+}
+
+export function storedWishlistTotal(days: WishlistDay[]): number | null {
+  return days.length ? days.reduce((sum, day) => sum + day.net, 0) : null;
 }
 
 function safeCount(value: unknown): number {

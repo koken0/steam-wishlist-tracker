@@ -1,4 +1,4 @@
-import { WishlistConnectorError } from '@/lib/wishlist-server';
+import { WishlistConnectorError } from './wishlist-errors.ts';
 
 const IV_BYTES = 12;
 
