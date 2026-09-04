@@ -51,6 +51,9 @@ reference is in `db/schema.ts`; forward-only D1 migrations are under
 
 The Financial API key is never stored as plaintext in D1. The server requires
 `WISHLIST_ENCRYPTION_KEY` to read or update a saved connection.
+For local development, the package `predev` lifecycle prepares this ignored
+server-only key before the application starts and preserves an existing value.
+Hosted environments must provide it through managed server secrets instead.
 
 ## Authentication and authorization
 

@@ -15,12 +15,17 @@ First run:
 ```bash
 npm install
 cp .env.example .env.local
-npm run setup:local
 npm run dev
 ```
 
 Open `http://127.0.0.1:3000`, sign in with the local test identity, and connect
 the Steam project through onboarding. Never commit `.env.local` or `.wrangler/`.
+
+The `predev` lifecycle step runs `scripts/ensure-local-encryption-key.mjs`
+automatically. It creates `WISHLIST_ENCRYPTION_KEY` in the ignored `.env.local`
+file only when missing and preserves the existing value. This keeps saved
+connections decryptable across restarts. `npm run setup:local` remains an
+explicit troubleshooting command, not a required onboarding step.
 
 ## Routine validation
 
@@ -96,7 +101,7 @@ and source control during the migration.
 | Symptom | Check |
 | --- | --- |
 | Sign-in loops locally | Visit `/signout-with-chatgpt?return_to=/`, then sign in again |
-| `ENCRYPTION_NOT_CONFIGURED` | Run `npm run setup:local` and restart the server |
+| `ENCRYPTION_NOT_CONFIGURED` | Restart with `npm run dev`; if preparation was skipped, run `npm run setup:local` explicitly |
 | Steam access denied | Key permissions, App ID, and Steamworks IP allowlist |
 | App ID mismatch | Confirm the key is authorized for the exact configured App ID |
 | No wishlist records | Try a valid recent date range and confirm the app has reporting data |

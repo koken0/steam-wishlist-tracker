@@ -259,7 +259,7 @@ function Onboarding({ step, data, setup, error, loading, connect, next, back, fi
             <span className="setup-icon">◎</span><p className="eyebrow">STEP 1 OF 3</p><h1>Create your private workspace</h1><p className="setup-lead">Wishline uses passwordless platform sign-in. Your identity owns one isolated workspace; Wishline does not create or store a password.</p>
             <div className={`connection-card ${setup ? 'connected' : ''}`}><span>{setup ? '✓' : '◎'}</span><p><small>WISHLINE ACCOUNT</small><b>{setup ? setup.user.name || setup.user.email || 'Authenticated owner' : 'Sign in to continue'}</b><em>{setup ? setup.workspace.workspaceName : 'Local testing uses a stable simulated account'}</em></p><strong>{setup ? 'READY' : 'SIGN IN'}</strong></div>
             {error && <div className="inline-error"><b>Account required.</b><span>{error}</span></div>}
-            <div className="security-callout"><span>◆</span><p><b>No Wishline password to manage.</b><br/>Local sign-in is simulated; a hosted private Site uses your authenticated platform identity.</p></div>
+            <div className="security-callout"><span>◆</span><p><b>Secure local storage is prepared automatically.</b><br/>Starting Wishline creates the local server protection key when needed; it never enters the browser or Git.</p></div>
           </>}
           {step === 2 && <>
             <span className="setup-icon project-icon">S</span><p className="eyebrow">STEP 2 OF 3</p><h1>Connect your Steam project</h1><p className="setup-lead">The browser sends these details once over the private setup request. The server validates the App ID, protects the key, and never returns it.</p>

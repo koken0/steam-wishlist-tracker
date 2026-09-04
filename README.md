@@ -111,6 +111,12 @@ npm install
 npm run dev
 ```
 
+`npm run dev` automatically prepares the ignored local server-protection key
+before Wishline starts. It creates the key only when missing and preserves an
+existing key so saved Steam connections remain readable. `npm run setup:local`
+remains available as an explicit repair/setup command but is not part of the
+normal onboarding path.
+
 Open `http://localhost:3000`.
 
 The development server binds to `127.0.0.1` so live financial data is not exposed to other devices on the local network.
@@ -142,10 +148,10 @@ Keep `WISHLIST_DATA_SOURCE=fixture`. The dashboard will label every surface as *
 > **Warning:** a Financial API key is account-wide and must be treated like a password. Enter it only in Wishline's private connection form; never paste it into chat, source code, or a Git commit.
 
 1. Copy `.env.example` to `.env.local` if it does not exist.
-2. Generate the ignored local AES-256-GCM wrapping key and start Wishline:
+2. Start Wishline. The ignored local AES-256-GCM protection key is prepared
+   automatically before the development server starts:
 
 ```bash
-npm run setup:local
 npm run dev
 ```
 
