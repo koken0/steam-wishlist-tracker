@@ -14,7 +14,7 @@ import {
 } from '@/lib/wishlist-history-store';
 import { WishlistConnectorError } from '@/lib/wishlist-errors';
 import { fetchSteamWishlistDate, requireUsableWishlistDays } from '@/lib/wishlist-steam-client';
-import { currentAndPreviousUtcDates, recentBaselineAdds } from '@/lib/wishlist-polling';
+import { connectionValidationDates, currentAndPreviousUtcDates, recentBaselineAdds } from '@/lib/wishlist-polling';
 
 const STEAM_STORE_ENDPOINT = 'https://store.steampowered.com/api/appdetails';
 const MIN_FORCE_REFRESH_MS = 60_000;
@@ -182,26 +182,28 @@ function buildSteamDashboard(
   return readWishlistAlerts(connection.cacheScope, connection.appId).then((alerts) => ({ ...result, alerts }));
 }
 
-export async function validateSteamConnection(connection: SteamConnection): Promise<{ projectName: string; records: number }> {
-  const dates = utcDatesEndingToday(Math.min(7, clampInteger(process.env.STEAM_LOOKBACK_DAYS, 7, 1, 90)));
-  const [payloads, storeProjectName] = await Promise.all([
-    mapWithConcurrency(dates, 1, (date) => fetchSteamWishlistDate(connection.apiKey, connection.appId, date)),
-    fetchSteamProjectName(connection.appId),
+export async function validateSteamConnection(
+  connection: SteamConnection,
+  fetchImpl: typeof fetch = fetch,
+): Promise<{ projectName: string; records: number }> {
+  const [payload, storeProjectName] = await Promise.all([
+    fetchSteamWishlistDate(connection.apiKey, connection.appId, connectionValidationDates()[0], fetchImpl),
+    fetchSteamProjectName(connection.appId, fetchImpl),
   ]);
-  const records = requireUsableWishlistDays(payloads).length;
+  const records = requireUsableWishlistDays([payload]).length;
   return {
     projectName: connection.projectName?.trim() || storeProjectName || `Steam App ${connection.appId}`,
     records,
   };
 }
 
-async function fetchSteamProjectName(appId: number): Promise<string | null> {
+async function fetchSteamProjectName(appId: number, fetchImpl: typeof fetch = fetch): Promise<string | null> {
   const url = new URL(STEAM_STORE_ENDPOINT);
   url.searchParams.set('appids', String(appId));
   url.searchParams.set('l', 'english');
 
   try {
-    const response = await fetch(url, {
+    const response = await fetchImpl(url, {
       headers: { Accept: 'application/json' },
       cache: 'no-store',
       signal: AbortSignal.timeout(10_000),

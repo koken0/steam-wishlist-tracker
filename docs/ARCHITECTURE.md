@@ -90,7 +90,8 @@ the current GMT date. Valve's API launch note says recent wishlist data is
 updated in batches, normally within an hour or a few hours. Wishline therefore
 implements intraday batch monitoring without describing it as strict real time:
 
-1. Perform one bounded historical backfill during onboarding.
+1. Validate the key and App ID with one request for the current GMT date, then
+   perform one bounded historical backfill after the connection is saved.
 2. Persist the latest value for each reporting date in D1.
 3. Every hour, query only yesterday and today in GMT.
 4. Store a new intraday observation only when today's counters or Steam

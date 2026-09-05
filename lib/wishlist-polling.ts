@@ -5,6 +5,10 @@ export function currentAndPreviousUtcDates(now = new Date()): string[] {
   return [-1, 0].map((offset) => new Date(start + offset * 86_400_000).toISOString().slice(0, 10));
 }
 
+export function connectionValidationDates(now = new Date()): [string] {
+  return [now.toISOString().slice(0, 10)];
+}
+
 export function recentBaselineAdds(days: WishlistDay[], beforeDate: string): number | null {
   const values = days
     .filter((day) => day.date < beforeDate)

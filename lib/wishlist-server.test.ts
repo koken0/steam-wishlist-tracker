@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { currentAndPreviousUtcDates, recentBaselineAdds } from './wishlist-polling.ts';
+import { connectionValidationDates, currentAndPreviousUtcDates, recentBaselineAdds } from './wishlist-polling.ts';
 import type { WishlistDay } from './wishlist-contract.ts';
 
 function day(date: string, adds: number): WishlistDay {
@@ -33,4 +33,11 @@ test('spike baseline uses up to seven completed days before today', () => {
   ];
   assert.equal(recentBaselineAdds(days, '2026-09-03'), 40);
   assert.equal(recentBaselineAdds(days.slice(0, 4), '2026-09-03'), null);
+});
+
+test('connection validation targets exactly the current GMT date', () => {
+  assert.deepEqual(
+    connectionValidationDates(new Date('2026-09-05T23:59:59.000Z')),
+    ['2026-09-05'],
+  );
 });
