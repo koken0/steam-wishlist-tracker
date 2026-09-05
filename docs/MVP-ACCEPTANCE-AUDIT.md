@@ -61,7 +61,7 @@ Full runtime account isolation and 24-48 hour cadence evidence remain.
 | Browser landing page | Meets |
 | Hosted Google sign-in and authenticated setup | Meets |
 | Authorized hosted Steam onboarding | Meets - 24 normalized days, sanitized evidence |
-| Browser onboarding entry | Meets for hosted staging; local scripted identity remains partial |
+| Browser onboarding entry | Meets for hosted staging and local scripted identity |
 | Authorized real Steam onboarding | Meets - hosted run completed with sanitized evidence |
 
 ## 4.1 Owner entry and onboarding
@@ -69,7 +69,7 @@ Full runtime account isolation and 24-48 hour cadence evidence remain.
 | Requirement | Status | Evidence / gap |
 | --- | --- | --- |
 | Saved workspace requires authentication | Meets | `/api/setup` requires a platform identity and saved connections are resolved through that identity. |
-| Stable local owner; no browser-supplied user ID | Partial | Application code trusts only platform headers. The local browser callback still needs a successful smoke run. |
+| Stable local owner; no browser-supplied user ID | Meets | The authorized local script completed through the Sites sign-in cookie. The simulated identity branch is limited to development loopback requests; staging requires Firebase. |
 | Exact positive numeric App ID and bounded key | Meets | Setup validates integer App ID, key presence/length/newlines, JSON type, and body size. |
 | Safe errors for invalid, unauthorized, limited, malformed, empty, and mismatched responses | Meets | Connector tests cover access denial, rate limiting, malformed JSON, empty data, network failure, upstream failure, and App-ID mismatch without exposing secrets. |
 | Validate before saving | Meets | Steam is called before persistence and zero usable records reject onboarding. |
@@ -166,9 +166,7 @@ requires an authorized 24-48 hour cadence trial and the integral PWA tests.
 2. Run the remaining deterministic UI checks for inclusive ranges and
    missing-date presentation during the integral test.
 3. Record basic local load and refresh timings during the integral test.
-4. Repair and rerun the local scripted onboarding identity path; hosted
-   onboarding has already produced sanitized real-data evidence.
-5. Perform and record the clean-checkout recovery drill.
+4. Perform and record the clean-checkout recovery drill.
 
 ## Final decision
 

@@ -151,6 +151,7 @@ npm run lint    # Run static code-quality checks
 npm run start   # Serve a completed production build
 npm run test:fixture  # Validate the anonymous Steam response contract
 npm run test:contract # Validate totals, normalization, and freshness boundaries
+npm run test:onboarding # Authorized, sanitized local identity/onboarding check
 ```
 
 ## Validate with the anonymous fixture
@@ -199,6 +200,11 @@ allowlisting limitations. `WISHLIST_ALLOWED_USER_IDS` remains required only for
 the legacy environment-driven connector.
 
 The key is sent to Steamworks in the `x-webapi-key` request header, never in the URL. Browser responses contain only the configured App ID, project label, timestamps, normalized aggregate metrics, and safe spike events. Manual refreshes use an authenticated POST action, cannot bypass the server more than once per minute, and normal responses use the configured server cache. After onboarding, refresh requests only yesterday and today's GMT records.
+
+The authorized local acceptance script follows the same Sites sign-in route as
+the browser. Local identity is recognized only in a development Worker on a
+loopback origin; hosted Cloudflare requests continue to require a verified
+Firebase ID token.
 
 ## Capture a sanitized real response
 

@@ -28,6 +28,40 @@ test('local identity comes only from trusted platform headers', async () => {
   else process.env.FIREBASE_PROJECT_ID = originalProject;
 });
 
+test('local Sites session is accepted only on a development loopback origin', async () => {
+  const mutableEnv = process.env as unknown as Record<string, string | undefined>;
+  const originalProject = process.env.FIREBASE_PROJECT_ID;
+  const originalNodeEnv = process.env.NODE_ENV;
+  mutableEnv.FIREBASE_PROJECT_ID = 'wishline-staging';
+  mutableEnv.NODE_ENV = 'development';
+
+  const local = new Request('http://127.0.0.1:3000/api/setup', {
+    headers: {
+      'oai-authenticated-user-id': 'local_seedy',
+      'oai-authenticated-user-email': 'seedy@sites.test',
+      'oai-authenticated-user-full-name': 'Seedy',
+    },
+  });
+  assert.deepEqual(await getWishlineUser(local), {
+    id: 'local_seedy',
+    email: 'seedy@sites.test',
+    name: 'Seedy',
+  });
+
+  const remote = new Request('https://wishline.example/api/setup', {
+    headers: { 'oai-authenticated-user-id': 'local_seedy' },
+  });
+  assert.equal(await getWishlineUser(remote), null);
+
+  mutableEnv.NODE_ENV = 'production';
+  assert.equal(await getWishlineUser(local), null);
+
+  if (originalProject === undefined) delete mutableEnv.FIREBASE_PROJECT_ID;
+  else mutableEnv.FIREBASE_PROJECT_ID = originalProject;
+  if (originalNodeEnv === undefined) delete mutableEnv.NODE_ENV;
+  else mutableEnv.NODE_ENV = originalNodeEnv;
+});
+
 test('Firebase ID tokens require the expected signature and project claims', async () => {
   const projectId = 'wishline-staging';
   const now = Math.floor(Date.now() / 1000);

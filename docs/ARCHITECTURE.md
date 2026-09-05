@@ -71,6 +71,13 @@ Hosted environments must provide it through managed server secrets instead.
 Application code must not implement its own password database or trust a user
 ID supplied by client JavaScript.
 
+The Cloudflare Vite runtime loads the configured Firebase project in local
+development too. Authentication therefore recognizes Sites' exact simulated
+identity first only when `NODE_ENV=development` and the request URL is a
+loopback origin. The Sites middleware strips incoming identity headers before
+injecting that identity. This local branch is unavailable in production;
+Firebase remains authoritative on staging.
+
 ## Steam integration
 
 Wishline calls the fixed Steamworks partner endpoint with the key in the

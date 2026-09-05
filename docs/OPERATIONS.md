@@ -46,7 +46,9 @@ npm run test:onboarding
 ```
 
 That acceptance script prints only sanitized connection metadata and fails if
-the API key appears in a client response.
+the API key appears in a client response. It must run against an already
+started local development server and uses the Sites sign-in cookie; it does not
+send a user identity header.
 
 ## Environment values
 
@@ -143,7 +145,7 @@ hosting provider.
 | Stored total looks lower than Steamworks | Check the displayed coverage start; Wishline does not infer activity before its first stored date |
 | Local workspace disappeared | Confirm the project-local `.wrangler/` state still exists |
 | Local dev runtime rejects the compatibility date | Upgrade the local Cloudflare runtime or lower `compatibility_date` to the newest date it explicitly supports, then rerun the full validation suite |
-| Local scripted onboarding returns `AUTH_REQUIRED` | Treat the simulated Sites identity path as a separate local integration issue; do not use direct trusted identity headers as a production workaround |
+| Local scripted onboarding returns `AUTH_REQUIRED` | Confirm `npm run dev` is current and the test URL is loopback. The Worker accepts Sites' exact simulated identity only in development; staging still requires Firebase. |
 
 ## Incident rule
 

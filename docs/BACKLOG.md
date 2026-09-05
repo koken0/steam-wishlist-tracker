@@ -36,16 +36,6 @@ bodies, or treat a lack of changed Steam data as a synchronization failure.
 
 ## Do next
 
-### WL-002 — Repair the automated local onboarding identity path
-
-`npm run dev` starts after aligning the Worker compatibility date, but
-`npm run test:onboarding` receives `AUTH_REQUIRED`. Determine where the Sites
-simulated identity is lost between the Vite middleware and the Worker API.
-
-**Done when:** The authorized onboarding script completes against a clean local
-server and prints only sanitized metadata. Production authentication must not
-accept browser-supplied identity headers as a workaround.
-
 ### WL-003 — Prove tenant isolation and safe connection replacement
 
 Add integration coverage for two unrelated authenticated users and for
@@ -123,3 +113,5 @@ commercial access.
   requests.
 - Owner-confirmed disconnect with deletion of the protected connection and all
   workspace-scoped wishlist data.
+- Local Sites identity works through the authorized onboarding script without
+  weakening Firebase authentication in production.

@@ -71,10 +71,31 @@ the installed local runtime, so `npm run dev` could not start. Keep
 upgrade the runtime dependency in the same tested change.
 
 After aligning the date, the server started successfully. The scripted local
-onboarding still receives `401` because the simulated Sites identity does not
-reach the Worker API path in the current Vinext/Cloudflare development stack.
-Treat that as a separate integration defect; do not confuse it with Steam
-connectivity, which was independently verified with sanitized `200` results.
+onboarding still received `401`; the initial hypothesis was that the simulated
+Sites identity did not reach the Worker API path. It remained important to
+treat that as a separate integration defect and not confuse it with Steam
+connectivity, which had independently returned sanitized `200` results. The
+follow-up below records the corrected diagnosis.
+
+### Local Firebase configuration can mask a valid Sites identity
+
+Follow-up inspection showed that the Sites identity headers did reach the
+Worker. The actual conflict was that the Cloudflare Vite runtime also loaded
+`FIREBASE_PROJECT_ID` from `wrangler.jsonc` locally, so authentication entered
+Firebase bearer-token mode before considering Sites' simulated identity.
+
+Wishline now recognizes only Sites' exact simulated user when the runtime is in
+development and the request origin is loopback, before applying Firebase
+verification. The Sites middleware removes client-provided identity headers
+before injecting this local identity. Production has no local branch and still
+requires a signed Firebase token. The authorized local onboarding script then
+completed with seven normalized records and no credential in either response.
+
+The clean local database also exposed that runtime schema initialization had
+not kept pace with migration `0002`: intraday and alert tables were missing.
+Runtime initialization now creates the same tables and indexes as the
+forward-only migrations, allowing the first dashboard load to persist an
+observation safely.
 
 ## Verified outcome
 
