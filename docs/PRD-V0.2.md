@@ -213,10 +213,12 @@ raw upstream payloads.
 
 ### 3.9 Retention, deletion, and export
 
-For the local prototype, records and encrypted connection data remain only in
-the project-local development environment until the owner resets or deletes
-that environment. No production retention promise applies, and export is not
-an MVP feature.
+For the private prototype, records and encrypted connection data remain until
+the owner chooses **Disconnect and delete all data**. That action removes the
+encrypted credential, daily history, intraday observations, and alerts while
+retaining only the empty owner workspace for reconnection. It does not revoke
+the source key in Steamworks. No broader production retention promise applies,
+and export is not an MVP feature.
 
 Before a hosted pilot, the product must define retention duration, backup
 behavior, deletion completion time, export format, and storage regions. Before

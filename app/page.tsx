@@ -76,6 +76,20 @@ async function connectSteam(input: { appId: string; apiKey: string; projectName:
   return payload as SetupState;
 }
 
+async function disconnectSteam(): Promise<SetupState> {
+  const authorization = await wishlineAuthorizationHeader();
+  const response = await fetch('/api/setup', {
+    method: 'DELETE',
+    cache: 'no-store',
+    headers: { ...authorization, 'X-Wishline-Action': 'disconnect-and-delete' },
+  });
+  const payload = await response.json() as SetupState | { error?: { message?: string } };
+  if (!response.ok || 'error' in payload) {
+    throw new Error('error' in payload ? payload.error?.message || 'Steam data could not be deleted.' : 'Steam data could not be deleted.');
+  }
+  return payload as SetupState;
+}
+
 export default function Home() {
   const [screen, setScreen] = useState<Screen>('welcome');
   const [view, setView] = useState<View>('overview');
@@ -188,6 +202,24 @@ export default function Home() {
     }
   }
 
+  async function disconnectAndDelete() {
+    if (!window.confirm('Delete the saved Steam credential and all wishlist history for this workspace? This cannot be undone.')) return;
+    setSetupLoading(true);
+    try {
+      const value = await disconnectSteam();
+      setSetup(value);
+      setWishlistData(null);
+      setDataError('');
+      setSetupError('');
+      setOnboardingStep(2);
+      setScreen('onboarding');
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'Steam data could not be deleted.');
+    } finally {
+      setSetupLoading(false);
+    }
+  }
+
   if (screen === 'welcome') {
     return <Welcome onContinue={openOnboarding} />;
   }
@@ -238,7 +270,7 @@ export default function Home() {
           {view === 'projects' && wishlistData && <Projects data={wishlistData} onOpen={() => setView('overview')} notify={notify} />}
           {view === 'widget' && wishlistData && <WidgetPreview data={wishlistData} refreshing={refreshing} onRefresh={refreshData} />}
           {view === 'security' && <Security data={wishlistData} token={token} setToken={setToken} notify={notify} />}
-          {view === 'settings' && <Settings data={wishlistData} milestone={milestone} setMilestone={setMilestone} notify={notify} reset={() => { setScreen('onboarding'); setOnboardingStep(2); setSetupError(''); }} />}
+          {view === 'settings' && <Settings data={wishlistData} milestone={milestone} setMilestone={setMilestone} notify={notify} reset={() => { setScreen('onboarding'); setOnboardingStep(2); setSetupError(''); }} disconnect={disconnectAndDelete} disconnecting={setupLoading} />}
         </div>
       </section>
       {toast && <div className="toast" role="status"><span>✓</span>{toast}</div>}
@@ -416,8 +448,8 @@ function Security({ data, token, setToken, notify }: { data:WishlistDashboardDat
   return <><PageHeading eyebrow="SECURITY CENTER" title="Access without exposing keys" copy="Verify the protected credential boundary and simulate companion access." /><div className="security-grid"><article className="panel security-main"><div className="security-hero"><span>◆</span><div><h2>Financial key isolation</h2><p>The authenticated setup endpoint validates and protects the key before storage. The browser receives normalized wishlist aggregates and never receives the credential again.</p></div><em>{data?.source === 'steam' ? 'LIVE BOUNDARY' : 'FIXTURE MODE'}</em></div><div className="token-section"><div><p className="panel-title">Demo app token</p><p className="panel-subtitle">Companion-token issuance remains simulated; account authentication is active.</p></div>{token ? <><div className="token-value"><code>{token}</code><button onClick={()=>{navigator.clipboard?.writeText(token);notify('Token copied')}}>Copy</button></div><div className="token-actions"><span>Issued just now · Read-only · {data?.projectName || 'configured project'}</span><button className="danger-button" onClick={revoke}>Revoke token</button></div></> : <div className="empty-token"><span>⌁</span><p><b>No active demo token</b><small>Issue one to simulate mobile companion access.</small></p><button className="primary-button compact" onClick={issue}>Issue token</button></div>}</div></article><aside className="panel audit-panel"><p className="panel-title">Connection facts</p><p className="panel-subtitle">Safe local verification</p><div className="audit-list"><div><span className="audit-dot green-dot"/><p><b>Browser API cache disabled</b><small>Private responses are never stored offline</small></p></div><div><span className="audit-dot purple-dot"/><p><b>Protected credential storage</b><small>No plaintext key in storage or client responses</small></p></div><div><span className="audit-dot"/><p><b>Source: {data?.source || 'checking'}</b><small>App ID {data?.appId || '—'}</small></p></div></div></aside></div><div className="security-principles"><div><span>01</span><b>Passwordless owner identity</b><p>Each authenticated user receives an isolated workspace.</p></div><div><span>02</span><b>Protected connection</b><p>The stored credential is available only to the server runtime.</p></div><div><span>03</span><b>Scoped clients next</b><p>Real revocable companion tokens still require a durable token service.</p></div></div></>;
 }
 
-function Settings({ data, milestone, setMilestone, notify, reset }: { data:WishlistDashboardData|null; milestone:string; setMilestone:(s:string)=>void; notify:(s:string)=>void; reset:()=>void }) {
-  return <><PageHeading eyebrow="PREFERENCES" title="Workspace settings" copy={`Configure the local experience for ${data?.projectName || 'the current project'}.`} /><div className="settings-layout"><article className="panel settings-panel"><div className="settings-section"><div><h2>Milestone target</h2><p>Choose the next round-number goal shown on the dashboard.</p></div><select value={milestone} onChange={(e)=>setMilestone(e.target.value)} aria-label="Milestone target"><option value="15000">15,000 wishlists</option><option value="25000">25,000 wishlists</option><option value="50000">50,000 wishlists</option><option value="100000">100,000 wishlists</option></select></div><div className="settings-section"><div><h2>Data source</h2><p>{data?.source === 'steam' ? 'Live server-side Steamworks adapter with a protected key.' : 'Deterministic anonymous data for contract validation.'}</p></div><span className={`demo-badge ${data?.source === 'steam' ? 'live' : ''}`}>{data?.source === 'steam' ? 'LIVE STEAM' : 'FIXTURE'}</span></div><div className="settings-section"><div><h2>Hourly intraday sync</h2><p>The backend checks today&apos;s GMT record once per hour; Steam may publish changes in batches.</p></div><label className="toggle"><input type="checkbox" defaultChecked disabled aria-label="Hourly intraday sync enabled"/><span/></label></div><div className="settings-actions"><button className="primary-button compact" onClick={()=>notify('Settings saved locally')}>Save changes</button></div></article><aside className="panel about-card"><span className="brand-mark">W</span><h2>Wishline MVP</h2><p>Local real-data acceptance build<br/>Version 0.2.0</p><hr/><p>{data?.source === 'steam' ? `Connected to App ID ${data.appId}.` : 'Ready to connect a Steamworks project through onboarding.'}</p><button className="danger-text" onClick={reset}>Update Steam connection</button></aside></div></>;
+function Settings({ data, milestone, setMilestone, notify, reset, disconnect, disconnecting }: { data:WishlistDashboardData|null; milestone:string; setMilestone:(s:string)=>void; notify:(s:string)=>void; reset:()=>void; disconnect:()=>void; disconnecting:boolean }) {
+  return <><PageHeading eyebrow="PREFERENCES" title="Workspace settings" copy={`Configure the local experience for ${data?.projectName || 'the current project'}.`} /><div className="settings-layout"><article className="panel settings-panel"><div className="settings-section"><div><h2>Milestone target</h2><p>Choose the next round-number goal shown on the dashboard.</p></div><select value={milestone} onChange={(e)=>setMilestone(e.target.value)} aria-label="Milestone target"><option value="15000">15,000 wishlists</option><option value="25000">25,000 wishlists</option><option value="50000">50,000 wishlists</option><option value="100000">100,000 wishlists</option></select></div><div className="settings-section"><div><h2>Data source</h2><p>{data?.source === 'steam' ? 'Live server-side Steamworks adapter with a protected key.' : 'Deterministic anonymous data for contract validation.'}</p></div><span className={`demo-badge ${data?.source === 'steam' ? 'live' : ''}`}>{data?.source === 'steam' ? 'LIVE STEAM' : 'FIXTURE'}</span></div><div className="settings-section"><div><h2>Hourly intraday sync</h2><p>The backend checks today&apos;s GMT record once per hour; Steam may publish changes in batches.</p></div><label className="toggle"><input type="checkbox" defaultChecked disabled aria-label="Hourly intraday sync enabled"/><span/></label></div><div className="settings-actions"><button className="primary-button compact" onClick={()=>notify('Settings saved locally')}>Save changes</button></div></article><aside className="panel about-card"><span className="brand-mark">W</span><h2>Wishline MVP</h2><p>Local real-data acceptance build<br/>Version 0.2.0</p><hr/><p>{data?.source === 'steam' ? `Connected to App ID ${data.appId}.` : 'Ready to connect a Steamworks project through onboarding.'}</p><button className="danger-text" onClick={reset}>Update Steam connection</button><button className="danger-button" disabled={disconnecting} onClick={disconnect}>{disconnecting ? 'Deleting…' : 'Disconnect and delete all data'}</button></aside></div></>;
 }
 
 function utcToday(): string {

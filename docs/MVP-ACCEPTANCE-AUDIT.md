@@ -76,6 +76,7 @@ Full runtime account isolation and 24-48 hour cadence evidence remain.
 | Encrypt key and never return it to the client | Meets | AES-256-GCM uses a random 12-byte nonce; API responses omit the key; API and service-worker caching are disabled. The authorized hosted run returned only normalized data. |
 | Successful onboarding opens one-game workspace | Meets | An authorized hosted project reached the ready step and opened a live dashboard with 24 normalized days on 2026-09-05. |
 | Safe connection replacement | Partial | The encrypted row is replaced only after validation. There is no automated regression test or replacement audit event. |
+| Owner disconnect and connection-data deletion | Meets in implementation | An authenticated, explicitly confirmed action deletes the encrypted connection, daily history, intraday observations, and alerts in one D1 batch while retaining the empty owner workspace. Browser verification remains pending. |
 
 ## 4.2 Dashboard and history
 

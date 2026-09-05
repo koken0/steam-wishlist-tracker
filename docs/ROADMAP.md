@@ -94,13 +94,14 @@ Acceptance criteria:
 
 ## Next: reliable private beta
 
-- Owner-facing disconnect and credential replacement history
+- Owner-facing disconnect is implemented with complete connection-data
+  deletion; credential replacement history remains pending
 - Audit events for connection creation, replacement, refresh, and failure
 - Error monitoring and health metrics without secret-bearing payloads
 - Managed rotation process for the server protection key
 - Per-workspace refresh quotas and abuse controls
 - Data export for owner-controlled aggregate history
-- Clear retention and deletion controls
+- Full account deletion, backup behavior, and production retention guarantees
 
 ## Later: companion experience
 

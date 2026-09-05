@@ -31,6 +31,9 @@ data. Treat both as sensitive even though the current product is an MVP.
 - The hourly Worker reads all saved connections only inside the server runtime;
   its HTTP fallback rejects requests without the scheduler bearer secret.
 - Intraday snapshots and alerts remain scoped by workspace and App ID.
+- Owner-confirmed disconnect deletes the encrypted Steam connection and all
+  daily, intraday, and alert data scoped to that workspace. It does not revoke
+  the source key in Steamworks.
 
 ## Production controls
 

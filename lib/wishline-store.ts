@@ -104,6 +104,22 @@ export async function saveSteamConnection(
   return getWorkspaceStatus(user);
 }
 
+export async function disconnectSteamConnection(user: WishlineUser): Promise<WishlineWorkspaceStatus> {
+  const db = await database();
+  const workspace = await getOrCreateWorkspace(user);
+  const now = new Date().toISOString();
+
+  await db.batch([
+    db.prepare('DELETE FROM wishlist_alerts WHERE workspace_id = ?').bind(workspace.id),
+    db.prepare('DELETE FROM wishlist_intraday_snapshots WHERE workspace_id = ?').bind(workspace.id),
+    db.prepare('DELETE FROM wishlist_daily_snapshots WHERE workspace_id = ?').bind(workspace.id),
+    db.prepare('DELETE FROM steam_connections WHERE workspace_id = ?').bind(workspace.id),
+    db.prepare('UPDATE workspaces SET updated_at = ? WHERE id = ?').bind(now, workspace.id),
+  ]);
+
+  return getWorkspaceStatus(user);
+}
+
 async function getOrCreateWorkspace(user: WishlineUser): Promise<WorkspaceRow> {
   const db = await database();
   const now = new Date().toISOString();

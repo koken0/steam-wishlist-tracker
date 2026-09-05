@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getWishlineUser } from '@/lib/wishline-auth';
-import { getWorkspaceStatus, saveSteamConnection } from '@/lib/wishline-store';
+import { disconnectSteamConnection, getWorkspaceStatus, saveSteamConnection } from '@/lib/wishline-store';
 import { validateSteamConnection, WishlistConnectorError } from '@/lib/wishlist-server';
 
 export const dynamic = 'force-dynamic';
@@ -74,6 +74,24 @@ export async function POST(request: Request) {
       { user: publicUser(user), workspace, validation: { records: validated.records, projectName: validated.projectName } },
       { headers: privateHeaders() },
     );
+  } catch (error) {
+    return errorResponse(error);
+  }
+}
+
+export async function DELETE(request: Request) {
+  const user = await getWishlineUser(request);
+  if (!user) return authRequired();
+  if (request.headers.get('x-wishline-action') !== 'disconnect-and-delete') {
+    return NextResponse.json(
+      { error: { code: 'INVALID_DISCONNECT_REQUEST', message: 'The disconnect action was not accepted.' } },
+      { status: 400, headers: privateHeaders() },
+    );
+  }
+
+  try {
+    const workspace = await disconnectSteamConnection(user);
+    return NextResponse.json({ user: publicUser(user), workspace }, { headers: privateHeaders() });
   } catch (error) {
     return errorResponse(error);
   }

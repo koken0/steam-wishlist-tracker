@@ -176,8 +176,10 @@ All items below are required before paid production launch:
       partner credential and data to Wishline.
 - [ ] Add an explicit statement that Wishline is independent and is not
       affiliated with, sponsored by, or endorsed by Valve or Steam.
-- [ ] Implement owner-facing disconnect, complete credential deletion, account
-      deletion, and documented retention behavior.
+- [x] Implement owner-facing disconnect and complete deletion of the encrypted
+      credential plus stored wishlist history, intraday observations, and
+      alerts.
+- [ ] Implement full account deletion and production retention guarantees.
 - [ ] Use managed secret/key protection with rotation, access auditing, recovery,
       and a tested incident-response procedure.
 - [ ] Require a stable outbound IP and customer-configured Steamworks IP

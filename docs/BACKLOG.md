@@ -82,10 +82,12 @@ Record connection creation/replacement, sync success/failure, freshness, and
 scheduled-run health without credentials or raw Steam responses. Add
 per-workspace request quotas and bounded retry telemetry.
 
-### WL-007 — Add owner-controlled disconnect, retention, and deletion
+### WL-007 — Complete account-level retention and deletion
 
-Provide complete credential deletion, documented history retention choices,
-and account/workspace deletion with recoverability expectations.
+Owner-controlled disconnect now deletes the encrypted credential and all
+workspace-scoped wishlist history and alerts. Add full account deletion,
+production retention guarantees, backup behavior, and recoverability
+expectations.
 
 ### WL-008 — Design encryption-key rotation
 
@@ -119,3 +121,5 @@ commercial access.
   with sanitized acceptance evidence.
 - Service-worker exclusion of API, cross-origin, and unsupported-scheme
   requests.
+- Owner-confirmed disconnect with deletion of the protected connection and all
+  workspace-scoped wishlist data.

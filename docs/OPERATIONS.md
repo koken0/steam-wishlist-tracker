@@ -116,6 +116,14 @@ Before rotation, implement a controlled migration that decrypts each connection
 with the old key and protects it with the new key. Keep both keys outside logs
 and source control during the migration.
 
+## Disconnect and deletion
+
+The owner can choose **Disconnect and delete all data** in Settings. After an
+explicit browser confirmation, Wishline deletes the encrypted Steam credential,
+daily history, intraday observations, and alerts for that workspace in one D1
+batch. The empty owner workspace remains available for reconnection. This
+action is irreversible in Wishline and does not revoke the key in Steamworks.
+
 ## Troubleshooting
 
 For the evidence and diagnostic sequence behind these checks, see

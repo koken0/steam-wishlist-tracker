@@ -30,7 +30,7 @@ timestamps. It never receives the saved Financial API key.
 | Component | Responsibility |
 | --- | --- |
 | `app/page.tsx` | Onboarding, dashboard views, refresh interactions, and client rendering |
-| `app/api/setup/route.ts` | Authenticated connection validation and persistence |
+| `app/api/setup/route.ts` | Authenticated connection validation, persistence, disconnect, and deletion |
 | `app/api/wishlist/route.ts` | Private normalized dashboard endpoint and refresh action |
 | `lib/wishline-auth.ts` | Reads the platform-provided authenticated identity |
 | `lib/wishline-store.ts` | Creates owner workspaces and reads/writes Steam connections in D1 |
@@ -122,6 +122,12 @@ The service worker caches only successful same-origin HTTP(S) shell and asset
 responses. Requests below `/api/`, cross-origin requests, and browser-extension
 schemes are never cached. This keeps private API data out of offline storage and
 prevents unsupported request schemes from causing rejected cache operations.
+
+Owner disconnect uses an authenticated `DELETE /api/setup` request with an
+explicit action header. One D1 batch removes alerts, intraday observations,
+daily snapshots, and the encrypted Steam connection before returning the empty
+workspace status. The owner workspace record remains available for a later
+reconnection. Wishline deletion does not revoke the source key in Steamworks.
 
 ## Non-goals for Phase 1
 

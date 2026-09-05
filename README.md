@@ -72,8 +72,10 @@ The server connector, D1 workspace, encrypted live Steamworks connection,
 durable daily history, intraday observations, spike events, freshness states,
 and last-known-good fallback are implemented. The staging Worker and D1 database
 are deployed at `wishline.celkoken.workers.dev`, and Cloudflare registered the
-hourly cron. Firebase identity is integrated; hosted encryption secrets, real-data acceptance,
-external Web Push, and managed key rotation remain pending.
+hourly cron. Firebase identity, the hosted encryption secret, and authorized
+real-data onboarding are verified. Owner disconnect deletes the encrypted
+credential and all stored wishlist data for that workspace. External Web Push
+and managed key rotation remain pending.
 
 > **Commercial launch gate:** do not enable billing or accept customer Financial
 > Web API keys in paid production until Valve has confirmed the hosted SaaS
@@ -88,7 +90,7 @@ app/
   page.tsx          MVP screens, normalized data rendering, and interactions
   globals.css       Responsive visual system and component styles
   api/wishlist/     Private, no-store server endpoint
-  api/setup/        Authenticated account and encrypted connection endpoint
+  api/setup/        Authenticated connection, disconnect, and deletion endpoint
 lib/
   wishlist-contract.ts  Shared response contract and normalizer
   wishlist-server.ts    Fixture/live adapter, Steam client, and server cache
