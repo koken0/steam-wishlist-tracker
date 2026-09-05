@@ -152,6 +152,7 @@ npm run start   # Serve a completed production build
 npm run test:fixture  # Validate the anonymous Steam response contract
 npm run test:contract # Validate totals, normalization, and freshness boundaries
 npm run test:onboarding # Authorized, sanitized local identity/onboarding check
+npm run test:browser # Chromium acceptance for auth, dashboard, errors, mobile, and PWA
 ```
 
 ## Validate with the anonymous fixture
@@ -205,6 +206,12 @@ The authorized local acceptance script follows the same Sites sign-in route as
 the browser. Local identity is recognized only in a development Worker on a
 loopback origin; hosted Cloudflare requests continue to require a verified
 Firebase ID token.
+
+`npm run test:browser` starts an isolated fixture-mode server on port 3100. Its
+browser-owned API doubles use only obvious placeholder keys and never call
+Steam. Playwright screenshots, traces, and video are disabled so form contents
+cannot be retained in test artifacts. The PWA scenario uses the real service
+worker and verifies that `/api/` responses remain outside Cache Storage.
 
 ## Capture a sanitized real response
 

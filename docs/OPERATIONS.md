@@ -36,8 +36,14 @@ npm run lint
 npx tsc --noEmit
 npm run test:contract
 npm run test:fixture
+npm run test:browser
 npm run build
 ```
+
+Install the pinned Chromium runtime once with `npx playwright install
+chromium`. Browser acceptance starts a fixture-mode server on port 3100 and
+uses only placeholder connection values. It must not be pointed at real Steam
+credentials or configured to record screenshots, traces, or video.
 
 When authorized real credentials are available and Steam access is expected:
 

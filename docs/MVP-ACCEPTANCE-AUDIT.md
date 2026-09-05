@@ -58,6 +58,7 @@ Full runtime account isolation and 24-48 hour cadence evidence remain.
 | TypeScript (`tsc --noEmit`) | Meets |
 | Anonymous fixture validation | Meets - 14 daily records |
 | Production build | Meets |
+| Chromium browser/PWA suite | Meets - 3 scenarios at desktop and phone sizes |
 | Browser landing page | Meets |
 | Hosted Google sign-in and authenticated setup | Meets |
 | Authorized hosted Steam onboarding | Meets - 24 normalized days, sanitized evidence |
@@ -75,7 +76,7 @@ Full runtime account isolation and 24-48 hour cadence evidence remain.
 | Validate before saving | Meets | Steam is called before persistence and zero usable records reject onboarding. |
 | Encrypt key and never return it to the client | Meets | AES-256-GCM uses a random 12-byte nonce; API responses omit the key; API and service-worker caching are disabled. The authorized hosted run returned only normalized data. |
 | Successful onboarding opens one-game workspace | Meets | An authorized hosted project reached the ready step and opened a live dashboard with 24 normalized days on 2026-09-05. |
-| Safe connection replacement | Partial | The encrypted row is replaced only after validation. There is no automated regression test or replacement audit event. |
+| Safe connection replacement | Partial | Browser acceptance covers the reconnection experience and confirms neither placeholder key renders. Durable failed-replacement and tenant-isolation tests remain pending. |
 | Owner disconnect and connection-data deletion | Meets in implementation | An authenticated, explicitly confirmed action deletes the encrypted connection, daily history, intraday observations, and alerts in one D1 batch while retaining the empty owner workspace. Browser verification remains pending. |
 
 ## 4.2 Dashboard and history
@@ -88,7 +89,7 @@ Full runtime account isolation and 24-48 hour cadence evidence remain.
 | Inclusive date-range totals and trend | Partial | The client filters inclusively and sums `net`; no automated calculation tests exist. |
 | Missing dates differ from zero | Missing | Missing records are omitted without an incomplete-coverage indicator. |
 | Late corrections recalculate dependent metrics | Meets | Daily records are upserted by workspace, App ID, and reporting date, then the full stored result is recalculated. |
-| Phone and desktop usability | Partial | Responsive styles and phone-sized presentation exist. A repeatable viewport/accessibility smoke test is missing. |
+| Phone and desktop usability | Meets for MVP | Chromium acceptance verifies the dashboard at desktop and 390 × 844 without horizontal overflow. A broader accessibility audit remains future hardening. |
 
 ## 4.3 Refresh and caching
 
@@ -107,9 +108,9 @@ Full runtime account isolation and 24-48 hour cadence evidence remain.
 
 | Requirement | Status | Evidence / gap |
 | --- | --- | --- |
-| Valid manifest, icons, name, theme, and service worker | Meets by inspection | Required files and registration are present; installability still needs a browser-install smoke test. |
-| Clear offline shell | Partial | The shell falls back to `/`; a deliberate offline test and clearer offline status are missing. |
-| Private API data excluded from service-worker cache | Meets | `/api/` requests exit before caching and API responses use `private, no-store`. |
+| Valid manifest, icons, name, theme, and service worker | Meets | Browser acceptance validates the manifest, standalone display, required icon metadata, registration, and active controller. |
+| Clear offline shell | Meets | A deliberate Chromium offline navigation loads the cached root shell; private API requests reject while offline instead of returning stored data. |
+| Private API data excluded from service-worker cache | Meets | Browser inspection finds no `/api/` entries in any Cache Storage bucket, and offline API fetches fail at the network boundary. |
 | Preview uses normalized data and correct labels | Meets | It uses dashboard data and displays total kind, latest reported movement, coverage, and freshness. |
 | Preview is not presented as a delivered native widget | Meets | The surface explicitly identifies itself as a future native concept outside the MVP. |
 
@@ -161,12 +162,10 @@ requires an authorized 24-48 hour cadence trial and the integral PWA tests.
 
 ### P1 - Required to complete validation evidence
 
-1. Add a browser smoke test covering sign-in, onboarding, dashboard refresh,
-   reconnection, mobile viewport, and offline shell behavior.
-2. Run the remaining deterministic UI checks for inclusive ranges and
+1. Run the remaining deterministic UI checks for inclusive ranges and
    missing-date presentation during the integral test.
-3. Record basic local load and refresh timings during the integral test.
-4. Perform and record the clean-checkout recovery drill.
+2. Record basic local load and refresh timings during the integral test.
+3. Perform and record the clean-checkout recovery drill.
 
 ## Final decision
 

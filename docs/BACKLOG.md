@@ -45,16 +45,6 @@ replacing a saved Steam connection.
 connection or history; a failed replacement preserves the prior valid
 connection; a successful replacement never exposes either key.
 
-### WL-004 — Add a repeatable browser acceptance suite
-
-Cover hosted sign-in, onboarding state, dashboard load, safe refresh,
-reconnection, mobile viewport, service-worker behavior, installation readiness,
-and the offline shell.
-
-**Done when:** The suite runs from documented commands, produces no secret-
-bearing artifacts, and records pass/fail evidence for desktop and phone-sized
-views.
-
 ### WL-005 — Close history presentation gaps
 
 Add explicit incomplete-coverage and missing-date treatment plus automated
@@ -115,3 +105,7 @@ commercial access.
   workspace-scoped wishlist data.
 - Local Sites identity works through the authorized onboarding script without
   weakening Firebase authentication in production.
+- Repeatable Chromium acceptance covers authentication, onboarding,
+  reconnection, 429/503 errors, desktop/mobile layout, install metadata,
+  service-worker privacy, and the offline shell without secret-bearing
+  artifacts.

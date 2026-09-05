@@ -130,6 +130,14 @@ responses. Requests below `/api/`, cross-origin requests, and browser-extension
 schemes are never cached. This keeps private API data out of offline storage and
 prevents unsupported request schemes from causing rejected cache operations.
 
+The Playwright acceptance suite separates browser-flow tests (service worker
+blocked so API doubles remain observable) from PWA tests (real service worker
+enabled). It verifies local sign-in, onboarding, reconnection, dashboard and
+safe 429/503 rendering at desktop and phone sizes. The PWA scenario verifies
+manifest metadata, required icons, an offline navigation fallback, and absence
+of `/api/` entries from Cache Storage. Screenshots, video, and traces are
+disabled because onboarding fields must not be retained as artifacts.
+
 Owner disconnect uses an authenticated `DELETE /api/setup` request with an
 explicit action header. One D1 batch removes alerts, intraday observations,
 daily snapshots, and the encrypted Steam connection before returning the empty
