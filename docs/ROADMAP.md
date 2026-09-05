@@ -40,8 +40,9 @@ Acceptance criteria:
 ### 1. Deploy a private staging environment
 
 Current progress: the Worker, D1 database, migrations, and hourly cron are
-deployed in the owner's Cloudflare account. Firebase identity is integrated;
-runtime secrets and real-data acceptance remain open.
+deployed in the owner's Cloudflare account. Firebase identity and the runtime
+encryption secret are configured. One authorized real-data onboarding run
+loaded 24 normalized days; cadence and tenant-isolation evidence remain open.
 
 Acceptance criteria:
 
@@ -63,8 +64,8 @@ Acceptance criteria:
 - Failed Steam requests do not replace the last valid result.
 - A 24-48 hour real-data trial records `time_generated` and observed counter
   changes to validate the useful cadence.
-- [x] Retries use bounded backoff and respect rate limits; onboarding also
-  validates reporting dates sequentially to avoid request bursts.
+- [x] Retries use bounded backoff and respect rate limits; onboarding validates
+  the current GMT date with one request before starting historical backfill.
 
 ### 3. Make the stored wishlist total a product workflow
 

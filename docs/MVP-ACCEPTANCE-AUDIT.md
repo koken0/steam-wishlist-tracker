@@ -2,8 +2,8 @@
 
 **Baseline:** PRD v0.2 Vision Draft  
 **Scope:** Local PWA plus Cloudflare staging foundation
-**Result:** Worker, D1, migrations, hourly cron, and Firebase identity deployed;
-hosted secrets and real-data validation pending
+**Result:** Worker, D1, migrations, hourly cron, Firebase identity, hosted
+encryption secret, and authorized real-data onboarding verified
 
 ## Product-value finding
 
@@ -25,10 +25,11 @@ The first P0 closure block is now implemented:
 - onboarding rejects validation with zero usable records; and
 - contract tests cover totals, normalization, and freshness boundaries.
 
-Full runtime account-isolation verification and real-data acceptance remain
-part of the integral manual test. Hourly synchronization is deployed, but has
-no real connection to process until hosted secrets and a Steam connection are
-configured.
+Full runtime account-isolation verification remains part of the integral manual
+test. On 2026-09-05, an authorized non-critical Steam project completed hosted
+onboarding and loaded 24 normalized days without exposing its credential.
+Hourly synchronization is deployed with that saved connection; its 24-48 hour
+cadence evidence remains pending.
 
 Status meanings:
 
@@ -46,8 +47,8 @@ the committed fixture, and has the intended server-side credential boundary.
 It is a credible technical product proof with a deployed staging foundation.
 
 It now satisfies the central PRD v0.2 stored-data contract. Automated
-failure-mode coverage is present. Full runtime account-isolation
-and authorized real-data evidence remain for the integral manual test.
+failure-mode coverage and one authorized hosted onboarding run are present.
+Full runtime account isolation and 24-48 hour cadence evidence remain.
 
 ## Verification performed
 
@@ -58,6 +59,8 @@ and authorized real-data evidence remain for the integral manual test.
 | Anonymous fixture validation | Meets - 14 daily records |
 | Production build | Meets |
 | Browser landing page | Meets |
+| Hosted Google sign-in and authenticated setup | Meets |
+| Authorized hosted Steam onboarding | Meets - 24 normalized days, sanitized evidence |
 | Browser onboarding entry | Partial - rendered correctly, but the automated browser could not complete the local platform sign-in callback |
 | Authorized real Steam onboarding | Pending real data |
 
@@ -70,8 +73,8 @@ and authorized real-data evidence remain for the integral manual test.
 | Exact positive numeric App ID and bounded key | Meets | Setup validates integer App ID, key presence/length/newlines, JSON type, and body size. |
 | Safe errors for invalid, unauthorized, limited, malformed, empty, and mismatched responses | Partial | Safe errors exist and zero normalized records are rejected. Broader automated connector tests are absent. |
 | Validate before saving | Meets | Steam is called before persistence and zero usable records reject onboarding. |
-| Encrypt key and never return it to the client | Meets | AES-256-GCM uses a random 12-byte nonce; API responses omit the key; API and service-worker caching are disabled. Real-data redaction still needs the authorized acceptance run. |
-| Successful onboarding opens one-game workspace | Pending real data | UI flow exists; the real connector requires an authorized key. |
+| Encrypt key and never return it to the client | Meets | AES-256-GCM uses a random 12-byte nonce; API responses omit the key; API and service-worker caching are disabled. The authorized hosted run returned only normalized data. |
+| Successful onboarding opens one-game workspace | Meets | An authorized hosted project reached the ready step and opened a live dashboard with 24 normalized days on 2026-09-05. |
 | Safe connection replacement | Partial | The encrypted row is replaced only after validation. There is no automated regression test or replacement audit event. |
 
 ## 4.2 Dashboard and history
@@ -163,8 +166,8 @@ requires an authorized 24-48 hour cadence trial and the integral PWA tests.
 2. Run the remaining deterministic UI checks for inclusive ranges and
    missing-date presentation during the integral test.
 3. Record basic local load and refresh timings during the integral test.
-4. Run the redacted onboarding acceptance script with an authorized,
-   non-critical Steam test project.
+4. Repair and rerun the local scripted onboarding identity path; hosted
+   onboarding has already produced sanitized real-data evidence.
 5. Perform and record the clean-checkout recovery drill.
 
 ## Final decision
