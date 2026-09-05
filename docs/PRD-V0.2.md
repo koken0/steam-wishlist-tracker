@@ -213,17 +213,20 @@ raw upstream payloads.
 
 ### 3.9 Retention, deletion, and export
 
-For the private prototype, records and encrypted connection data remain until
-the owner chooses **Disconnect and delete all data**. That action removes the
-encrypted credential, daily history, intraday observations, and alerts while
-retaining only the empty owner workspace for reconnection. It does not revoke
-the source key in Steamworks. No broader production retention promise applies,
-and export is not an MVP feature.
+For the private prototype, normalized daily history and encrypted connection
+data remain until the owner chooses **Disconnect and delete all data**. That
+action removes the encrypted credential, daily history, intraday observations,
+and alerts while retaining only the empty owner workspace for reconnection.
+Intraday observations expire after 90 days; alerts, sanitized audit events, and
+scheduled-run summaries expire after 365 days through the hourly retention
+job. **Delete Wishline account** additionally removes the workspace record. No
+action revokes the source key in Steamworks. No broader backup-erasure promise
+applies, and export is not an MVP feature.
 
-Before a hosted pilot, the product must define retention duration, backup
-behavior, deletion completion time, export format, and storage regions. Before
-commercialization, those rules must also appear in the Privacy Policy and
-customer terms.
+Before a hosted pilot, the operator must verify provider backup behavior,
+deletion completion time across recovery copies, export format, and storage
+regions. Before commercialization, those rules must also appear in the Privacy
+Policy and customer terms.
 
 ## 4. Functional acceptance criteria
 
@@ -385,19 +388,22 @@ must always follow Section 3.8.
 
 - The owner can replace the Steam connection after the new key is validated.
 - A suspected Steam key exposure requires immediate revocation at Steam.
-- The prototype's server protection key must not be replaced while saved
-  connections depend on it; recovery requires a documented reset or a future
-  re-wrapping migration.
-- Managed key rotation and tested re-wrapping are mandatory before production.
+- The server protection key is rotated through a dual-key window and a bounded,
+  idempotent re-wrapping action; the previous key remains configured until all
+  saved envelopes are verified current.
+- Tested application re-wrapping is implemented. Managed KMS/HSM custody,
+  recovery ownership, and an operator production drill remain mandatory before
+  production.
 
 ### 5.6 Audit and monitoring
 
-For the local prototype, automated checks and sanitized diagnostic output are
-sufficient. Persistent production audit logs are deferred. Before a hosted
-pilot, connection creation, replacement, refresh success/failure, deletion,
-and privileged access must be observable without recording credentials or raw
-sensitive Steam responses. Health monitoring must distinguish Wishline failure,
-Steam failure, and stale last-known-good data.
+Persistent D1 audit events now cover connection creation/replacement,
+validation failure, disconnect, account deletion, sync outcome, retention, and
+key re-wrapping. Events accept only scoped identifiers and sanitized reason
+codes—never credentials, request bodies, arbitrary messages, or raw Steam
+responses. Scheduled-run summaries distinguish attempted, successful, and
+failed work. External alerting and privileged-access-provider logs remain a
+hosted-pilot control.
 
 ## 6. Local privacy and operating boundary
 

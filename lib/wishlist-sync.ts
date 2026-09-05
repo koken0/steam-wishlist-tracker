@@ -1,5 +1,7 @@
 import { listSteamConnectionsForSync } from '@/lib/wishline-store';
 import { getWishlistDashboardData } from '@/lib/wishlist-server';
+import { WishlistConnectorError } from '@/lib/wishlist-errors';
+import { enforceRetention, persistSyncRun, recordAuditEventSafely } from '@/lib/wishline-governance';
 
 export type WishlistSyncSummary = {
   startedAt: string;
@@ -7,6 +9,13 @@ export type WishlistSyncSummary = {
   attempted: number;
   succeeded: number;
   failed: number;
+  retention: {
+    intradayDeleted: number;
+    alertsDeleted: number;
+    auditsDeleted: number;
+    syncRunsDeleted: number;
+    auditRecorded: boolean;
+  };
 };
 
 export async function syncAllWishlistConnections(): Promise<WishlistSyncSummary> {
@@ -23,18 +32,34 @@ export async function syncAllWishlistConnections(): Promise<WishlistSyncSummary>
         projectName: connection.projectName,
         cacheScope: connection.workspaceId,
       });
-      if (data.syncWarning) failed += 1;
-      else succeeded += 1;
-    } catch {
+      if (data.syncWarning) {
+        failed += 1;
+        await recordAuditEventSafely({ workspaceId: connection.workspaceId, appId: connection.appId, eventType: 'sync.failure', outcome: 'failure', reasonCode: data.syncWarning.code });
+      } else {
+        succeeded += 1;
+        await recordAuditEventSafely({ workspaceId: connection.workspaceId, appId: connection.appId, eventType: 'sync.success', outcome: 'success', reasonCode: data.freshness.toUpperCase() });
+      }
+    } catch (error) {
       failed += 1;
+      await recordAuditEventSafely({
+        workspaceId: connection.workspaceId,
+        appId: connection.appId,
+        eventType: 'sync.failure',
+        outcome: 'failure',
+        reasonCode: error instanceof WishlistConnectorError ? error.code : 'INTERNAL_ERROR',
+      });
     }
   }
 
-  return {
+  const completedAt = new Date().toISOString();
+  const run = {
     startedAt,
-    completedAt: new Date().toISOString(),
+    completedAt,
     attempted: connections.length,
     succeeded,
     failed,
   };
+  await persistSyncRun(run);
+  const retention = await enforceRetention(new Date(completedAt));
+  return { ...run, retention };
 }

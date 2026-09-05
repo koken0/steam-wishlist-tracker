@@ -101,3 +101,23 @@ test('dashboard remains usable at a phone-sized viewport', async ({ page }) => {
   expect(overflow).toBeLessThanOrEqual(1);
   await expect(page.getByRole('navigation', { name: 'Primary navigation' })).toBeVisible();
 });
+
+test('account deletion requires browser confirmation and returns to the welcome shell', async ({ page }) => {
+  let deleteCalls = 0;
+  await page.route('**/api/setup', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(connectedSetup()) }));
+  await page.route('**/api/wishlist', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(dashboardFixture) }));
+  await page.route('**/api/account', async (route) => {
+    expect(route.request().method()).toBe('DELETE');
+    expect(route.request().headers()['x-wishline-action']).toBe('delete-account');
+    deleteCalls += 1;
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ deleted: true }) });
+  });
+  await signInLocally(page);
+  await page.getByRole('button', { name: /Continue to demo/ }).click();
+  await page.getByRole('button', { name: /Open dashboard/ }).click();
+  await page.getByRole('button', { name: 'Settings' }).click();
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: 'Delete Wishline account' }).click();
+  await expect(page.getByRole('heading', { name: /Your Steam wishlists/ })).toBeVisible();
+  expect(deleteCalls).toBe(1);
+});

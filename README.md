@@ -75,7 +75,8 @@ are deployed at `wishline.celkoken.workers.dev`, and Cloudflare registered the
 hourly cron. Firebase identity, the hosted encryption secret, and authorized
 real-data onboarding are verified. Owner disconnect deletes the encrypted
 credential and all stored wishlist data for that workspace. External Web Push
-and managed key rotation remain pending.
+and managed KMS/HSM custody remain pending; application-level dual-key
+re-wrapping is implemented but has not been run against deployed data.
 
 > **Commercial launch gate:** do not enable billing or accept customer Financial
 > Web API keys in paid production until Valve has confirmed the hosted SaaS
@@ -91,15 +92,19 @@ app/
   globals.css       Responsive visual system and component styles
   api/wishlist/     Private, no-store server endpoint
   api/setup/        Authenticated connection, disconnect, and deletion endpoint
+  api/account/      Owner-confirmed full account deletion
+  api/internal/     Scheduled sync and privileged key re-wrapping
 lib/
   wishlist-contract.ts  Shared response contract and normalizer
   wishlist-server.ts    Fixture/live adapter, Steam client, and server cache
   wishline-auth.ts      Platform identity extraction
-  wishline-store.ts     D1 workspace and connection persistence
+  wishline-store.ts     Runtime D1 binding adapter
+  wishline-store-core.ts  Testable workspace and connection persistence
+  wishline-governance-core.ts  Audit, retention, and key re-wrapping
   wishlist-history-store.ts  D1 daily wishlist history
   wishlist-polling.ts  GMT date targeting and spike baseline rules
   wishlist-sync.ts     Hourly synchronization across saved workspaces
-  secret-crypto.ts      AES-256-GCM secret envelope
+  secret-crypto.ts      Versioned dual-key AES-256-GCM envelope
 worker.ts               Web requests plus the hourly scheduled handler
 db/
   schema.ts             Durable data model reference
@@ -107,6 +112,7 @@ drizzle/
   0000_wishline_accounts.sql  Hosted D1 migration
   0001_wishlist_history.sql   Durable per-date history
   0002_intraday_sync_and_alerts.sql  Changed observations and spike events
+  0003_governance.sql        Sanitized audit and scheduled-run health
 fixtures/
   steam-wishlist.sample.json  Anonymous contract fixture
 scripts/
@@ -244,11 +250,17 @@ To capture another number of days, set `STEAM_CAPTURE_DAYS` in `.env.local` betw
 
 - Read-only app token issuance and revocation
 - External Web Push delivery for stored spike events
-- Managed production rotation for the server-side encryption key
+- Managed KMS/HSM custody for the server-side encryption key
 - Push notifications and native Android widget delivery
 
 The generated demo app token remains only in browser memory. The project has no Stripe integration because billing belongs to Phase 2 of the PRD.
 
+Application-level retention, full account deletion, sanitized audit events,
+scheduled-run summaries, and controlled dual-key re-wrapping are implemented.
+See [data retention](docs/DATA-RETENTION.md) and the operator runbook in
+[operations](docs/OPERATIONS.md). These controls do not clear the Valve or
+managed-key launch gates.
+
 ## Production seams
 
-The UI is organized around the production boundaries described by the PRD: passwordless platform identity, a durable owner workspace and per-date history in D1, AES-256-GCM credential storage, a per-App-ID response cache, scoped client tokens, and a reader-only mobile experience. A managed encryption-key rotation policy, scheduled poller, and native Android widget remain production follow-up work.
+The UI is organized around the production boundaries described by the PRD: passwordless platform identity, a durable owner workspace and per-date history in D1, versioned AES-256-GCM credential storage, a per-App-ID response cache, scoped client tokens, and a reader-only mobile experience. Managed KMS/HSM custody, provider backup guarantees, production alerting, and a native Android widget remain follow-up work.

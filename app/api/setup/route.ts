@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { getWishlineUser } from '@/lib/wishline-auth';
 import { disconnectSteamConnection, getWorkspaceStatus, saveSteamConnection } from '@/lib/wishline-store';
 import { validateSteamConnection, WishlistConnectorError } from '@/lib/wishlist-server';
+import { recordAuditEventSafely } from '@/lib/wishline-governance';
+import { validateAndSaveConnection } from '@/lib/wishlist-connection-workflow';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,6 +37,7 @@ export async function POST(request: Request) {
     );
   }
 
+  let auditAppId: number | null = null;
   try {
     const rawBody = await request.text();
     if (new TextEncoder().encode(rawBody).byteLength > 4096) {
@@ -50,6 +53,7 @@ export async function POST(request: Request) {
       throw new WishlistConnectorError('INVALID_JSON', 'The connection request was not valid JSON.', 400);
     }
     const appId = Number(body.appId);
+    auditAppId = Number.isInteger(appId) && appId > 0 ? appId : null;
     const apiKey = typeof body.apiKey === 'string' ? body.apiKey.trim() : '';
     const requestedName = typeof body.projectName === 'string' ? body.projectName.trim() : '';
 
@@ -63,18 +67,26 @@ export async function POST(request: Request) {
       throw new WishlistConnectorError('INVALID_PROJECT_NAME', 'The project name must be 120 characters or fewer.', 400);
     }
 
-    const validated = await validateSteamConnection({ apiKey, appId, projectName: requestedName || undefined });
-    const workspace = await saveSteamConnection(user, {
-      apiKey,
-      appId,
-      projectName: validated.projectName,
+    const { workspace, validation } = await validateAndSaveConnection(user, {
+      apiKey, appId, projectName: requestedName || undefined,
+    }, {
+      validate: validateSteamConnection,
+      save: saveSteamConnection,
     });
 
     return NextResponse.json(
-      { user: publicUser(user), workspace, validation: { records: validated.records, projectName: validated.projectName } },
+      { user: publicUser(user), workspace, validation },
       { headers: privateHeaders() },
     );
   } catch (error) {
+    const connectorError = error instanceof WishlistConnectorError ? error : null;
+    await recordAuditEventSafely({
+      workspaceId: null,
+      appId: auditAppId,
+      eventType: 'connection.validation_failed',
+      outcome: 'failure',
+      reasonCode: connectorError?.code || 'INTERNAL_ERROR',
+    });
     return errorResponse(error);
   }
 }

@@ -45,9 +45,9 @@ configured cap.
 The first hosted save attempt returned `ENCRYPTION_NOT_CONFIGURED`. Configure
 `WISHLIST_ENCRYPTION_KEY` as a Cloudflare secret before accepting real
 credentials. Generate it outside source control, never echo it, and do not
-rotate it while saved connections depend on it without implementing
-re-wrapping first. A failed encryption precondition must leave no partial
-connection behind.
+replace it in one step while saved connections depend on it. Use the documented
+dual-key re-wrapping procedure. A failed encryption precondition must leave no
+partial connection behind.
 
 ### Browser console messages need classification
 
@@ -97,11 +97,32 @@ Runtime initialization now creates the same tables and indexes as the
 forward-only migrations, allowing the first dashboard load to persist an
 observation safely.
 
+### Governance controls must be testable without production data
+
+Audit, retention, isolation, deletion, and encryption rotation are exercised
+against ephemeral Miniflare D1 databases. This caught two design requirements
+that unit-only crypto tests would miss: a failed replacement must leave the old
+row readable, and deleting a second workspace must not alter the first
+workspace's connection or history.
+
+Audit storage deliberately has no payload or message column. Event types,
+outcomes, optional workspace/App ID scope, and reason codes are validated
+before insertion. This makes accidental logging of a request body or upstream
+response structurally harder.
+
+Key rotation uses a dual-key window. Reads accept the current and explicitly
+identified previous key, writes use the current key, and the re-wrapping action
+prepares every new envelope before issuing its bounded update batch. The old
+key must remain configured until an idempotent verification run reports all
+envelopes current. Implementing this mechanism does not authorize rotating the
+deployed key without the operator procedure and recovery evidence.
+
 ## Verified outcome
 
 The authorized hosted run completed Google sign-in, authenticated setup, Steam
 validation, encrypted connection storage, historical backfill, and a live
 dashboard containing 24 normalized reporting days. No credential appeared in
 the UI or sanitized test output. This proves technical connectivity, not the
-24-48 hour cadence hypothesis, tenant isolation, commercial authorization, or
-production readiness.
+24-48 hour cadence hypothesis, commercial authorization, or production
+readiness. Tenant isolation and replacement safety are now covered separately
+by ephemeral two-owner D1 tests rather than claims based on that hosted run.

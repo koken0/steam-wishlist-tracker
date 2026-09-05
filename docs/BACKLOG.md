@@ -36,35 +36,21 @@ bodies, or treat a lack of changed Steam data as a synchronization failure.
 
 ## Do next
 
-### WL-003 — Prove tenant isolation and safe connection replacement
-
-Add integration coverage for two unrelated authenticated users and for
-replacing a saved Steam connection.
-
-**Done when:** User B cannot read, refresh, replace, or delete user A's
-connection or history; a failed replacement preserves the prior valid
-connection; a successful replacement never exposes either key.
-
 ## Before a broader private beta
 
-### WL-006 — Add sanitized audit and health visibility
+### WL-006 — Add quotas and retry telemetry
 
-Record connection creation/replacement, sync success/failure, freshness, and
-scheduled-run health without credentials or raw Steam responses. Add
-per-workspace request quotas and bounded retry telemetry.
+Sanitized audit events and scheduled-run health are durable. Add per-workspace
+request quotas and aggregate bounded-retry telemetry without credentials, raw
+Steam responses, or free-form error payloads.
 
 ### WL-007 — Complete account-level retention and deletion
 
-Owner-controlled disconnect now deletes the encrypted credential and all
-workspace-scoped wishlist history and alerts. Add full account deletion,
-production retention guarantees, backup behavior, and recoverability
-expectations.
-
-### WL-008 — Design encryption-key rotation
-
-Implement controlled re-wrapping before rotating the deployed
-`WISHLIST_ENCRYPTION_KEY`. Never replace it while stored connections depend on
-the current value.
+Owner-controlled disconnect and full account deletion are implemented, and the
+hourly job enforces active-store retention. Establish and test the provider
+backup expiry, restore-time deletion replay, storage-region evidence, and the
+external privacy/terms commitment before describing deletion as a production
+guarantee.
 
 ### WL-009 — Run the clean-checkout recovery drill
 
@@ -103,3 +89,9 @@ commercial access.
 - Inclusive GMT range calculations and the dashboard distinguish missing dates
   from reported zero activity, surface incomplete coverage, and recalculate
   after corrected records.
+- Ephemeral D1 integration tests prove two-owner isolation, failed and
+  successful connection replacement, scoped deletion, sanitized audit fields,
+  retention cutoffs, and dual-key re-wrapping.
+- Full account deletion, scheduled active-store retention, scheduler health,
+  and versioned/idempotent credential-envelope rotation are implemented without
+  changing the deployed key or existing data.

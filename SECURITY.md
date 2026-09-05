@@ -31,6 +31,9 @@ data. Treat both as sensitive even though the current product is an MVP.
 - The hourly Worker reads all saved connections only inside the server runtime;
   its HTTP fallback rejects requests without the scheduler bearer secret.
 - Intraday snapshots and alerts remain scoped by workspace and App ID.
+- Persistent audit rows contain only event type, outcome, sanitized reason
+  code, timestamp, and optional workspace/App ID scope. They have no free-form
+  payload column and never contain request bodies or upstream responses.
 - Owner-confirmed disconnect deletes the encrypted Steam connection and all
   daily, intraday, and alert data scoped to that workspace. It does not revoke
   the source key in Steamworks.
@@ -43,8 +46,22 @@ Before using a real key outside local acceptance:
 - Configure server secrets through the hosting environment.
 - Restrict access to logs, D1 data, and deployment settings.
 - Use the Steamworks IP allowlist when a stable egress IP is available.
-- Test tenant isolation with two independent accounts.
-- Establish credential rotation and incident ownership.
+- Keep the two-owner D1 isolation and replacement tests passing.
+- Establish managed key custody, complete a production rotation drill, and
+  assign incident ownership.
+
+## Server protection-key rotation
+
+Wishline encryption envelopes are versioned and carry a non-secret key ID.
+The runtime supports one current and one previous AES-256-GCM key during a
+controlled rotation window. New writes always use the current key; reads select
+the matching key and legacy envelopes try the controlled pair.
+
+Rotation is authorized by a separate bearer secret and explicit action header,
+and is capped at 100 saved connections per run. It prepares every replacement
+envelope before changing a row, records no plaintext or ciphertext in audit,
+and is idempotent. Do not remove the previous key until a second run reports
+every scanned envelope already current and live reads have been verified.
 
 ## Reporting a vulnerability
 

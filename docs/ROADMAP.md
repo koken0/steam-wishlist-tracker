@@ -88,18 +88,21 @@ Acceptance criteria:
 
 - Contract tests cover valid, empty, malformed, unauthorized, rate-limited, and
   App-ID-mismatch Steam responses.
-- Integration tests cover account isolation and saved-connection replacement.
-- A browser smoke test covers sign-in, onboarding, refresh, and reconnect.
+- [x] Integration tests cover account isolation and saved-connection replacement.
+- [x] A browser smoke test covers sign-in, onboarding, refresh, and reconnect.
 - [x] Data tests cover missing dates, corrected dates, stored-total
   reconstruction, and freshness boundaries.
 - CI runs lint, TypeScript, fixture tests, and build on every pull request.
 
 ## Next: reliable private beta
 
-- Owner-facing disconnect is implemented with complete connection-data
-  deletion; credential replacement history remains pending
-- Audit events for connection creation, replacement, refresh, and failure
-- Error monitoring and health metrics without secret-bearing payloads
+- Owner-facing disconnect and full account deletion are implemented with
+  complete active-store data deletion; provider backup guarantees remain
+  pending.
+- [x] Sanitized audit events cover connection, sync, deletion, retention, and
+  re-wrapping actions; scheduled-run summaries provide durable health counts.
+- Error monitoring, per-workspace quotas, and aggregate retry telemetry without
+  secret-bearing payloads.
 - Managed rotation process for the server protection key
 - Per-workspace refresh quotas and abuse controls
 - Data export for owner-controlled aggregate history

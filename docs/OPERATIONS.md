@@ -61,6 +61,10 @@ send a user identity header.
 | Value | Purpose | Required |
 | --- | --- | --- |
 | `WISHLIST_ENCRYPTION_KEY` | Protects saved workspace credentials | Yes for app onboarding |
+| `WISHLIST_ENCRYPTION_KEY_ID` | Non-secret ID written into new credential envelopes | Yes; defaults to `primary` |
+| `WISHLIST_PREVIOUS_ENCRYPTION_KEY` | Temporarily reads old envelopes during a controlled rotation | Rotation window only |
+| `WISHLIST_PREVIOUS_ENCRYPTION_KEY_ID` | Non-secret ID of the temporary previous key | Rotation window only |
+| `WISHLINE_ROTATION_SECRET` | Authorizes the privileged re-wrapping action | Before key rotation |
 | `STEAM_LOOKBACK_DAYS` | Initial onboarding backfill, capped at 90 days | Optional |
 | `STEAM_CACHE_SECONDS` | Server cache lifetime, bounded by the connector | Optional |
 | `WISHLINE_SYNC_SECRET` | Bearer secret accepted only by the private scheduler endpoint | Required for external scheduler |
@@ -118,11 +122,31 @@ Before the first hosted real-data test:
 
 ### Wishline server protection key
 
-The current data model does not yet support automatic re-wrapping. Do not
-replace `WISHLIST_ENCRYPTION_KEY` while saved connections still depend on it.
-Before rotation, implement a controlled migration that decrypts each connection
-with the old key and protects it with the new key. Keep both keys outside logs
-and source control during the migration.
+Never replace the current key in one step. Use this controlled sequence:
+
+1. Assign the deployed key a non-secret ID in
+   `WISHLIST_ENCRYPTION_KEY_ID`; existing legacy envelopes remain readable.
+2. Configure the same old material and ID as
+   `WISHLIST_PREVIOUS_ENCRYPTION_KEY` and
+   `WISHLIST_PREVIOUS_ENCRYPTION_KEY_ID` before changing the current key.
+3. Configure a new random 32-byte current key and a new current ID. At this
+   point reads accept both keys and all new writes use only the new key.
+4. From a secret-capable operator client, POST
+   `/api/internal/rotate-encryption` with the rotation bearer secret and
+   `X-Wishline-Action: rewrap-connections`. Never place either encryption key,
+   bearer value, or response headers in shell history or logs.
+5. The action first decrypts and prepares every pending envelope, then updates
+   a bounded batch. If any old envelope is unreadable, no pending envelope in
+   that run is changed. The response contains counts and the non-secret current
+   key ID only.
+6. Run the action again. Require `rewrapped: 0` and
+   `alreadyCurrent: scanned`, then verify normal dashboard reads.
+7. Only after that verification, remove both previous-key variables. Retain the
+   retired key according to the private recovery procedure, never in source.
+
+Runs are capped at 100 connections. A larger installation must add a reviewed
+cursor/batch plan before rotation rather than silently accepting a partial
+run.
 
 ## Disconnect and deletion
 
@@ -131,6 +155,27 @@ explicit browser confirmation, Wishline deletes the encrypted Steam credential,
 daily history, intraday observations, and alerts for that workspace in one D1
 batch. The empty owner workspace remains available for reconnection. This
 action is irreversible in Wishline and does not revoke the key in Steamworks.
+
+**Delete Wishline account** is a separate confirmed Settings action. It removes
+the workspace record as well as the connection and all workspace wishlist
+data. Do not invoke either deletion as an operational test against a real
+workspace. See `DATA-RETENTION.md` for active-store lifetimes and backup limits.
+
+## Audit, scheduler health, and retention
+
+Migration `0003_governance.sql` adds sanitized `audit_events` and `sync_runs`.
+Audit inspection must select only the defined columns; there is deliberately no
+request, response, header, credential, or free-form message payload. The hourly
+job persists attempted/succeeded/failed counts, then deletes expired intraday
+observations (90 days), alerts (365 days), audit events (365 days), and sync
+summaries (365 days). Daily history and connections remain until an owner
+deletion action so retention never changes the stored total silently.
+
+Apply the forward migration before deploying this code:
+
+```bash
+npm run db:migrate:cloudflare
+```
 
 ## Troubleshooting
 

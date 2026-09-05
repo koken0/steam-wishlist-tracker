@@ -34,6 +34,8 @@ timestamps. It never receives the saved Financial API key.
 | `app/api/wishlist/route.ts` | Private normalized dashboard endpoint and refresh action |
 | `lib/wishline-auth.ts` | Reads the platform-provided authenticated identity |
 | `lib/wishline-store.ts` | Creates owner workspaces and reads/writes Steam connections in D1 |
+| `lib/wishline-store-core.ts` | Database-injected connection store used by runtime and isolated D1 integration tests |
+| `lib/wishline-governance-core.ts` | Sanitized audit events, sync health, retention enforcement, and credential re-wrapping |
 | `lib/wishlist-history-store.ts` | Upserts normalized daily snapshots and reads durable project history |
 | `lib/secret-crypto.ts` | Protects and restores credentials within the server runtime |
 | `lib/wishlist-server.ts` | Steam client, fixture adapter, metadata lookup, throttling, and cache |
@@ -54,6 +56,13 @@ The Financial API key is never stored as plaintext in D1. The server requires
 For local development, the package `predev` lifecycle prepares this ignored
 server-only key before the application starts and preserves an existing value.
 Hosted environments must provide it through managed server secrets instead.
+
+New credential envelopes contain a non-secret key ID. During rotation the
+runtime may hold a current and previous key, can read both envelope generations,
+and writes only with the current key. The privileged rotation action decrypts
+all eligible rows before issuing a bounded D1 update batch, so a bad previous
+key fails before existing rows change. Legacy two-part envelopes remain
+readable and can be upgraded in the same pass.
 
 Client history calculations live in `lib/wishlist-history.ts`. They sort the
 stored records, reconstruct per-date totals from the current stored total, and
@@ -150,6 +159,14 @@ explicit action header. One D1 batch removes alerts, intraday observations,
 daily snapshots, and the encrypted Steam connection before returning the empty
 workspace status. The owner workspace record remains available for a later
 reconnection. Wishline deletion does not revoke the source key in Steamworks.
+
+`audit_events` accepts only enumerated event types, success/failure, scoped IDs,
+and sanitized reason codes; it has no payload or message column. `sync_runs`
+stores aggregate scheduler health. The hourly handler enforces 90-day intraday
+and 365-day alert/audit/health retention after synchronization. Daily history
+is owner-action retained because rolling deletion would silently alter the
+stored total. Full account deletion removes the workspace itself as well as
+all workspace data.
 
 ## Non-goals for Phase 1
 

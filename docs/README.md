@@ -15,6 +15,8 @@ This directory contains the durable project documentation. Keep the root
   implementation constraints.
 - [Operations](OPERATIONS.md): local operation, hosted-environment checklist,
   secret rotation, and troubleshooting.
+- [Data retention](DATA-RETENTION.md): active-store lifetimes, deletion
+  semantics, scheduled enforcement, and backup limitations.
 - [Engineering learnings](ENGINEERING-LEARNINGS.md): sanitized incident
   findings, diagnostic rules, and regression-prevention knowledge.
 - [Steamworks compliance and monetization](STEAM-COMPLIANCE.md): durable legal
@@ -37,6 +39,7 @@ Update documentation in the same change that alters its subject:
 | --- | --- |
 | Runtime, route, persistence, or data-flow change | `ARCHITECTURE.md` |
 | Environment variable, deployment, or recovery change | `OPERATIONS.md` and `.env.example` |
+| Retention duration, deletion, or backup behavior | `DATA-RETENTION.md` |
 | Security boundary or credential-handling change | `SECURITY.md` |
 | Steam API, Steam data, branding, hosting, or monetization change | `STEAM-COMPLIANCE.md` |
 | Scope, priority, or milestone change | `ROADMAP.md` |

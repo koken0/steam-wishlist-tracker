@@ -58,7 +58,7 @@ Full runtime account isolation and 24-48 hour cadence evidence remain.
 | TypeScript (`tsc --noEmit`) | Meets |
 | Anonymous fixture validation | Meets - 14 daily records |
 | Production build | Meets |
-| Chromium browser/PWA suite | Meets - 3 scenarios at desktop and phone sizes |
+| Chromium browser/PWA suite | Meets - 4 scenarios at desktop and phone sizes |
 | Browser landing page | Meets |
 | Hosted Google sign-in and authenticated setup | Meets |
 | Authorized hosted Steam onboarding | Meets - 24 normalized days, sanitized evidence |
@@ -76,8 +76,8 @@ Full runtime account isolation and 24-48 hour cadence evidence remain.
 | Validate before saving | Meets | Steam is called before persistence and zero usable records reject onboarding. |
 | Encrypt key and never return it to the client | Meets | AES-256-GCM uses a random 12-byte nonce; API responses omit the key; API and service-worker caching are disabled. The authorized hosted run returned only normalized data. |
 | Successful onboarding opens one-game workspace | Meets | An authorized hosted project reached the ready step and opened a live dashboard with 24 normalized days on 2026-09-05. |
-| Safe connection replacement | Partial | Browser acceptance covers the reconnection experience and confirms neither placeholder key renders. Durable failed-replacement and tenant-isolation tests remain pending. |
-| Owner disconnect and connection-data deletion | Meets in implementation | An authenticated, explicitly confirmed action deletes the encrypted connection, daily history, intraday observations, and alerts in one D1 batch while retaining the empty owner workspace. Browser verification remains pending. |
+| Safe connection replacement | Meets | Browser acceptance covers reconnection without rendering either placeholder key. Ephemeral D1 tests prove a failed validation preserves the old connection and a successful replacement returns no key. |
+| Owner disconnect and connection-data deletion | Meets | D1 integration tests prove workspace-scoped deletion; browser acceptance covers the explicit confirmation boundary. Full account deletion removes the workspace as a separate action. |
 
 ## 4.2 Dashboard and history
 
@@ -116,14 +116,13 @@ Full runtime account isolation and 24-48 hour cadence evidence remain.
 
 ## 5. Non-functional requirements
 
-### Security - Partial
+### Security - Meets for the private MVP
 
 Implemented: server-only key use, AES-256-GCM, fixed HTTPS endpoint, App ID
 validation, bounded inputs, private API headers, and workspace-scoped database
-queries.
-
-Missing evidence: automated two-user isolation and saved-connection replacement
-tests, plus a log/response secret scan across failure paths.
+queries. Ephemeral D1 tests cover two owners, scoped reads/deletes,
+failed/successful replacement, encrypted-at-rest values, and key-free workflow
+responses. Browser tests retain no screenshots, traces, or video.
 
 ### Performance - Missing evidence
 
@@ -139,19 +138,22 @@ history is implemented. A timed clean-checkout recovery drill remains missing.
 ### Availability and freshness - Partial
 
 Freshness classification is implemented and rendered. Hosted onboarding is
-verified, but the 24-48 hour hourly-cadence trial and repaired local scripted
-identity path remain outstanding.
+verified and the local scripted identity path passes. The 24-48 hour
+hourly-cadence trial remains outstanding.
 
-### Credential rotation - Partial
+### Credential rotation - Meets at the application layer
 
-Steam connection replacement exists. Server protection-key re-wrapping does
-not; documentation correctly requires a reset or future migration.
+Versioned envelopes, legacy compatibility, a current/previous dual-key window,
+bounded all-prepare-before-update re-wrapping, idempotence, a separate
+privileged action, and D1 integration tests are present. Managed key custody and
+a production rotation drill remain launch controls.
 
-### Audit and monitoring - Partial
+### Audit and monitoring - Meets at the application layer
 
-The fixture and onboarding scripts provide sanitized diagnostics. Persistent
-events, structured health states, and explicit differentiation between Steam,
-Wishline, and stale-data failures are not implemented.
+Persistent allowlisted events cover connection, sync, deletion, retention, and
+re-wrapping actions without a payload column. Scheduled runs retain aggregate
+health counts, and sync failures retain only safe reason codes. External
+alerting and provider privileged-access logs remain hosted-pilot controls.
 
 ## MVP closure backlog
 

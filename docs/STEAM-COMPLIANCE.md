@@ -198,6 +198,12 @@ Stripe or other billing work must remain deferred until the Valve authorization
 item is resolved. Completing only the technical controls does not clear the
 contractual gate.
 
+Wishline now has versioned dual-key envelopes, bounded application re-wrapping,
+sanitized D1 audit events, active-store retention, and full account deletion.
+The checklist remains open because managed key custody, provider-level access
+auditing, backup recovery/deletion evidence, and a production incident drill
+are not established.
+
 ## Question to send Valve
 
 Use a Steamworks Support ticket and, if appropriate, the contact address listed
