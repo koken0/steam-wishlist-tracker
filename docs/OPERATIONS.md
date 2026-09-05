@@ -80,11 +80,11 @@ browser, a URL, source control, or scheduler logs.
 Cloudflare staging currently uses Worker `wishline`, D1 database `wishline`,
 and `https://wishline.celkoken.workers.dev`. All committed migrations are
 applied and the hourly cron is registered. Keep it empty of real credentials
-until Firebase identity and the encryption secret are configured.
+until the encryption secret and an authorized real Steam connection are configured.
 
 Before the first hosted real-data test:
 
-- Require validated Firebase identity before accepting hosted onboarding.
+- Confirm Google sign-in succeeds through Firebase from the deployed domain.
 - Configure `WISHLIST_ENCRYPTION_KEY` as a server secret, never as a public
   build variable.
 - Apply and inspect all migrations with `npm run db:migrate:cloudflare`.

@@ -14,7 +14,7 @@ Wishline is an English-language Phase 1 acceptance build for the Studio Wishlist
 | Application framework | Next.js 16.3.3 | App Router structure, metadata, and React application shell |
 | Server connector | Next.js Route Handler | Normalizes Steamworks responses without exposing the Financial API key |
 | UI runtime | React 19.2.8 | Interactive onboarding, navigation, settings, refresh, and token flows |
-| Identity | Sites identity locally; Firebase Auth planned for staging | Passwordless owner identity and workspace isolation |
+| Identity | Local simulated identity; Firebase Auth on staging | Passwordless Google sign-in and workspace isolation |
 | Persistence | Cloudflare D1 | Durable owner workspace, encrypted Steam connection, and normalized daily wishlist history |
 | Secret protection | Web Crypto AES-256-GCM | API keys are encrypted before D1 storage and never returned to clients |
 | Language | TypeScript 5.9.3 | Typed application source and build-time checks |
@@ -45,7 +45,7 @@ that pass the production dependency audit.
 ```text
 Browser / installed PWA
         |
-        +-- Sign in with ChatGPT (passwordless platform identity)
+        +-- Sign in with Google through Firebase Authentication
         +-- POST /api/setup (one-time Steam validation)
         |            |
         |            +-- AES-256-GCM encryption
@@ -72,7 +72,7 @@ The server connector, D1 workspace, encrypted live Steamworks connection,
 durable daily history, intraday observations, spike events, freshness states,
 and last-known-good fallback are implemented. The staging Worker and D1 database
 are deployed at `wishline.celkoken.workers.dev`, and Cloudflare registered the
-hourly cron. Firebase identity, hosted encryption secrets, real-data acceptance,
+hourly cron. Firebase identity is integrated; hosted encryption secrets, real-data acceptance,
 external Web Push, and managed key rotation remain pending.
 
 > **Commercial launch gate:** do not enable billing or accept customer Financial
@@ -175,7 +175,7 @@ Keep `WISHLIST_DATA_SOURCE=fixture`. The dashboard will label every surface as *
 npm run dev
 ```
 
-3. Select **Continue to demo**, then **Sign in with ChatGPT**. Local development uses the stable simulated identity `local_seedy`; a hosted private Site uses the authenticated platform identity.
+3. Select **Continue to demo**, then **Open local workspace**. Local development uses the stable simulated identity `local_seedy`; Cloudflare staging uses Google sign-in through Firebase.
 4. Enter the Steam App ID and Financial API key in **Connect Steam**. Wishline validates them against Steam before encrypting the key and storing the connection in the owner's D1 workspace.
 
 The older environment-driven connector remains available for diagnostics. To use it instead, set:
@@ -191,8 +191,8 @@ STEAM_CACHE_SECONDS=1800
 
 Restart `npm run dev` after changing environment values.
 
-For Cloudflare staging, complete Firebase Authentication before onboarding,
-store `WISHLIST_ENCRYPTION_KEY` as a Worker secret, and review Steamworks IP
+For Cloudflare staging, Firebase Authentication validates Google ID tokens before
+onboarding. Store `WISHLIST_ENCRYPTION_KEY` as a Worker secret, and review Steamworks IP
 allowlisting limitations. `WISHLIST_ALLOWED_USER_IDS` remains required only for
 the legacy environment-driven connector.
 

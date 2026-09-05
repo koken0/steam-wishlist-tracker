@@ -22,7 +22,7 @@ export async function POST(request: Request) {
 
 async function wishlistResponse(request: Request, force: boolean) {
   try {
-    const user = getWishlineUser(request);
+    const user = await getWishlineUser(request);
     const savedConnection = user ? await getSteamConnection(user) : null;
     if (!savedConnection) {
       const access = authorizeWishlistRequest(request);

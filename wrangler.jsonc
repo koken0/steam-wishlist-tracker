@@ -5,6 +5,9 @@
   "compatibility_date": "2026-09-04",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
+  "vars": {
+    "FIREBASE_PROJECT_ID": "wishline-staging"
+  },
   "triggers": {
     "crons": ["0 * * * *"]
   },

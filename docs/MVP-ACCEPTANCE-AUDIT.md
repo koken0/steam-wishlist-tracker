@@ -2,8 +2,8 @@
 
 **Baseline:** PRD v0.2 Vision Draft  
 **Scope:** Local PWA plus Cloudflare staging foundation
-**Result:** Worker, D1, migrations, and hourly cron deployed; Firebase identity,
-secrets, and real-data validation pending
+**Result:** Worker, D1, migrations, hourly cron, and Firebase identity deployed;
+hosted secrets and real-data validation pending
 
 ## Product-value finding
 
@@ -27,7 +27,7 @@ The first P0 closure block is now implemented:
 
 Full runtime account-isolation verification and real-data acceptance remain
 part of the integral manual test. Hourly synchronization is deployed, but has
-no real connection to process until Firebase identity and hosted secrets are
+no real connection to process until hosted secrets and a Steam connection are
 configured.
 
 Status meanings:

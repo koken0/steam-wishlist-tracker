@@ -1,6 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import {
+  observeWishlineUser,
+  signInToWishline,
+  signOutOfWishline,
+  usesFirebaseAuthentication,
+  wishlineAuthorizationHeader,
+} from '@/lib/firebase-client';
 import type { WishlistDashboardData } from '@/lib/wishlist-contract';
 
 type View = 'overview' | 'projects' | 'widget' | 'security' | 'settings';
@@ -29,10 +36,11 @@ const nav: { id: View; label: string; icon: string }[] = [
 ];
 
 async function fetchWishlistDashboard(force = false): Promise<WishlistDashboardData> {
+  const authorization = await wishlineAuthorizationHeader();
   const response = await fetch('/api/wishlist', {
     method: force ? 'POST' : 'GET',
     cache: 'no-store',
-    headers: force ? { 'X-Wishline-Action': 'refresh' } : undefined,
+    headers: force ? { ...authorization, 'X-Wishline-Action': 'refresh' } : authorization,
   });
   const payload = await response.json() as WishlistDashboardData | { error?: { message?: string } };
   if (!response.ok || 'error' in payload) {
@@ -42,7 +50,10 @@ async function fetchWishlistDashboard(force = false): Promise<WishlistDashboardD
 }
 
 async function fetchSetup(): Promise<SetupState> {
-  const response = await fetch('/api/setup', { cache: 'no-store' });
+  const response = await fetch('/api/setup', {
+    cache: 'no-store',
+    headers: await wishlineAuthorizationHeader(),
+  });
   const payload = await response.json() as SetupState | { error?: { message?: string } };
   if (!response.ok || 'error' in payload) {
     throw new Error('error' in payload ? payload.error?.message || 'Workspace could not be loaded.' : 'Workspace could not be loaded.');
@@ -51,10 +62,11 @@ async function fetchSetup(): Promise<SetupState> {
 }
 
 async function connectSteam(input: { appId: string; apiKey: string; projectName: string }): Promise<SetupState> {
+  const authorization = await wishlineAuthorizationHeader();
   const response = await fetch('/api/setup', {
     method: 'POST',
     cache: 'no-store',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { ...authorization, 'Content-Type': 'application/json' },
     body: JSON.stringify(input),
   });
   const payload = await response.json() as SetupState | { error?: { message?: string } };
@@ -80,10 +92,24 @@ export default function Home() {
 
   useEffect(() => {
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => undefined);
-    fetchWishlistDashboard()
-      .then((data) => { setWishlistData(data); setDataError(''); })
-      .catch((error: Error) => setDataError(error.message));
-    fetchSetup().then(setSetup).catch(() => undefined);
+    const loadWorkspace = () => {
+      fetchWishlistDashboard()
+        .then((data) => { setWishlistData(data); setDataError(''); })
+        .catch((error: Error) => setDataError(error.message));
+      fetchSetup().then(setSetup).catch(() => undefined);
+    };
+    if (!usesFirebaseAuthentication()) {
+      loadWorkspace();
+      return;
+    }
+    return observeWishlineUser((user) => {
+      if (user) loadWorkspace();
+      else {
+        setSetup(null);
+        setWishlistData(null);
+        setDataError('');
+      }
+    });
   }, []);
 
   const progress = useMemo(() => {
@@ -120,17 +146,29 @@ export default function Home() {
 
   async function openOnboarding() {
     setScreen('onboarding');
+    await authenticateAndLoadSetup();
+  }
+
+  async function authenticateAndLoadSetup() {
     setSetupLoading(true);
+    setSetupError('');
     try {
+      if (usesFirebaseAuthentication()) await signInToWishline();
       const value = await fetchSetup();
       setSetup(value);
-      setSetupError('');
       setOnboardingStep(value.workspace.connected ? 3 : 1);
     } catch (error) {
       setSetupError(error instanceof Error ? error.message : 'Sign in is required.');
     } finally {
       setSetupLoading(false);
     }
+  }
+
+  async function leaveWorkspace() {
+    if (usesFirebaseAuthentication()) await signOutOfWishline();
+    setSetup(null);
+    setWishlistData(null);
+    setScreen('welcome');
   }
 
   async function saveConnection(input: { appId: string; apiKey: string; projectName: string }) {
@@ -162,6 +200,7 @@ export default function Home() {
         setup={setup}
         error={setupError}
         loading={setupLoading}
+        authenticate={authenticateAndLoadSetup}
         connect={saveConnection}
         next={() => setOnboardingStep((step) => Math.min(3, step + 1))}
         back={() => onboardingStep === 1 ? setScreen('welcome') : setOnboardingStep((step) => step - 1)}
@@ -182,7 +221,7 @@ export default function Home() {
           ))}
         </nav>
         <div className={`sidebar-note ${wishlistData?.source === 'steam' ? 'live-source' : ''}`}><span className="status-dot" /><div>{wishlistData?.source === 'steam' ? 'Live Steam data' : 'Anonymous fixture'}<small>{wishlistData?.source === 'steam' ? 'Financial key stays server-side' : 'Safe local contract data'}</small></div></div>
-        <button className="profile" onClick={() => setScreen('welcome')}><span className="avatar">JA</span><span><b>Jordan Allen</b><small>Demo owner</small></span><span>↗</span></button>
+        <button className="profile" onClick={leaveWorkspace}><span className="avatar">{ownerInitials(setup)}</span><span><b>{setup?.user.name || setup?.user.email || 'Wishline owner'}</b><small>{usesFirebaseAuthentication() ? 'Sign out' : 'Local owner'}</small></span><span>↗</span></button>
       </aside>
 
       <section className="workspace">
@@ -242,7 +281,7 @@ function Welcome({ onContinue }: { onContinue: () => void }) {
   );
 }
 
-function Onboarding({ step, data, setup, error, loading, connect, next, back, finish }: { step:number; data:WishlistDashboardData|null; setup:SetupState|null; error:string; loading:boolean; connect:(input:{appId:string;apiKey:string;projectName:string})=>void; next:()=>void; back:()=>void; finish:()=>void }) {
+function Onboarding({ step, data, setup, error, loading, authenticate, connect, next, back, finish }: { step:number; data:WishlistDashboardData|null; setup:SetupState|null; error:string; loading:boolean; authenticate:()=>void; connect:(input:{appId:string;apiKey:string;projectName:string})=>void; next:()=>void; back:()=>void; finish:()=>void }) {
   const [appId, setAppId] = useState(setup?.workspace.appId ? String(setup.workspace.appId) : '');
   const [apiKey, setApiKey] = useState('');
   const [projectName, setProjectName] = useState(setup?.workspace.projectName || '');
@@ -276,7 +315,7 @@ function Onboarding({ step, data, setup, error, loading, connect, next, back, fi
             <span className="setup-icon ready-icon">✓</span><p className="eyebrow">STEP 3 OF 3</p><h1>Ready to track momentum</h1><p className="setup-lead">Your authenticated workspace and live Steam connection are ready. The Financial API key remains protected on the server.</p>
             <div className="review-list"><div><span className="game-tile">{setup?.workspace.projectName?.charAt(0) || 'W'}</span><p><small>TRACKING</small><b>{setup?.workspace.projectName || data?.projectName || 'Configured project'}</b></p><em>Live</em></div><div><span>◎</span><p><small>OWNER</small><b>{setup?.user.email || setup?.user.name || 'Authenticated account'}</b></p></div><div><span>◆</span><p><small>CREDENTIAL PROTECTION</small><b>Server-side only</b></p></div></div>
           </>}
-          <div className="setup-actions"><button className="secondary-button" onClick={back}>← Back</button>{step === 1 ? setup ? <button className="primary-button compact" disabled={loading} onClick={next}>Continue →</button> : <a className="primary-button compact" href="/signin-with-chatgpt?return_to=/">Sign in with ChatGPT →</a> : step === 3 ? <button className="primary-button compact" disabled={!setup?.workspace.connected} onClick={finish}>Open dashboard →</button> : null}</div>
+          <div className="setup-actions"><button className="secondary-button" onClick={back}>← Back</button>{step === 1 ? setup ? <button className="primary-button compact" disabled={loading} onClick={next}>Continue →</button> : usesFirebaseAuthentication() ? <button className="primary-button compact" disabled={loading} onClick={authenticate}>{loading ? 'Signing in…' : 'Sign in with Google →'}</button> : <a className="primary-button compact" href="/signin-with-chatgpt?return_to=/">Open local workspace →</a> : step === 3 ? <button className="primary-button compact" disabled={!setup?.workspace.connected} onClick={finish}>Open dashboard →</button> : null}</div>
         </section>
       </div>
     </main>
@@ -402,6 +441,12 @@ function coverageLabel(data: WishlistDashboardData): string {
   if (!data.coverageStart || !data.coverageEnd) return 'Stored coverage unavailable';
   if (data.coverageComplete) return `Complete stored history through ${data.coverageEnd}`;
   return `Stored coverage ${data.coverageStart} through ${data.coverageEnd}`;
+}
+
+function ownerInitials(setup: SetupState | null): string {
+  const label = setup?.user.name || setup?.user.email || 'Wishline owner';
+  const parts = label.split(/[\s@._-]+/).filter(Boolean);
+  return parts.slice(0, 2).map((part) => part.charAt(0).toUpperCase()).join('') || 'W';
 }
 
 function formatCount(value: number | null | undefined): string {

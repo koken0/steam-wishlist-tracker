@@ -6,7 +6,7 @@ import { validateSteamConnection, WishlistConnectorError } from '@/lib/wishlist-
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
-  const user = getWishlineUser(request);
+  const user = await getWishlineUser(request);
   if (!user) return authRequired();
 
   try {
@@ -18,7 +18,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const user = getWishlineUser(request);
+  const user = await getWishlineUser(request);
   if (!user) return authRequired();
 
   const contentLength = Number(request.headers.get('content-length') || '0');

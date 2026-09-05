@@ -59,8 +59,10 @@ Hosted environments must provide it through managed server secrets instead.
 
 - Local development uses the stable Sites test identity `local_seedy`.
 - A hosted private Site uses the platform-authenticated user headers.
-- Direct Cloudflare staging will validate Firebase ID tokens before resolving a
-  workspace. That adapter is pending and hosted onboarding remains disabled.
+- Direct Cloudflare staging validates Firebase ID tokens before resolving a
+  workspace. The browser sends a short-lived token in the Authorization header;
+  the Worker verifies its signature and Firebase project claims before trusting
+  the user ID.
 - Saved connections are resolved only through the authenticated user's
   workspace.
 - The older environment-driven Steam mode remains available for diagnostics;
