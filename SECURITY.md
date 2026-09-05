@@ -15,6 +15,8 @@ data. Treat both as sensitive even though the current product is an MVP.
 - Never send the key as a URL query parameter.
 - Never log request headers, raw setup bodies, protected credential values, or
   decrypted secrets.
+- Treat `WISHLINE_SYNC_SECRET` like a credential. Send it only in the private
+  scheduler endpoint's Authorization header, never in a URL or browser code.
 - Keep `.env.local`, `.wrangler/`, captures, and local database state out of Git.
 
 ## Security boundaries
@@ -26,6 +28,9 @@ data. Treat both as sensitive even though the current product is an MVP.
 - Browser and service-worker caches exclude `/api/` responses.
 - Client responses contain normalized aggregates and safe project metadata only.
 - App ID, response shape, request size, and refresh actions are validated.
+- The hourly Worker reads all saved connections only inside the server runtime;
+  its HTTP fallback rejects requests without the scheduler bearer secret.
+- Intraday snapshots and alerts remain scoped by workspace and App ID.
 
 ## Production controls
 

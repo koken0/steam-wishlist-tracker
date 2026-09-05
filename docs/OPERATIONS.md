@@ -53,14 +53,27 @@ the API key appears in a client response.
 | Value | Purpose | Required |
 | --- | --- | --- |
 | `WISHLIST_ENCRYPTION_KEY` | Protects saved workspace credentials | Yes for app onboarding |
-| `STEAM_LOOKBACK_DAYS` | Number of reporting dates requested, capped at 90 | Optional |
+| `STEAM_LOOKBACK_DAYS` | Initial onboarding backfill, capped at 90 days | Optional |
 | `STEAM_CACHE_SECONDS` | Server cache lifetime, bounded by the connector | Optional |
+| `WISHLINE_SYNC_SECRET` | Bearer secret accepted only by the private scheduler endpoint | Required for external scheduler |
 | `WISHLIST_DATA_SOURCE` | Selects fixture or legacy environment-driven Steam mode | Optional |
 | `STEAM_FINANCIAL_API_KEY` | Legacy connector and local acceptance script | Legacy/test only |
 | `STEAM_APP_ID` | Legacy connector and local acceptance script | Legacy/test only |
 | `WISHLIST_ALLOWED_USER_IDS` | Production allowlist for legacy live mode | Legacy production only |
 
 Keep `.env.example` aligned whenever a runtime value is added or removed.
+
+## Steam reporting cadence
+
+The API supports the current GMT date and recent values are published in
+intraday batches. Wishline runs hourly and requests only yesterday and today
+after the initial bounded history import. Yesterday is refreshed only while it
+is the immediately previous date; older closed dates are left untouched.
+
+The Cloudflare Worker exports an hourly scheduled handler. Environments that do
+not attach Worker cron triggers can POST to `/api/internal/hourly-sync` with
+`Authorization: Bearer <WISHLINE_SYNC_SECRET>`. Never place that secret in the
+browser, a URL, source control, or scheduler logs.
 
 ## Hosted-environment readiness checklist
 
@@ -104,7 +117,7 @@ and source control during the migration.
 | `ENCRYPTION_NOT_CONFIGURED` | Restart with `npm run dev`; if preparation was skipped, run `npm run setup:local` explicitly |
 | Steam access denied | Key permissions, App ID, and Steamworks IP allowlist |
 | App ID mismatch | Confirm the key is authorized for the exact configured App ID |
-| No wishlist records | Try a valid recent date range and confirm the app has reporting data |
+| No new wishlist date | Confirm the previous GMT date has been published; keep the last stored date while bounded retries remain pending |
 | Refresh returns cached data | Wait for the one-minute refresh safety window |
 | Dashboard says `Showing last stored data` | Steam refresh failed; inspect the safe error and freshness while preserving the stored history |
 | Stored total looks lower than Steamworks | Check the displayed coverage start; Wishline does not infer activity before its first stored date |

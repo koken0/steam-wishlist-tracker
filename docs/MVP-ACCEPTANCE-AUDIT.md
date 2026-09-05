@@ -2,7 +2,14 @@
 
 **Baseline:** PRD v0.2 Vision Draft  
 **Scope:** Current local PWA prototype  
-**Result:** Core data block implemented; final MVP acceptance still pending
+**Result:** Intraday backend foundation implemented; real-data validation pending
+
+## Product-value finding
+
+Valve's API accepts the current GMT date and updates recent wishlist activity
+in batches, normally within an hour or a few hours. This restores the core
+intraday monitoring hypothesis, although it remains a hypothesis until a real
+game demonstrates useful counter changes and alert timing over 24-48 hours.
 
 ## Implementation update
 
@@ -18,7 +25,9 @@ The first P0 closure block is now implemented:
 - contract tests cover totals, normalization, and freshness boundaries.
 
 Full runtime account-isolation verification and real-data acceptance remain
-part of the integral manual test. Scheduled polling remains a later phase.
+part of the integral manual test. Daily scheduled synchronization remains a
+later phase, and the manual connector still needs the closed-date correction
+described below.
 
 Status meanings:
 
@@ -87,6 +96,7 @@ and authorized real-data evidence remain for the integral manual test.
 | Failed refresh preserves last-known-good result | Meets | Durable D1 history is served with a safe warning after a failed refresh or process restart. |
 | Delayed and stale state displayed | Meets | Fresh/Delayed/Stale/Unknown is calculated at the documented boundaries and rendered. |
 | App ID and date range bounded | Meets | Fixed endpoint, exact App ID validation, and a 1-90 day lookback bound are implemented. |
+| Intraday incremental acquisition | Meets in implementation | The first load backfills a bounded range; later refreshes query only yesterday and today, storing changed intraday observations. Real cadence evidence is pending. |
 
 ## 4.4 Installable PWA and preview
 
@@ -142,8 +152,8 @@ Wishline, and stale-data failures are not implemented.
 
 ### P0 - Required before MVP acceptance
 
-No implementation-only P0 item remains in the current local scope. Final
-acceptance requires the authorized integral and PWA tests described below.
+No implementation-only P0 item remains for hourly collection. Final acceptance
+requires an authorized 24-48 hour cadence trial and the integral PWA tests.
 
 ### P1 - Required to complete validation evidence
 
@@ -158,9 +168,6 @@ acceptance requires the authorized integral and PWA tests described below.
 
 ## Final decision
 
-The current build is acceptable as a **local product proof**, but not yet as a
-completed **PRD v0.2 MVP**. The minimum functional closing path is durable data,
-correct totals and labels, freshness/last-known-good behavior, and automated
-failure/isolation coverage. Native applications, alerts, exports, teams, real
-tokens, billing, and hosted production infrastructure remain correctly
-deferred.
+The current build is an active **technical product proof**. It can now test the
+intraday premise, but is not accepted until real Steam data confirms useful
+hourly changes and the integral PWA checks pass.

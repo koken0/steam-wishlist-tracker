@@ -12,6 +12,14 @@ export type StoredSteamConnection = {
   updatedAt: string;
 };
 
+type StoredSteamConnectionRow = {
+  workspace_id: string;
+  app_id: number;
+  project_name: string;
+  encrypted_api_key: string;
+  updated_at: string;
+};
+
 export type WishlineWorkspaceStatus = {
   workspaceId: string;
   workspaceName: string;
@@ -55,6 +63,23 @@ export async function getSteamConnection(user: WishlineUser): Promise<StoredStea
     apiKey: await decryptSecret(row.encrypted_api_key),
     updatedAt: row.connection_updated_at,
   };
+}
+
+export async function listSteamConnectionsForSync(): Promise<StoredSteamConnection[]> {
+  const db = await database();
+  const result = await db.prepare(
+    `SELECT workspace_id, app_id, project_name, encrypted_api_key, updated_at
+       FROM steam_connections
+      ORDER BY workspace_id`,
+  ).all<StoredSteamConnectionRow>();
+
+  return Promise.all((result.results || []).map(async (row) => ({
+    workspaceId: row.workspace_id,
+    appId: row.app_id,
+    projectName: row.project_name,
+    apiKey: await decryptSecret(row.encrypted_api_key),
+    updatedAt: row.updated_at,
+  })));
 }
 
 export async function saveSteamConnection(

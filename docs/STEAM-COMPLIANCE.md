@@ -2,7 +2,7 @@
 
 > **Status:** Launch constraint and durable project knowledge
 >
-> **Last researched:** 2026-08-27 (America/Vancouver)
+> **Last researched:** 2026-09-04 (America/Vancouver)
 >
 > **Scope:** Wishline's use of Steamworks wishlist reporting and the proposed
 > paid hosted SaaS model. This is a technical and contractual risk assessment,
@@ -121,21 +121,30 @@ customer's unrestricted Financial API key through SaaS onboarding is allowed.
 
 Source: [Application Management Sharing](https://partner.steamgames.com/doc/gettingstarted/managing_apps/sharing)
 
-### 6. Wishlist data should be polled incrementally
+### 6. Wishlist API data supports intraday batch polling
 
-Valve says wishlist data is refreshed at least daily and closed prior dates do
-not need to be queried repeatedly. A production integration should persist
-normalized history and normally query only dates that may be new or incomplete.
+Two Valve surfaces have different freshness behavior. The Steamworks historical
+report excludes the current day and presents completed daily history. The API,
+however, explicitly recommends querying both yesterday and today in GMT. Valve's
+API launch announcement says recent wishlist data is updated regularly,
+typically within a few hours, and a Valve staff reply says recent data is
+generally available within an hour at the similar Wishlist API cadence.
 
-Wishline currently fetches a configurable rolling window (30 days by default)
-and holds only one in-memory cache entry. That is acceptable for an MVP but is
-not an efficient multi-tenant production design and could waste the applicable
-request allowance.
+This supports hourly polling of the current date, but not a strict real-time
+claim. Heavy store activity may delay updates. Completed historical dates should
+not be repeatedly queried because Valve warns that excessive requests may
+trigger rate limiting or key restrictions.
+
+Wishline performs one bounded onboarding backfill, then queries only yesterday
+and today each hour. Changed current-day observations are stored; yesterday is
+re-queried only while it is the immediately preceding date so the finalized
+value replaces its provisional value.
 
 Sources:
 
 - [GetAppWishlistReporting documentation](https://partner.steamgames.com/doc/webapi/IPartnerFinancialsService?language=english)
 - [Wishlist reporting](https://partner.steamgames.com/doc/marketing/wishlist/reporting)
+- [Wishlist Data API announcement](https://steamcommunity.com/gid/103582791433666425/announcements/detail/499474120884358024)
 
 ## Risk assessment
 
@@ -174,8 +183,10 @@ All items below are required before paid production launch:
 - [ ] Require a stable outbound IP and customer-configured Steamworks IP
       allowlisting where the deployment permits it.
 - [ ] Verify tenant isolation with automated integration tests.
-- [ ] Replace rolling-window refetching with durable incremental polling,
-      last-known-good storage, bounded retries, and per-workspace quotas.
+- [x] Replace rolling-window refetching with one-time backfill and hourly
+      yesterday/today polling plus last-known-good storage.
+- [ ] Validate the hourly cadence for 24-48 hours with an authorized test game,
+      add bounded retry/backoff, and establish per-workspace quotas.
 - [ ] Ensure no logs, traces, analytics, error reports, backups, or support tools
       expose plaintext keys or raw sensitive responses.
 - [ ] Establish a process to review Valve's terms and documentation periodically

@@ -2,6 +2,11 @@
 
 Wishline is an English-language Phase 1 acceptance build for the Studio Wishlist Tracker PRD. It is a mobile-responsive Progressive Web App with two interchangeable data sources: a committed anonymous fixture and an authenticated, server-only connection to Steamworks `GetAppWishlistReporting`.
 
+> **Product status:** active private prototype. Steam's API accepts the current
+> GMT date and publishes recent wishlist activity in intraday batches, normally
+> within an hour or a few hours. Wishline uses hourly polling without claiming
+> strict real-time delivery.
+
 ## Technology stack
 
 | Layer | Technology | Purpose |
@@ -60,7 +65,7 @@ Browser / installed PWA
         |     +-- offline fallback
 ```
 
-The server connector, passwordless identity, D1 workspace, encrypted live Steamworks connection, durable daily history, stored-total reconstruction, freshness states, and last-known-good fallback are implemented. Legacy environment-driven live mode remains loopback-only during local development and requires an allowlisted user in production. There is not yet a scheduled worker, Stripe integration, managed encryption-key rotation, or real app-token service.
+The server connector, passwordless identity, D1 workspace, encrypted live Steamworks connection, durable daily history, intraday observations, spike events, freshness states, and last-known-good fallback are implemented. After its initial history import, the connector queries only yesterday and today; the Worker exposes an hourly scheduled handler and a secret-protected scheduler endpoint. There is not yet external Web Push delivery, Stripe integration, managed encryption-key rotation, or a real app-token service.
 
 > **Commercial launch gate:** do not enable billing or accept customer Financial
 > Web API keys in paid production until Valve has confirmed the hosted SaaS
@@ -82,11 +87,16 @@ lib/
   wishline-auth.ts      Platform identity extraction
   wishline-store.ts     D1 workspace and connection persistence
   wishlist-history-store.ts  D1 daily wishlist history
+  wishlist-polling.ts  GMT date targeting and spike baseline rules
+  wishlist-sync.ts     Hourly synchronization across saved workspaces
   secret-crypto.ts      AES-256-GCM secret envelope
+worker.ts               Web requests plus the hourly scheduled handler
 db/
   schema.ts             Durable data model reference
 drizzle/
   0000_wishline_accounts.sql  Hosted D1 migration
+  0001_wishlist_history.sql   Durable per-date history
+  0002_intraday_sync_and_alerts.sql  Changed observations and spike events
 fixtures/
   steam-wishlist.sample.json  Anonymous contract fixture
 scripts/
@@ -173,7 +183,7 @@ Restart `npm run dev` after changing environment values.
 
 For a hosted environment, keep the Site private, configure `WISHLIST_ENCRYPTION_KEY` as a server secret, and IP-allowlist the deployed server address in the Steamworks Financial API Group. `WISHLIST_ALLOWED_USER_IDS` is still required only when using the legacy environment-driven Steam connection instead of an authenticated D1 workspace.
 
-The key is sent to Steamworks in the `x-webapi-key` request header, never in the URL. Browser responses contain only the configured App ID, project label, timestamps, and normalized aggregate metrics. Manual refreshes use an authenticated POST action, cannot bypass the server more than once per minute, and normal responses use the configured server cache.
+The key is sent to Steamworks in the `x-webapi-key` request header, never in the URL. Browser responses contain only the configured App ID, project label, timestamps, normalized aggregate metrics, and safe spike events. Manual refreshes use an authenticated POST action, cannot bypass the server more than once per minute, and normal responses use the configured server cache. After onboarding, refresh requests only yesterday and today's GMT records.
 
 ## Capture a sanitized real response
 
@@ -200,7 +210,7 @@ To capture another number of days, set `STEAM_CAPTURE_DAYS` in `.env.local` betw
 ## What remains simulated
 
 - Read-only app token issuance and revocation
-- Durable scheduled polling (manual refresh already persists last-known-good history)
+- External Web Push delivery for stored spike events
 - Managed production rotation for the server-side encryption key
 - Push notifications and native Android widget delivery
 

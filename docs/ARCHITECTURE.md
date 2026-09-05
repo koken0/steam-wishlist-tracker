@@ -79,6 +79,25 @@ reconstructed from the retained reporting dates and always exposes the coverage
 start and end. It does not claim that partial coverage is the game's lifetime
 Steam total.
 
+### Reporting cadence and query strategy
+
+The historical Steamworks report excludes the current day, but the API accepts
+the current GMT date. Valve's API launch note says recent wishlist data is
+updated in batches, normally within an hour or a few hours. Wishline therefore
+implements intraday batch monitoring without describing it as strict real time:
+
+1. Perform one bounded historical backfill during onboarding.
+2. Persist the latest value for each reporting date in D1.
+3. Every hour, query only yesterday and today in GMT.
+4. Store a new intraday observation only when today's counters or Steam
+   generation timestamp changed.
+5. Re-query yesterday during the following day so its final value replaces the
+   provisional value, but do not routinely query older dates.
+6. Preserve last-known-good history after failures or rate limiting.
+
+The Worker contains an hourly scheduled handler. A secret-protected HTTP route
+supports hosting environments that attach an external scheduler instead.
+
 ## Caching and freshness
 
 Normalized Steam dates are upserted into D1 before a live workspace response is
@@ -88,8 +107,8 @@ by workspace and App ID. Normal responses use `STEAM_CACHE_SECONDS`; forced
 refreshes cannot bypass the one-minute safety window. A restart clears only the
 response cache, not the normalized daily snapshots.
 
-Scheduled polling and bounded retry orchestration remain production follow-up
-work.
+External Web Push delivery and bounded retry orchestration remain follow-up
+work; detected spike events are already stored and shown in the PWA.
 
 ## PWA boundary
 

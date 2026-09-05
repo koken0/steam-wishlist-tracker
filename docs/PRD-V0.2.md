@@ -2,12 +2,28 @@
 
 ## Studio Wishlist Tracker / Wishline
 
-**Version 0.2 - Vision Draft**
+**Version 0.2 - Vision Draft - Intraday validation active**
 
 This version supersedes the MVP scope, data definitions, acceptance criteria,
 and non-functional requirements in the original PRD. The original product
 vision, personas, value proposition, pricing hypotheses, and go-to-market ideas
 remain directional unless explicitly changed below.
+
+### Product viability decision - corrected 2026-09-04
+
+The historical Steamworks report excludes the current day, but the newer
+`GetAppWishlistReporting` API accepts the current GMT date. Valve states that
+recent wishlist data is updated in batches, normally within an hour or a few
+hours. The product may therefore validate intraday monitoring and spike alerts.
+
+Wishline must describe this as **intraday batch data**, never strict real time.
+Hourly polling is the initial test cadence. Polling every 15-30 minutes is not a
+committed benefit because Valve warns against excessive repeated requests and
+does not promise updates that frequently.
+
+The value hypothesis remains subject to a 24-48 hour authorized real-game test:
+hourly observations must demonstrate meaningful same-day changes and alert
+latency before a hosted pilot is considered validated.
 
 ## 1. Product decision and current scope
 
@@ -23,11 +39,12 @@ The present product stage is a local prototype. It may use an anonymous fixture
 or an authorized real Steamworks Financial Web API key supplied by the key
 owner for private testing. It is not a paid production service.
 
-### 1.1 MVP objective
+### 1.1 Original MVP objective
 
 Prove that an owner can privately connect one Steam game, retrieve normalized
 wishlist activity, understand recent momentum, and use the experience from a
 phone-sized browser without exposing the Financial API key to client code.
+Technical feasibility and product usefulness remain separate acceptance gates.
 
 ### 1.2 MVP user and workspace
 
@@ -94,6 +111,27 @@ Wishlist purchases and gifts are displayed as conversion activity. They do not
 alter the `net movement` formula unless future official documentation requires
 a different calculation.
 
+### 3.1.1 Reporting availability and acquisition cadence
+
+Steam's historical report excludes the current calendar day, while the API
+accepts the current GMT date and may update its cumulative values in batches.
+Wishline treats today's record as provisional and older records as closed.
+
+- On first connection, Wishline performs one bounded historical backfill for
+  the dates available to the project or the configured retention window.
+- After backfill, the scheduled process runs hourly and requests only yesterday
+  and today in GMT.
+- Today's cumulative record may change during the day. Wishline stores a new
+  intraday observation only when counters or `time_generated` change.
+- Yesterday is refreshed during the following day to obtain its final value.
+  Older closed dates are not routinely requested again.
+- Manual refresh follows the same bounded date rule and the 60-second safety
+  interval. It cannot promise that Steam has generated a newer batch.
+- Hourly polling is the MVP test cadence; faster paid polling remains unproven.
+
+Sources: [Valve wishlist reporting](https://partner.steamgames.com/doc/marketing/wishlist/reporting?language=english)
+and [IPartnerFinancialsService](https://partner.steamgames.com/doc/webapi/IPartnerFinancialsService?language=english).
+
 ### 3.2 Net movement
 
 For a reporting date:
@@ -124,10 +162,9 @@ the records currently stored for the project.
 
 ### 3.4 Latest-day delta
 
-The primary delta is the net movement for the latest Steam reporting date held
-by Wishline. It is labeled with that date. The UI must not call it a rolling
-`last 24 hours` value unless timestamps actually cover a continuous 24-hour
-window.
+The primary delta is net movement for the latest Steam reporting date held by
+Wishline. When that date is today in GMT, label it `Today so far` with the Steam
+generation time. Do not call it real time or a rolling last-24-hours value.
 
 ### 3.5 Spike baseline
 
@@ -149,8 +186,8 @@ App ID and reporting date, even if that date is fetched again.
 - Steam generation time and Wishline fetch time are stored as UTC timestamps.
 - The UI may localize timestamp display, but it must not shift a reporting date
   into a different day.
-- `Today` is not used for a record unless the displayed date equals the current
-  Steam reporting date. Prefer `Latest reported day` in ambiguous cases.
+- The current GMT date is explicitly labeled provisional (`Today so far`). A
+  prior date may be labeled closed only after its following-day refresh.
 
 ### 3.7 Corrections and late data
 
@@ -161,11 +198,13 @@ subsequent request fails validation or cannot reach Steam.
 
 ### 3.8 Freshness and failure state
 
-- `Fresh`: the newest successful Steam generation or fetch timestamp is no more
-  than 24 hours old.
-- `Delayed`: more than 24 and no more than 48 hours old.
-- `Stale`: more than 48 hours old.
-- `Unknown`: neither timestamp is available.
+- `Fresh`: newest Steam generation or successful fetch is no more than two
+  hours old.
+- `Delayed`: more than two and no more than six hours old; this can occur during
+  normal upstream batching or heavy Steam activity.
+- `Stale`: more than six hours old or two scheduled hourly runs failed.
+- `Unknown`: no valid stored record or successful synchronization metadata is
+  available.
 
 The dashboard always displays the reporting date, Steam generation time when
 available, fetch time, and freshness state. A failed refresh must not erase or
@@ -221,6 +260,9 @@ Accepted when:
 
 - only an authenticated owner can request a refresh;
 - repeated manual refreshes cannot bypass the 60-second safety interval;
+- after the initial backfill, refresh requests only yesterday and today in GMT;
+- changed current-day observations are preserved for intraday comparison;
+- older stored historical dates are not routinely downloaded again;
 - normal reads use the configured server cache;
 - every response distinguishes Steam generation time, fetch time, and cache
   status;
@@ -257,8 +299,10 @@ Accepted when spike detection follows Section 3.5; milestone alerts are emitted
 once per threshold crossing; duplicate polling cannot duplicate an alert;
 quiet hours and per-project opt-in are honored; delivery failure is retried with
 bounded backoff; notification content contains no credential or sensitive raw
-payload; and the event and delivery outcome are auditable. This is not an MVP
-acceptance condition.
+payload; the alert identifies the provisional reporting date and generation
+time; and the event and delivery outcome are auditable. Alerts are intraday but
+may lag Steam activity by one or several hours. External push delivery is not
+an MVP acceptance condition.
 
 ### 4.7 Export - Later phase
 
@@ -330,9 +374,9 @@ not satisfy these criteria.
 ### 5.4 Availability and freshness
 
 The local prototype has no production uptime commitment. Acceptance is based on
-the documented local validation suite completing successfully. Hosted service
-availability, scheduled polling cadence, and alert delivery objectives must be
-measured and approved during the private-pilot design. Data freshness labels
+the documented local validation suite completing successfully. The hosted
+pilot starts with the hourly acquisition rule in Section 3.1.1; actual source
+and alert latency must be measured during pilot design. Data freshness labels
 must always follow Section 3.8.
 
 ### 5.5 Credential rotation
@@ -381,24 +425,25 @@ prototype behavior.
 - Real companion tokens and multi-device revocation.
 - Multiple projects, team invitations, and roles.
 - CSV/JSON export.
-- Durable scheduled polling and production last-known-good storage.
+- External Web Push delivery and production retry orchestration.
 - Hosted production infrastructure and production service levels.
 - Stripe, subscriptions, plan enforcement, and paid launch.
-- Final pricing and polling cadence by tier.
+- Final pricing and any polling cadence differentiation.
 - Public dashboards, cross-client benchmarks, or Steamworks write operations.
 
 ## 8. Vision-stage commercialization notes
 
 Per-game-seat pricing, unlimited paid-tier team members, Redis/Supabase/Stripe,
-15-30 minute priority polling, and Publisher-tier packaging remain hypotheses.
-They must be validated against official-data tests, measured infrastructure
-costs, store policies at the time of native release, and written Valve guidance.
+and Publisher-tier packaging remain hypotheses. They must be validated against
+official-data tests, measured infrastructure costs, store policies at the time
+of native release, and written Valve guidance. Polling faster than hourly must
+demonstrate additional upstream changes and remain within Valve's guidance.
 
 Until then, the prototype makes no pricing, uptime, polling-frequency, or
 unlimited-project commitment.
 
 ## 9. Approval status
 
-This document is a **Vision Draft**. Version 0.2 is approved as the working
-requirements baseline for the local PWA prototype. It is not approval for a
-hosted paid launch.
+This document is an **active Vision Draft** for an authorized private prototype.
+Version 0.2 supports hourly intraday validation but is not approval for a public
+or paid hosted launch.

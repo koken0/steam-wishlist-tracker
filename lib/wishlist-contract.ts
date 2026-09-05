@@ -31,6 +31,15 @@ export type WishlistDashboardData = {
   freshness: WishlistFreshness;
   cacheHit: boolean;
   syncWarning: { code: string; message: string } | null;
+  alerts: Array<{
+    id: string;
+    kind: 'spike';
+    reportDate: string;
+    title: string;
+    message: string;
+    createdAt: string;
+    readAt: string | null;
+  }>;
   daily: WishlistDay[];
 };
 
@@ -98,8 +107,8 @@ export function classifyWishlistFreshness(
   const value = new Date(timestamp).valueOf();
   if (!Number.isFinite(value)) return 'unknown';
   const ageHours = Math.max(0, nowMs - value) / 3_600_000;
-  if (ageHours <= 24) return 'fresh';
-  if (ageHours <= 48) return 'delayed';
+  if (ageHours <= 2) return 'fresh';
+  if (ageHours <= 6) return 'delayed';
   return 'stale';
 }
 

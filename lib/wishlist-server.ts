@@ -6,11 +6,15 @@ import {
   type WishlistDay,
 } from '@/lib/wishlist-contract';
 import {
+  createSpikeAlertIfNeeded,
+  readWishlistAlerts,
   readWishlistHistory,
+  saveWishlistObservation,
   saveWishlistHistory,
 } from '@/lib/wishlist-history-store';
 import { WishlistConnectorError } from '@/lib/wishlist-errors';
 import { fetchSteamWishlistDate, requireUsableWishlistDays } from '@/lib/wishlist-steam-client';
+import { currentAndPreviousUtcDates, recentBaselineAdds } from '@/lib/wishlist-polling';
 
 const STEAM_STORE_ENDPOINT = 'https://store.steampowered.com/api/appdetails';
 const MIN_FORCE_REFRESH_MS = 60_000;
@@ -81,6 +85,7 @@ function loadFixtureData(): WishlistDashboardData {
     freshness: classifyWishlistFreshness(latestGeneratedAt(daily), new Date().toISOString()),
     cacheHit: false,
     syncWarning: null,
+    alerts: [],
     daily,
   };
 }
@@ -88,19 +93,33 @@ function loadFixtureData(): WishlistDashboardData {
 async function loadSteamData(connection: SteamConnection): Promise<WishlistDashboardData> {
   const { apiKey: key, appId } = connection;
   const lookbackDays = clampInteger(process.env.STEAM_LOOKBACK_DAYS, 30, 1, 90);
-  const dates = utcDatesEndingToday(lookbackDays);
   const fetchedAt = new Date().toISOString();
   let storeProjectName: string | null = null;
 
   try {
+    const existing = connection.cacheScope
+      ? await readWishlistHistory(connection.cacheScope, appId)
+      : { daily: [], fetchedAt: null };
+    const dates = existing.daily.length ? currentAndPreviousUtcDates() : utcDatesEndingToday(lookbackDays);
     const [payloads, fetchedProjectName] = await Promise.all([
       mapWithConcurrency(dates, 4, (date) => fetchSteamWishlistDate(key, appId, date)),
-      fetchSteamProjectName(appId),
+      connection.projectName?.trim() ? Promise.resolve(null) : fetchSteamProjectName(appId),
     ]);
     storeProjectName = fetchedProjectName;
     const fetchedDaily = requireUsableWishlistDays(payloads);
 
     if (connection.cacheScope) {
+      const currentDate = utcDate(0);
+      const currentDay = fetchedDaily.find((day) => day.date === currentDate);
+      if (currentDay) {
+        const changed = await saveWishlistObservation(connection.cacheScope, appId, currentDay, fetchedAt);
+        if (changed) {
+          const baseline = recentBaselineAdds(existing.daily, currentDate);
+          if (baseline != null) {
+            await createSpikeAlertIfNeeded(connection.cacheScope, appId, currentDay, baseline, fetchedAt);
+          }
+        }
+      }
       await saveWishlistHistory(connection.cacheScope, appId, fetchedDaily, fetchedAt);
       const history = await readWishlistHistory(connection.cacheScope, appId);
       return buildSteamDashboard(connection, history.daily, history.fetchedAt || fetchedAt, storeProjectName, null);
@@ -130,14 +149,14 @@ function buildSteamDashboard(
   fetchedAt: string,
   storeProjectName: string | null,
   syncWarning: { code: string; message: string } | null,
-): WishlistDashboardData {
+): WishlistDashboardData | Promise<WishlistDashboardData> {
   const coverageStart = daily.at(0)?.date || null;
   const coverageEnd = daily.at(-1)?.date || null;
   const currentWishlists = storedWishlistTotal(daily);
   const currentWishlistsAsOf = coverageEnd ? `${coverageEnd}T00:00:00.000Z` : null;
   const generatedAt = latestGeneratedAt(daily);
 
-  return {
+  const result: WishlistDashboardData = {
     source: 'steam',
     appId: connection.appId,
     projectName: connection.projectName?.trim()
@@ -156,8 +175,11 @@ function buildSteamDashboard(
     freshness: classifyWishlistFreshness(generatedAt, fetchedAt),
     cacheHit: false,
     syncWarning,
+    alerts: [],
     daily,
   };
+  if (!connection.cacheScope) return result;
+  return readWishlistAlerts(connection.cacheScope, connection.appId).then((alerts) => ({ ...result, alerts }));
 }
 
 export async function validateSteamConnection(connection: SteamConnection): Promise<{ projectName: string; records: number }> {
@@ -216,6 +238,12 @@ function utcDatesEndingToday(days: number): string[] {
   const today = new Date();
   const end = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
   return Array.from({ length: days }, (_, index) => new Date(end - (days - 1 - index) * 86_400_000).toISOString().slice(0, 10));
+}
+
+function utcDate(offsetDays: number): string {
+  const now = new Date();
+  const start = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  return new Date(start + offsetDays * 86_400_000).toISOString().slice(0, 10);
 }
 
 async function mapWithConcurrency<T, R>(items: T[], concurrency: number, task: (item: T) => Promise<R>): Promise<R[]> {

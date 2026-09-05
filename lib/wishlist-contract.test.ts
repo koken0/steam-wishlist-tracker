@@ -10,10 +10,10 @@ import {
 const now = Date.parse('2026-09-03T12:00:00.000Z');
 
 test('classifies freshness at the documented boundaries', () => {
-  assert.equal(classifyWishlistFreshness('2026-09-02T12:00:00.000Z', null, now), 'fresh');
-  assert.equal(classifyWishlistFreshness('2026-09-02T11:59:59.000Z', null, now), 'delayed');
-  assert.equal(classifyWishlistFreshness('2026-09-01T12:00:00.000Z', null, now), 'delayed');
-  assert.equal(classifyWishlistFreshness('2026-09-01T11:59:59.000Z', null, now), 'stale');
+  assert.equal(classifyWishlistFreshness('2026-09-03T10:00:00.000Z', null, now), 'fresh');
+  assert.equal(classifyWishlistFreshness('2026-09-03T09:59:59.000Z', null, now), 'delayed');
+  assert.equal(classifyWishlistFreshness('2026-09-03T06:00:00.000Z', null, now), 'delayed');
+  assert.equal(classifyWishlistFreshness('2026-09-03T05:59:59.000Z', null, now), 'stale');
   assert.equal(classifyWishlistFreshness(null, null, now), 'unknown');
 });
 

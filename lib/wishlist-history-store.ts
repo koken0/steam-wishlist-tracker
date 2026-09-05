@@ -14,6 +14,34 @@ type WishlistHistoryRow = {
   fetched_at: string;
 };
 
+type WishlistCountsRow = {
+  adds: number;
+  deletes: number;
+  purchases: number;
+  gifts: number;
+  generated_at: string | null;
+};
+
+export type WishlistAlert = {
+  id: string;
+  kind: 'spike';
+  reportDate: string;
+  title: string;
+  message: string;
+  createdAt: string;
+  readAt: string | null;
+};
+
+type WishlistAlertRow = {
+  id: string;
+  kind: 'spike';
+  report_date: string;
+  title: string;
+  message: string;
+  created_at: string;
+  read_at: string | null;
+};
+
 export async function saveWishlistHistory(
   workspaceId: string,
   appId: number,
@@ -74,6 +102,86 @@ export async function readWishlistHistory(
   };
 }
 
+export async function saveWishlistObservation(
+  workspaceId: string,
+  appId: number,
+  day: WishlistDay,
+  fetchedAt: string,
+): Promise<boolean> {
+  const db = await historyDatabase();
+  const previous = await db.prepare(
+    `SELECT adds, deletes, purchases, gifts, generated_at
+       FROM wishlist_intraday_snapshots
+      WHERE workspace_id = ? AND app_id = ? AND report_date = ?
+      ORDER BY fetched_at DESC
+      LIMIT 1`,
+  ).bind(workspaceId, appId, day.date).first<WishlistCountsRow>();
+
+  if (previous
+    && previous.adds === day.adds
+    && previous.deletes === day.deletes
+    && previous.purchases === day.purchases
+    && previous.gifts === day.gifts
+    && previous.generated_at === day.generatedAt) return false;
+
+  await db.prepare(
+    `INSERT INTO wishlist_intraday_snapshots (
+       id, workspace_id, app_id, report_date, adds, deletes, purchases, gifts,
+       generated_at, fetched_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(
+    crypto.randomUUID(), workspaceId, appId, day.date, day.adds, day.deletes,
+    day.purchases, day.gifts, day.generatedAt, fetchedAt,
+  ).run();
+  return true;
+}
+
+export async function createSpikeAlertIfNeeded(
+  workspaceId: string,
+  appId: number,
+  day: WishlistDay,
+  baselineAdds: number,
+  createdAt: string,
+): Promise<boolean> {
+  if (baselineAdds <= 0 || day.adds < baselineAdds * 2 || day.adds - baselineAdds < 25) return false;
+  const db = await historyDatabase();
+  const result = await db.prepare(
+    `INSERT OR IGNORE INTO wishlist_alerts (
+       id, workspace_id, app_id, report_date, kind, title, message, created_at
+     ) VALUES (?, ?, ?, ?, 'spike', ?, ?, ?)`,
+  ).bind(
+    crypto.randomUUID(), workspaceId, appId, day.date,
+    'Wishlist spike detected',
+    `${day.adds} additions today, ${formatRatio(day.adds / baselineAdds)}x the recent daily average.`,
+    createdAt,
+  ).run();
+  return Boolean(result.meta.changes);
+}
+
+export async function readWishlistAlerts(
+  workspaceId: string,
+  appId: number,
+  limit = 20,
+): Promise<WishlistAlert[]> {
+  const db = await historyDatabase();
+  const result = await db.prepare(
+    `SELECT id, kind, report_date, title, message, created_at, read_at
+       FROM wishlist_alerts
+      WHERE workspace_id = ? AND app_id = ?
+      ORDER BY created_at DESC
+      LIMIT ?`,
+  ).bind(workspaceId, appId, Math.min(100, Math.max(1, limit))).all<WishlistAlertRow>();
+  return (result.results || []).map((row) => ({
+    id: row.id,
+    kind: row.kind,
+    reportDate: row.report_date,
+    title: row.title,
+    message: row.message,
+    createdAt: row.created_at,
+    readAt: row.read_at,
+  }));
+}
+
 let schemaReady: Promise<void> | null = null;
 
 async function historyDatabase(): Promise<D1Database> {
@@ -107,4 +215,9 @@ async function initializeHistorySchema(db: D1Database): Promise<void> {
     )`),
     db.prepare('CREATE INDEX IF NOT EXISTS idx_wishlist_snapshots_app_date ON wishlist_daily_snapshots(app_id, report_date)'),
   ]);
+  await db.prepare('PRAGMA optimize').run();
+}
+
+function formatRatio(value: number): string {
+  return value.toFixed(value >= 10 ? 0 : 1);
 }

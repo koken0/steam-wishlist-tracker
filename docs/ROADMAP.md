@@ -4,6 +4,13 @@ This roadmap separates the approved Phase 1 MVP from production hardening and
 later product expansion. Move an item to **Done** only when its acceptance
 criteria are verified.
 
+## Current decision: validate hourly intraday monitoring
+
+Steam's API accepts the current GMT date and updates recent wishlist activity
+in batches. The private prototype will validate whether hourly monitoring and
+spike alerts provide useful mobile awareness beyond the daily historical
+Steamworks report. This does not clear the separate hosted-key compliance gate.
+
 ## Done: Phase 1 local product proof
 
 - Responsive English PWA and installable application shell
@@ -13,11 +20,11 @@ criteria are verified.
 - Passwordless owner identity and one workspace per user
 - In-app Steam connection flow with protected server-side storage
 - D1 schema and initial migration
-- Intraday manual refresh with throttling and workspace-scoped cache
+- Throttled manual refresh with workspace-scoped cache
 - Overview, date-range history, projects, widget preview, security, and settings
 - Redacted real-data acceptance script
 
-## Now: production-ready hosted pilot
+## Now: private hosted pilot
 
 ### 0. Resolve the Steamworks commercial integration gate
 
@@ -40,13 +47,18 @@ Acceptance criteria:
 - A test Steam project completes onboarding and refresh.
 - A second authenticated user cannot read the first user's project.
 
-### 2. Add durable polling and last-known-good data
+### 2. Validate hourly intraday acquisition
 
 Acceptance criteria:
 
-- A scheduled job records normalized daily snapshots in D1.
+- Onboarding performs one bounded historical backfill.
+- Later refreshes request only yesterday and today in GMT.
+- A scheduled job runs once per hour and stores changed observations.
+- Yesterday is finalized during the following day; older dates are not
+  routinely downloaded again.
 - Failed Steam requests do not replace the last valid result.
-- The dashboard distinguishes Steam generation time, fetch time, and stale data.
+- A 24-48 hour real-data trial records `time_generated` and observed counter
+  changes to validate the useful cadence.
 - Retries use bounded backoff and respect rate limits.
 
 ### 3. Make the stored wishlist total a product workflow
@@ -87,7 +99,7 @@ Acceptance criteria:
 
 - Real scoped and revocable companion tokens
 - Durable mobile/widget read endpoint
-- Push notifications for milestones and unusual momentum
+- Web Push delivery for stored intraday spike and milestone events
 - Native Android widget after the PWA behavior is proven
 - Multiple projects and team roles only after single-project isolation is solid
 
