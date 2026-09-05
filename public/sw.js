@@ -1,4 +1,4 @@
-const CACHE_NAME = 'wishline-demo-v2';
+const CACHE_NAME = 'wishline-demo-v3';
 const APP_SHELL = ['/', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', (event) => {
@@ -16,12 +16,14 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
-  if (url.pathname.startsWith('/api/')) return;
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
+  if (url.origin !== self.location.origin || url.pathname.startsWith('/api/')) return;
   event.respondWith(
     fetch(event.request)
-      .then((response) => {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+      .then(async (response) => {
+        if (response.ok) {
+          await caches.open(CACHE_NAME).then((cache) => cache.put(event.request, response.clone()));
+        }
         return response;
       })
       .catch(() => caches.match(event.request).then((cached) => cached || caches.match('/'))),

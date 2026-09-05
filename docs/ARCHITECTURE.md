@@ -117,8 +117,10 @@ work; detected spike events are already stored and shown in the PWA.
 
 ## PWA boundary
 
-The service worker caches the application shell and offline fallback only.
-Requests below `/api/` are not cached by the browser or service worker.
+The service worker caches only successful same-origin HTTP(S) shell and asset
+responses. Requests below `/api/`, cross-origin requests, and browser-extension
+schemes are never cached. This keeps private API data out of offline storage and
+prevents unsupported request schemes from causing rejected cache operations.
 
 ## Non-goals for Phase 1
 
