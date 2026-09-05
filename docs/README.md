@@ -22,6 +22,8 @@ This directory contains the durable project documentation. Keep the root
   alternatives. Read this before changing Steam access, hosting, or billing.
 - [Roadmap](ROADMAP.md): prioritized work, acceptance criteria, and deferred
   scope.
+- [Backlog](BACKLOG.md): the ordered execution queue, beginning with exactly
+  what should be done now.
 - [Security policy](../SECURITY.md): credential rules, threat boundaries, and
   vulnerability reporting.
 - [Contributing](../CONTRIBUTING.md): branch, validation, review, and commit
@@ -38,6 +40,7 @@ Update documentation in the same change that alters its subject:
 | Security boundary or credential-handling change | `SECURITY.md` |
 | Steam API, Steam data, branding, hosting, or monetization change | `STEAM-COMPLIANCE.md` |
 | Scope, priority, or milestone change | `ROADMAP.md` |
+| Execution order or task completion criteria | `BACKLOG.md` |
 | Developer workflow or required check change | `CONTRIBUTING.md` |
 | Reusable operational discovery or incident lesson | `ENGINEERING-LEARNINGS.md` |
 

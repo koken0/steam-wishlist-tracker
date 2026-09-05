@@ -2,7 +2,8 @@
 
 This roadmap separates the approved Phase 1 MVP from production hardening and
 later product expansion. Move an item to **Done** only when its acceptance
-criteria are verified.
+criteria are verified. For the concrete top-to-bottom execution order, use
+[`BACKLOG.md`](BACKLOG.md).
 
 ## Current decision: validate hourly intraday monitoring
 
