@@ -61,8 +61,8 @@ Full runtime account isolation and 24-48 hour cadence evidence remain.
 | Browser landing page | Meets |
 | Hosted Google sign-in and authenticated setup | Meets |
 | Authorized hosted Steam onboarding | Meets - 24 normalized days, sanitized evidence |
-| Browser onboarding entry | Partial - rendered correctly, but the automated browser could not complete the local platform sign-in callback |
-| Authorized real Steam onboarding | Pending real data |
+| Browser onboarding entry | Meets for hosted staging; local scripted identity remains partial |
+| Authorized real Steam onboarding | Meets - hosted run completed with sanitized evidence |
 
 ## 4.1 Owner entry and onboarding
 
@@ -71,7 +71,7 @@ Full runtime account isolation and 24-48 hour cadence evidence remain.
 | Saved workspace requires authentication | Meets | `/api/setup` requires a platform identity and saved connections are resolved through that identity. |
 | Stable local owner; no browser-supplied user ID | Partial | Application code trusts only platform headers. The local browser callback still needs a successful smoke run. |
 | Exact positive numeric App ID and bounded key | Meets | Setup validates integer App ID, key presence/length/newlines, JSON type, and body size. |
-| Safe errors for invalid, unauthorized, limited, malformed, empty, and mismatched responses | Partial | Safe errors exist and zero normalized records are rejected. Broader automated connector tests are absent. |
+| Safe errors for invalid, unauthorized, limited, malformed, empty, and mismatched responses | Meets | Connector tests cover access denial, rate limiting, malformed JSON, empty data, network failure, upstream failure, and App-ID mismatch without exposing secrets. |
 | Validate before saving | Meets | Steam is called before persistence and zero usable records reject onboarding. |
 | Encrypt key and never return it to the client | Meets | AES-256-GCM uses a random 12-byte nonce; API responses omit the key; API and service-worker caching are disabled. The authorized hosted run returned only normalized data. |
 | Successful onboarding opens one-game workspace | Meets | An authorized hosted project reached the ready step and opened a live dashboard with 24 normalized days on 2026-09-05. |
@@ -120,9 +120,8 @@ Implemented: server-only key use, AES-256-GCM, fixed HTTPS endpoint, App ID
 validation, bounded inputs, private API headers, and workspace-scoped database
 queries.
 
-Missing evidence: automated two-user isolation test, log/response secret scan
-across failure paths, and tests for malformed, empty, unauthorized,
-rate-limited, and mismatched Steam responses.
+Missing evidence: automated two-user isolation and saved-connection replacement
+tests, plus a log/response secret scan across failure paths.
 
 ### Performance - Missing evidence
 
@@ -131,15 +130,15 @@ No repeatable measurement currently proves the local p95 dashboard target,
 
 ### Reliability and recovery - Partial
 
-Upstream requests have a 15-second timeout and validation failures do not write
-new cache data. Retries with bounded backoff, durable last-known-good history,
-and a timed clean-checkout recovery drill are missing.
+Upstream requests have a 15-second timeout, bounded HTTP 429 backoff, and
+validation failures do not write new cache data. Durable last-known-good
+history is implemented. A timed clean-checkout recovery drill remains missing.
 
 ### Availability and freshness - Partial
 
-The required local code checks pass. The PRD freshness classification is not
-implemented, and the full documented validation suite cannot be considered
-complete until the authorized onboarding run is performed.
+Freshness classification is implemented and rendered. Hosted onboarding is
+verified, but the 24-48 hour hourly-cadence trial and repaired local scripted
+identity path remain outstanding.
 
 ### Credential rotation - Partial
 

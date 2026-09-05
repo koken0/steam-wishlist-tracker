@@ -118,6 +118,11 @@ and source control during the migration.
 
 ## Troubleshooting
 
+For the evidence and diagnostic sequence behind these checks, see
+[`ENGINEERING-LEARNINGS.md`](ENGINEERING-LEARNINGS.md). In particular, compare
+identical request counts and dates before attributing Steam rate limits to the
+hosting provider.
+
 | Symptom | Check |
 | --- | --- |
 | Sign-in loops locally | Visit `/signout-with-chatgpt?return_to=/`, then sign in again |
@@ -129,6 +134,8 @@ and source control during the migration.
 | Dashboard says `Showing last stored data` | Steam refresh failed; inspect the safe error and freshness while preserving the stored history |
 | Stored total looks lower than Steamworks | Check the displayed coverage start; Wishline does not infer activity before its first stored date |
 | Local workspace disappeared | Confirm the project-local `.wrangler/` state still exists |
+| Local dev runtime rejects the compatibility date | Upgrade the local Cloudflare runtime or lower `compatibility_date` to the newest date it explicitly supports, then rerun the full validation suite |
+| Local scripted onboarding returns `AUTH_REQUIRED` | Treat the simulated Sites identity path as a separate local integration issue; do not use direct trusted identity headers as a production workaround |
 
 ## Incident rule
 
