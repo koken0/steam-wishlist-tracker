@@ -17,7 +17,7 @@ export const dashboardFixture = {
   appId: 1234567,
   projectName: 'Acceptance Harbor',
   releaseState: 'Steamworks project',
-  currentWishlists: 42,
+  currentWishlists: 10,
   currentWishlistsAsOf: '2026-09-05T00:00:00.000Z',
   totalKind: 'stored',
   coverageStart: '2026-09-03',
@@ -31,8 +31,7 @@ export const dashboardFixture = {
   alerts: [],
   daily: [
     day('2026-09-03', 12, 2),
-    day('2026-09-04', 18, 3),
-    day('2026-09-05', 20, 3),
+    day('2026-09-05', 0, 0),
   ],
 } as const;
 

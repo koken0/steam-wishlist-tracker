@@ -45,15 +45,6 @@ replacing a saved Steam connection.
 connection or history; a failed replacement preserves the prior valid
 connection; a successful replacement never exposes either key.
 
-### WL-005 — Close history presentation gaps
-
-Add explicit incomplete-coverage and missing-date treatment plus automated
-inclusive-range calculations.
-
-**Done when:** Missing data is visually distinct from zero activity, selected
-date ranges include both endpoints, and corrected dates recalculate all
-dependent metrics.
-
 ## Before a broader private beta
 
 ### WL-006 — Add sanitized audit and health visibility
@@ -109,3 +100,6 @@ commercial access.
   reconnection, 429/503 errors, desktop/mobile layout, install metadata,
   service-worker privacy, and the offline shell without secret-bearing
   artifacts.
+- Inclusive GMT range calculations and the dashboard distinguish missing dates
+  from reported zero activity, surface incomplete coverage, and recalculate
+  after corrected records.

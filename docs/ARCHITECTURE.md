@@ -55,6 +55,13 @@ For local development, the package `predev` lifecycle prepares this ignored
 server-only key before the application starts and preserves an existing value.
 Hosted environments must provide it through managed server secrets instead.
 
+Client history calculations live in `lib/wishlist-history.ts`. They sort the
+stored records, reconstruct per-date totals from the current stored total, and
+enumerate selected GMT dates inclusively. Range summaries aggregate only
+reported records while returning explicit missing-date entries. The chart uses
+those entries to break lines and draw striped gaps, so a missing row cannot be
+mistaken for a reported zero.
+
 ## Authentication and authorization
 
 - Local development uses the stable Sites test identity `local_seedy`.

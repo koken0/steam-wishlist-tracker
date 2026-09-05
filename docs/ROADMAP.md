@@ -79,6 +79,8 @@ Acceptance criteria:
 - The UI never presents a partial stored history as the game's complete
   lifetime Steam total.
 - Historical reconstruction clearly labels stored values and their coverage.
+- [x] Inclusive range calculations enumerate missing GMT dates explicitly,
+  preserve reported zero-activity days, and recalculate after corrections.
 
 ### 4. Expand automated coverage
 
@@ -88,7 +90,7 @@ Acceptance criteria:
   App-ID-mismatch Steam responses.
 - Integration tests cover account isolation and saved-connection replacement.
 - A browser smoke test covers sign-in, onboarding, refresh, and reconnect.
-- Data tests cover missing dates, corrected dates, stored-total
+- [x] Data tests cover missing dates, corrected dates, stored-total
   reconstruction, and freshness boundaries.
 - CI runs lint, TypeScript, fixture tests, and build on every pull request.
 

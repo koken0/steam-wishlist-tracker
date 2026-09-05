@@ -202,6 +202,11 @@ the legacy environment-driven connector.
 
 The key is sent to Steamworks in the `x-webapi-key` request header, never in the URL. Browser responses contain only the configured App ID, project label, timestamps, normalized aggregate metrics, and safe spike events. Manual refreshes use an authenticated POST action, cannot bypass the server more than once per minute, and normal responses use the configured server cache. After onboarding, refresh requests only yesterday and today's GMT records.
 
+History ranges include both selected endpoints. Wishline enumerates every GMT
+calendar date in the range, marks absent Steam records as missing, and never
+turns them into zero activity. The chart breaks across gaps; a reported day
+whose counts are genuinely zero remains a recorded point.
+
 The authorized local acceptance script follows the same Sites sign-in route as
 the browser. Local identity is recognized only in a development Worker on a
 loopback origin; hosted Cloudflare requests continue to require a verified

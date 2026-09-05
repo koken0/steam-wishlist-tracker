@@ -9,6 +9,11 @@ import {
   wishlineAuthorizationHeader,
 } from '@/lib/firebase-client';
 import type { WishlistDashboardData } from '@/lib/wishlist-contract';
+import {
+  buildWishlistHistory,
+  summarizeWishlistRange,
+  type WishlistRangeEntry,
+} from '@/lib/wishlist-history';
 
 type View = 'overview' | 'projects' | 'widget' | 'security' | 'settings';
 type Screen = 'welcome' | 'onboarding' | 'app';
@@ -372,23 +377,11 @@ function Overview({ data, progress, milestone }: { data:WishlistDashboardData; p
   const toGo = data.currentWishlists == null ? null : Math.max(0, milestone - data.currentWishlists);
   const estimatedDays = average > 0 && toGo != null ? Math.ceil(toGo / average) : null;
 
-  const history = useMemo(() => {
-    let runningTotal = data.currentWishlists;
-    const totals = new Map<string, number>();
-    for (let index = data.daily.length - 1; index >= 0; index--) {
-      const day = data.daily[index];
-      if (runningTotal != null) {
-        totals.set(day.date, runningTotal);
-        runningTotal -= day.net;
-      }
-    }
-    return data.daily.map((day) => ({ ...day, total: totals.get(day.date) ?? null }));
-  }, [data]);
-
-  const selected = history.filter((day) => (!fromDate || day.date >= fromDate) && (!toDate || day.date <= toDate));
-  const selectedNet = selected.reduce((sum, day) => sum + day.net, 0);
-  const selectedAdds = selected.reduce((sum, day) => sum + day.adds, 0);
-  const selectedDeletes = selected.reduce((sum, day) => sum + day.deletes, 0);
+  const history = useMemo(() => buildWishlistHistory(data.daily, data.currentWishlists), [data]);
+  const selected = useMemo(
+    () => summarizeWishlistRange(history, fromDate, toDate),
+    [fromDate, history, toDate],
+  );
 
   return <>
     <PageHeading eyebrow={formatHeadingDate(latest?.date)} title="Your wishlists are moving." copy={`${data.projectName}'s latest Steam-generated data is ${Math.abs(pace).toFixed(0)}% ${pace >= 0 ? 'above' : 'below'} the previous weekly pace.`} />
@@ -401,7 +394,7 @@ function Overview({ data, progress, milestone }: { data:WishlistDashboardData; p
     </div>
     <article className="panel range-panel">
       <div className="range-head"><div><p className="panel-title">Histórico entre fechas</p><p className="panel-subtitle">Movimiento neto diario y evolución estimada del total</p></div><div className="date-range"><label>Desde<input type="date" min={firstDate} max={toDate || lastDate} value={fromDate} onChange={(event)=>setFromDate(event.target.value)} /></label><span>→</span><label>Hasta<input type="date" min={fromDate || firstDate} max={lastDate} value={toDate} onChange={(event)=>setToDate(event.target.value)} /></label></div></div>
-      {selected.length ? <><div className="range-summary"><div><small>PERÍODO</small><b>{selected.length} {selected.length === 1 ? 'día' : 'días'}</b></div><div><small>ALTAS</small><b className="green">+{formatCount(selectedAdds)}</b></div><div><small>BAJAS</small><b>-{formatCount(selectedDeletes)}</b></div><div><small>CRECIMIENTO NETO</small><b className={selectedNet >= 0 ? 'green' : ''}>{signedCount(selectedNet)}</b></div></div><WishlistRangeChart days={selected} /></> : <div className="empty-range">No hay registros en este rango. Elegí fechas dentro del histórico disponible.</div>}
+      {selected.expectedDays ? <><div className={`range-coverage ${selected.complete ? 'complete' : 'incomplete'}`} role="status"><b>{selected.complete ? 'Cobertura completa' : 'Cobertura incompleta'}</b><span>{selected.complete ? `${selected.recordedDays} días reportados` : `${selected.recordedDays} de ${selected.expectedDays} días con datos · faltan ${selected.missingDates.join(', ')}`}</span></div><div className="range-summary"><div><small>PERÍODO INCLUSIVO</small><b>{selected.expectedDays} {selected.expectedDays === 1 ? 'día' : 'días'}</b></div><div><small>ALTAS REPORTADAS</small><b className="green">+{formatCount(selected.adds)}</b></div><div><small>BAJAS REPORTADAS</small><b>-{formatCount(selected.deletes)}</b></div><div><small>CRECIMIENTO NETO REPORTADO</small><b className={selected.net >= 0 ? 'green' : ''}>{signedCount(selected.net)}</b></div></div>{selected.recordedDays ? <WishlistRangeChart entries={selected.entries} /> : <div className="empty-range">No hay registros en este rango. Los días se muestran como faltantes, no como actividad cero.</div>}</> : <div className="empty-range">Elegí un rango válido dentro del histórico disponible.</div>}
     </article>
     <div className="dashboard-grid">
       <article className="panel trend-panel"><div className="panel-head"><div><p className="panel-title">Últimos 7 días</p><p className="panel-subtitle">Altas, bajas y neto reportado por Steam</p></div><div className="legend"><span><i className="legend-now" />Neto</span></div></div><div className="daily-table">{recent.slice().reverse().map(day=><div key={day.date}><time>{formatShortDate(day.date)}</time><span className="daily-adds">+{formatCount(day.adds)}</span><span className="daily-deletes">-{formatCount(day.deletes)}</span><b>{signedCount(day.net)}</b></div>)}</div></article>
@@ -411,24 +404,65 @@ function Overview({ data, progress, milestone }: { data:WishlistDashboardData; p
   </>;
 }
 
-function WishlistRangeChart({ days }: { days: Array<WishlistDashboardData['daily'][number] & { total:number|null }> }) {
+function WishlistRangeChart({ entries }: { entries: WishlistRangeEntry[] }) {
   const width = 900;
   const height = 250;
   const padding = 28;
-  const values = days.map((day) => day.total ?? day.net);
+  const recorded = entries.flatMap((entry, index) => entry.day ? [{ ...entry.day, index }] : []);
+  const values = recorded.map((day) => day.total ?? day.net);
   const min = Math.min(...values);
   const max = Math.max(...values);
   const span = Math.max(1, max - min);
-  const points = days.map((day, index) => {
-    const x = days.length === 1 ? width / 2 : padding + index * ((width - padding * 2) / (days.length - 1));
+  const xForIndex = (index: number) => entries.length === 1
+    ? width / 2
+    : padding + index * ((width - padding * 2) / (entries.length - 1));
+  const points = recorded.map((day) => {
+    const x = xForIndex(day.index);
     const y = height - padding - (((day.total ?? day.net) - min) / span) * (height - padding * 2);
     return { ...day, x, y };
   });
-  const path = points.map((point, index) => `${index ? 'L' : 'M'} ${point.x} ${point.y}`).join(' ');
-  const area = `${path} L ${points.at(-1)?.x} ${height-padding} L ${points[0]?.x} ${height-padding} Z`;
-  const labelEvery = Math.max(1, Math.ceil(days.length / 6));
+  const segments = points.reduce<typeof points[]>((result, point) => {
+    const previous = result.at(-1)?.at(-1);
+    if (!previous || point.index !== previous.index + 1) result.push([point]);
+    else result.at(-1)?.push(point);
+    return result;
+  }, []);
+  const labelEvery = Math.max(1, Math.ceil(entries.length / 6));
 
-  return <div className="history-chart"><div className="history-scale"><span>{formatCount(max)}</span><span>{formatCount(min)}</span></div><svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Evolución de wishlists en el período seleccionado"><defs><linearGradient id="historyFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#6755e7" stopOpacity=".28"/><stop offset="1" stopColor="#6755e7" stopOpacity=".02"/></linearGradient></defs><line x1={padding} y1={padding} x2={width-padding} y2={padding}/><line x1={padding} y1={height/2} x2={width-padding} y2={height/2}/><line x1={padding} y1={height-padding} x2={width-padding} y2={height-padding}/><path className="history-area" d={area}/><path className="history-line" d={path}/>{points.map((point)=><circle key={point.date} cx={point.x} cy={point.y} r="4"><title>{formatShortDate(point.date)} · {formatCount(point.total)} stored total · {signedCount(point.net)} net</title></circle>)}</svg><div className="history-dates">{points.map((point,index)=><span key={point.date} style={{left:`${(point.x/width)*100}%`}}>{index % labelEvery === 0 || index === points.length-1 ? formatChartDate(point.date) : ''}</span>)}</div><p className="chart-note">The total line is reconstructed from the history stored by Wishline. It does not claim activity from before the displayed coverage start.</p></div>;
+  return (
+    <div className="history-chart">
+      <div className="history-scale"><span>{formatCount(max)}</span><span>{formatCount(min)}</span></div>
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Evolución de wishlists en el período seleccionado; los bloques rayados indican fechas sin datos">
+        <defs>
+          <linearGradient id="historyFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#6755e7" stopOpacity=".28"/>
+            <stop offset="1" stopColor="#6755e7" stopOpacity=".02"/>
+          </linearGradient>
+          <pattern id="missingFill" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <line x1="0" y1="0" x2="0" y2="8" stroke="#c58a55" strokeWidth="3" opacity=".35"/>
+          </pattern>
+        </defs>
+        <line x1={padding} y1={padding} x2={width-padding} y2={padding}/>
+        <line x1={padding} y1={height/2} x2={width-padding} y2={height/2}/>
+        <line x1={padding} y1={height-padding} x2={width-padding} y2={height-padding}/>
+        {entries.map((entry, index) => entry.status === 'missing' ? (
+          <rect className="history-missing" key={entry.date} x={xForIndex(index)-8} y={padding} width="16" height={height-padding*2}>
+            <title>{formatShortDate(entry.date)} · sin dato reportado</title>
+          </rect>
+        ) : null)}
+        {segments.map((segment, index) => {
+          const path = segment.map((point, pointIndex) => `${pointIndex ? 'L' : 'M'} ${point.x} ${point.y}`).join(' ');
+          const area = `${path} L ${segment.at(-1)?.x} ${height-padding} L ${segment[0]?.x} ${height-padding} Z`;
+          return <g key={index}><path className="history-area" d={area}/><path className="history-line" d={path}/></g>;
+        })}
+        {points.map((point) => <circle key={point.date} cx={point.x} cy={point.y} r="4"><title>{formatShortDate(point.date)} · {formatCount(point.total)} stored total · {signedCount(point.net)} net</title></circle>)}
+      </svg>
+      <div className="history-dates">
+        {entries.map((entry, index) => <span className={entry.status === 'missing' ? 'missing' : ''} key={entry.date} style={{left:`${(xForIndex(index)/width)*100}%`}}>{index % labelEvery === 0 || index === entries.length-1 || entry.status === 'missing' ? formatChartDate(entry.date) : ''}</span>)}
+      </div>
+      <p className="chart-note">La línea usa sólo fechas reportadas y se interrumpe ante datos faltantes; un día reportado con cero actividad conserva su punto. El total se reconstruye únicamente desde el histórico guardado por Wishline.</p>
+    </div>
+  );
 }
 
 function Projects({ data, onOpen, notify }: { data:WishlistDashboardData; onOpen:()=>void; notify:(s:string)=>void }) {

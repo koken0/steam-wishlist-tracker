@@ -66,6 +66,9 @@ test('authenticates, onboards, reconnects, loads the dashboard, and renders safe
 
   await expect(page.getByText('Stored wishlist total').first()).toBeVisible();
   await expect(page.getByText('Acceptance Harbor').first()).toBeVisible();
+  await expect(page.getByText('Cobertura incompleta')).toBeVisible();
+  await expect(page.getByText(/faltan 2026-09-04/)).toBeVisible();
+  await expect(page.locator('circle title').filter({ hasText: '+0 net' })).toHaveCount(1);
   await expect(page.locator('body')).not.toContainText('acceptance-key-one');
 
   refreshFailure = { status: 429, message: 'Steamworks rate-limited the connector. Wait before refreshing again.' };

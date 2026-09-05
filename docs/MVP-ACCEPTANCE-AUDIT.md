@@ -86,9 +86,9 @@ Full runtime account isolation and 24-48 hour cadence evidence remain.
 | Fixture and Steam use one normalized contract | Meets | Both adapters return `WishlistDashboardData`. |
 | Latest date, movement, freshness, source, and coverage | Meets | Latest activity, source, coverage dates, timestamps, and explicit freshness state render. |
 | Stored total labels | Meets | Stored totals are derived only from retained history and show their coverage. |
-| Inclusive date-range totals and trend | Partial | The client filters inclusively and sums `net`; no automated calculation tests exist. |
-| Missing dates differ from zero | Missing | Missing records are omitted without an incomplete-coverage indicator. |
-| Late corrections recalculate dependent metrics | Meets | Daily records are upserted by workspace, App ID, and reporting date, then the full stored result is recalculated. |
+| Inclusive date-range totals and trend | Meets | Pure calculation tests cover both endpoints, UTC month boundaries, invalid ranges, and reported-only sums. Browser acceptance renders the resulting summary. |
+| Missing dates differ from zero | Meets | Every selected calendar date becomes a recorded or missing entry. The UI shows incomplete coverage, lists missing dates, draws striped gaps, and preserves a zero-activity point. |
+| Late corrections recalculate dependent metrics | Meets | Daily records are upserted by workspace, App ID, and reporting date; tests show corrected input recalculates range aggregates and every running total. |
 | Phone and desktop usability | Meets for MVP | Chromium acceptance verifies the dashboard at desktop and 390 × 844 without horizontal overflow. A broader accessibility audit remains future hardening. |
 
 ## 4.3 Refresh and caching
@@ -162,10 +162,8 @@ requires an authorized 24-48 hour cadence trial and the integral PWA tests.
 
 ### P1 - Required to complete validation evidence
 
-1. Run the remaining deterministic UI checks for inclusive ranges and
-   missing-date presentation during the integral test.
-2. Record basic local load and refresh timings during the integral test.
-3. Perform and record the clean-checkout recovery drill.
+1. Record basic local load and refresh timings during the integral test.
+2. Perform and record the clean-checkout recovery drill.
 
 ## Final decision
 
