@@ -1,8 +1,9 @@
 # MVP acceptance audit
 
 **Baseline:** PRD v0.2 Vision Draft  
-**Scope:** Current local PWA prototype  
-**Result:** Intraday backend foundation implemented; real-data validation pending
+**Scope:** Local PWA plus Cloudflare staging foundation
+**Result:** Worker, D1, migrations, and hourly cron deployed; Firebase identity,
+secrets, and real-data validation pending
 
 ## Product-value finding
 
@@ -25,9 +26,9 @@ The first P0 closure block is now implemented:
 - contract tests cover totals, normalization, and freshness boundaries.
 
 Full runtime account-isolation verification and real-data acceptance remain
-part of the integral manual test. Daily scheduled synchronization remains a
-later phase, and the manual connector still needs the closed-date correction
-described below.
+part of the integral manual test. Hourly synchronization is deployed, but has
+no real connection to process until Firebase identity and hosted secrets are
+configured.
 
 Status meanings:
 
@@ -42,10 +43,10 @@ Status meanings:
 
 The prototype successfully builds, passes lint and TypeScript checks, validates
 the committed fixture, and has the intended server-side credential boundary.
-It is a credible local product proof.
+It is a credible technical product proof with a deployed staging foundation.
 
 It now satisfies the central PRD v0.2 stored-data contract. Automated
-Automated failure-mode coverage is now present. Full runtime account-isolation
+failure-mode coverage is present. Full runtime account-isolation
 and authorized real-data evidence remain for the integral manual test.
 
 ## Verification performed

@@ -77,14 +77,17 @@ browser, a URL, source control, or scheduler logs.
 
 ## Hosted-environment readiness checklist
 
+Cloudflare staging currently uses Worker `wishline`, D1 database `wishline`,
+and `https://wishline.celkoken.workers.dev`. All committed migrations are
+applied and the hourly cron is registered. Keep it empty of real credentials
+until Firebase identity and the encryption secret are configured.
+
 Before the first hosted real-data test:
 
-- Keep the Site private and require platform sign-in.
+- Require validated Firebase identity before accepting hosted onboarding.
 - Configure `WISHLIST_ENCRYPTION_KEY` as a server secret, never as a public
   build variable.
-- Apply and inspect the D1 migration.
-- Confirm both `0000_wishline_accounts.sql` and
-  `0001_wishlist_history.sql` have been applied in order.
+- Apply and inspect all migrations with `npm run db:migrate:cloudflare`.
 - Confirm the deployed egress IP can be allowlisted in Steamworks, or document
   why the Steam account does not use an IP restriction.
 - Connect a non-critical test App ID first.

@@ -14,7 +14,7 @@ Wishline is an English-language Phase 1 acceptance build for the Studio Wishlist
 | Application framework | Next.js 16.3.3 | App Router structure, metadata, and React application shell |
 | Server connector | Next.js Route Handler | Normalizes Steamworks responses without exposing the Financial API key |
 | UI runtime | React 19.2.8 | Interactive onboarding, navigation, settings, refresh, and token flows |
-| Identity | Sites / Sign in with ChatGPT | Passwordless owner identity locally and when hosted |
+| Identity | Sites identity locally; Firebase Auth planned for staging | Passwordless owner identity and workspace isolation |
 | Persistence | Cloudflare D1 | Durable owner workspace, encrypted Steam connection, and normalized daily wishlist history |
 | Secret protection | Web Crypto AES-256-GCM | API keys are encrypted before D1 storage and never returned to clients |
 | Language | TypeScript 5.9.3 | Typed application source and build-time checks |
@@ -25,7 +25,10 @@ Wishline is an English-language Phase 1 acceptance build for the Studio Wishlist
 | Runtime target | Node.js 22.13 or newer | Local development and build runtime |
 | Package manager | npm | Dependency and script management |
 
-The scaffold also includes the Cloudflare Vite plugin, Workers type definitions, Wrangler, and OpenAI Sites configuration. They provide a deployment path, but this delivery is intentionally local and does not require a Cloudflare account. Security-sensitive dependencies are pinned to versions that pass the production dependency audit.
+The Cloudflare Vite plugin and Wrangler build and deploy the app directly to a
+Cloudflare Worker. OpenAI Sites metadata remains temporarily available during
+the staging transition. Security-sensitive dependencies are pinned to versions
+that pass the production dependency audit.
 
 ## Project documentation
 
@@ -65,7 +68,12 @@ Browser / installed PWA
         |     +-- offline fallback
 ```
 
-The server connector, passwordless identity, D1 workspace, encrypted live Steamworks connection, durable daily history, intraday observations, spike events, freshness states, and last-known-good fallback are implemented. After its initial history import, the connector queries only yesterday and today; the Worker exposes an hourly scheduled handler and a secret-protected scheduler endpoint. There is not yet external Web Push delivery, Stripe integration, managed encryption-key rotation, or a real app-token service.
+The server connector, D1 workspace, encrypted live Steamworks connection,
+durable daily history, intraday observations, spike events, freshness states,
+and last-known-good fallback are implemented. The staging Worker and D1 database
+are deployed at `wishline.celkoken.workers.dev`, and Cloudflare registered the
+hourly cron. Firebase identity, hosted encryption secrets, real-data acceptance,
+external Web Push, and managed key rotation remain pending.
 
 > **Commercial launch gate:** do not enable billing or accept customer Financial
 > Web API keys in paid production until Valve has confirmed the hosted SaaS
@@ -135,6 +143,8 @@ Other useful commands:
 
 ```bash
 npm run build   # Create a production bundle
+npm run db:migrate:cloudflare # Apply pending migrations to hosted D1
+npm run deploy:cloudflare # Build and deploy the Worker plus its cron
 npm run lint    # Run static code-quality checks
 npm run start   # Serve a completed production build
 npm run test:fixture  # Validate the anonymous Steam response contract
@@ -181,7 +191,10 @@ STEAM_CACHE_SECONDS=1800
 
 Restart `npm run dev` after changing environment values.
 
-For a hosted environment, keep the Site private, configure `WISHLIST_ENCRYPTION_KEY` as a server secret, and IP-allowlist the deployed server address in the Steamworks Financial API Group. `WISHLIST_ALLOWED_USER_IDS` is still required only when using the legacy environment-driven Steam connection instead of an authenticated D1 workspace.
+For Cloudflare staging, complete Firebase Authentication before onboarding,
+store `WISHLIST_ENCRYPTION_KEY` as a Worker secret, and review Steamworks IP
+allowlisting limitations. `WISHLIST_ALLOWED_USER_IDS` remains required only for
+the legacy environment-driven connector.
 
 The key is sent to Steamworks in the `x-webapi-key` request header, never in the URL. Browser responses contain only the configured App ID, project label, timestamps, normalized aggregate metrics, and safe spike events. Manual refreshes use an authenticated POST action, cannot bypass the server more than once per minute, and normal responses use the configured server cache. After onboarding, refresh requests only yesterday and today's GMT records.
 

@@ -39,6 +39,10 @@ Acceptance criteria:
 
 ### 1. Deploy a private staging environment
 
+Current progress: the Worker, D1 database, migrations, and hourly cron are
+deployed in the owner's Cloudflare account. Firebase identity, runtime secrets,
+and real-data acceptance remain open.
+
 Acceptance criteria:
 
 - Platform sign-in is required before workspace access.

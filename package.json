@@ -9,6 +9,8 @@
     "predev": "node scripts/ensure-local-encryption-key.mjs",
     "dev": "vinext dev --host 127.0.0.1",
     "build": "vinext build",
+    "deploy:cloudflare": "npm run build && wrangler deploy",
+    "db:migrate:cloudflare": "wrangler d1 migrations apply wishline --remote",
     "start": "vinext start",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "setup:local": "node scripts/ensure-local-encryption-key.mjs",

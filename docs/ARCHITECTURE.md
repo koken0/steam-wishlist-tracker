@@ -59,6 +59,8 @@ Hosted environments must provide it through managed server secrets instead.
 
 - Local development uses the stable Sites test identity `local_seedy`.
 - A hosted private Site uses the platform-authenticated user headers.
+- Direct Cloudflare staging will validate Firebase ID tokens before resolving a
+  workspace. That adapter is pending and hosted onboarding remains disabled.
 - Saved connections are resolved only through the authenticated user's
   workspace.
 - The older environment-driven Steam mode remains available for diagnostics;
@@ -95,8 +97,9 @@ implements intraday batch monitoring without describing it as strict real time:
    provisional value, but do not routinely query older dates.
 6. Preserve last-known-good history after failures or rate limiting.
 
-The Worker contains an hourly scheduled handler. A secret-protected HTTP route
-supports hosting environments that attach an external scheduler instead.
+The direct Cloudflare staging Worker has an active `0 * * * *` cron trigger. A
+secret-protected HTTP route supports other hosting environments that attach an
+external scheduler instead.
 
 ## Caching and freshness
 
