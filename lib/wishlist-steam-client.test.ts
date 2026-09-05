@@ -32,10 +32,37 @@ test('maps authorization and rate-limit responses to safe errors', async () => {
   for (const [status, code] of [[401, 'STEAM_ACCESS_DENIED'], [403, 'STEAM_ACCESS_DENIED'], [429, 'STEAM_RATE_LIMITED']] as const) {
     const fetchImpl = (async () => new Response('', { status })) as typeof fetch;
     await assert.rejects(
-      fetchSteamWishlistDate('secret', 123, '2026-09-03', fetchImpl),
+      fetchSteamWishlistDate('secret', 123, '2026-09-03', fetchImpl, async () => undefined),
       (error) => errorCode(error) === code && !String((error as Error).message).includes('secret'),
     );
   }
+});
+
+test('retries rate limits with bounded Retry-After delays', async () => {
+  let calls = 0;
+  const delays: number[] = [];
+  const fetchImpl = (async () => {
+    calls += 1;
+    if (calls < 3) return new Response('', { status: 429, headers: { 'Retry-After': '60' } });
+    return Response.json({
+      response: {
+        appid: 123,
+        date: '2026-09-03',
+        wishlist_summary: { wishlist_adds: 9, wishlist_deletes: 2 },
+      },
+    });
+  }) as typeof fetch;
+
+  const payload = await fetchSteamWishlistDate(
+    'secret',
+    123,
+    '2026-09-03',
+    fetchImpl,
+    async (delayMs) => { delays.push(delayMs); },
+  );
+  assert.equal(payload.response?.appid, 123);
+  assert.equal(calls, 3);
+  assert.deepEqual(delays, [5_000, 5_000]);
 });
 
 test('maps an upstream server failure without exposing the response body', async () => {

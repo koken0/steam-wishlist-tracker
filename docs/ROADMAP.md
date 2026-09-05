@@ -63,7 +63,8 @@ Acceptance criteria:
 - Failed Steam requests do not replace the last valid result.
 - A 24-48 hour real-data trial records `time_generated` and observed counter
   changes to validate the useful cadence.
-- Retries use bounded backoff and respect rate limits.
+- [x] Retries use bounded backoff and respect rate limits; onboarding also
+  validates reporting dates sequentially to avoid request bursts.
 
 ### 3. Make the stored wishlist total a product workflow
 

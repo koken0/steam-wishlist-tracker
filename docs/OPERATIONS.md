@@ -91,6 +91,9 @@ Before the first hosted real-data test:
 - Confirm the deployed egress IP can be allowlisted in Steamworks, or document
   why the Steam account does not use an IP restriction.
 - Connect a non-critical test App ID first.
+- Initial validation queries reporting dates sequentially and retries HTTP 429
+  responses with a bounded delay. If Steam still returns a rate limit after the
+  retries, stop and wait before submitting again.
 - Verify no API response or log contains the Financial API key.
 - Define who can access deployment logs and runtime secrets.
 - Document a rollback version before enabling real credentials.

@@ -7,25 +7,36 @@ import {
 import { WishlistConnectorError } from './wishlist-errors.ts';
 
 const STEAM_ENDPOINT = 'https://partner.steam-api.com/IPartnerFinancialsService/GetAppWishlistReporting/v001/';
+const MAX_RATE_LIMIT_ATTEMPTS = 3;
+const MAX_RETRY_DELAY_MS = 5_000;
 
 export async function fetchSteamWishlistDate(
   key: string,
   appId: number,
   date: string,
   fetchImpl: typeof fetch = fetch,
+  sleepImpl: (delayMs: number) => Promise<void> = sleep,
 ): Promise<SteamWishlistResponse> {
   const url = new URL(STEAM_ENDPOINT);
   url.searchParams.set('appid', String(appId));
   url.searchParams.set('date', date);
 
-  let response: Response;
-  try {
-    response = await fetchImpl(url, {
-      headers: { Accept: 'application/json', 'x-webapi-key': key },
-      cache: 'no-store',
-      signal: AbortSignal.timeout(15_000),
-    });
-  } catch {
+  let response: Response | null = null;
+  for (let attempt = 1; attempt <= MAX_RATE_LIMIT_ATTEMPTS; attempt += 1) {
+    try {
+      response = await fetchImpl(url, {
+        headers: { Accept: 'application/json', 'x-webapi-key': key },
+        cache: 'no-store',
+        signal: AbortSignal.timeout(15_000),
+      });
+    } catch {
+      throw new WishlistConnectorError('STEAM_UNREACHABLE', 'The server could not reach the Steamworks partner API.', 502);
+    }
+    if (response.status !== 429 || attempt === MAX_RATE_LIMIT_ATTEMPTS) break;
+    await sleepImpl(retryDelayMs(response, attempt));
+  }
+
+  if (!response) {
     throw new WishlistConnectorError('STEAM_UNREACHABLE', 'The server could not reach the Steamworks partner API.', 502);
   }
 
@@ -50,6 +61,18 @@ export async function fetchSteamWishlistDate(
     throw new WishlistConnectorError('STEAM_APP_MISMATCH', 'Steamworks returned wishlist data for an unexpected App ID.', 502);
   }
   return payload;
+}
+
+function retryDelayMs(response: Response, attempt: number): number {
+  const retryAfterSeconds = Number(response.headers.get('retry-after'));
+  if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds >= 0) {
+    return Math.min(MAX_RETRY_DELAY_MS, retryAfterSeconds * 1_000);
+  }
+  return Math.min(MAX_RETRY_DELAY_MS, 750 * (2 ** (attempt - 1)));
+}
+
+function sleep(delayMs: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, delayMs));
 }
 
 export function requireUsableWishlistDays(payloads: SteamWishlistResponse[]): WishlistDay[] {

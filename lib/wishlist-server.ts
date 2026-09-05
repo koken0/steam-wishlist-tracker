@@ -185,7 +185,7 @@ function buildSteamDashboard(
 export async function validateSteamConnection(connection: SteamConnection): Promise<{ projectName: string; records: number }> {
   const dates = utcDatesEndingToday(Math.min(7, clampInteger(process.env.STEAM_LOOKBACK_DAYS, 7, 1, 90)));
   const [payloads, storeProjectName] = await Promise.all([
-    mapWithConcurrency(dates, 3, (date) => fetchSteamWishlistDate(connection.apiKey, connection.appId, date)),
+    mapWithConcurrency(dates, 1, (date) => fetchSteamWishlistDate(connection.apiKey, connection.appId, date)),
     fetchSteamProjectName(connection.appId),
   ]);
   const records = requireUsableWishlistDays(payloads).length;
