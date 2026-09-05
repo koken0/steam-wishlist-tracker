@@ -67,6 +67,22 @@ not real-time data. Perform a bounded historical backfill once; afterward query
 only yesterday and today. The hourly poll may update today's cumulative record
 and capture changed observations. Stop routinely querying older closed dates.
 
+## Incremental commits
+
+Create a commit whenever a coherent, reviewable milestone is complete and its
+applicable validation has passed. Do not accumulate unrelated phases or several
+finished milestones in one large commit.
+
+Each commit must represent one working outcome and include the code, tests,
+migrations, and documentation required for that outcome. If an intermediate
+state would knowingly leave the project broken, keep it together with the
+smallest subsequent change needed to restore a valid state.
+
+Before starting the next substantial phase, commit the completed phase. Preserve
+changes made by the user, exclude unrelated work, and continue to follow the
+repository rules that prohibit committing secrets, local state, and generated
+captures.
+
 ## Required validation
 
 Before committing implementation changes, run:
