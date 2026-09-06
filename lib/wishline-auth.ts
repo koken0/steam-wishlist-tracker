@@ -1,4 +1,5 @@
 import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from 'jose';
+import { hasLaunchAccess } from './wishline-launch-access.ts';
 
 export type WishlineUser = {
   id: string;
@@ -18,6 +19,7 @@ const FIREBASE_JWKS = createRemoteJWKSet(
 );
 
 export async function getWishlineUser(request: Request): Promise<WishlineUser | null> {
+  if (!await hasLaunchAccess(request)) return null;
   const localUser = localSitesUser(request);
   if (localUser) return localUser;
 

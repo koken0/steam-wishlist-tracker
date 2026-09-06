@@ -18,6 +18,7 @@ import {
 type View = 'overview' | 'projects' | 'widget' | 'security' | 'settings';
 type Screen = 'restoring' | 'welcome' | 'onboarding' | 'app';
 type PushState = 'checking' | 'unsupported' | 'unconfigured' | 'disabled' | 'denied' | 'working' | 'enabled' | 'error';
+type AccessState = { required: boolean; unlocked: boolean };
 
 type PushConfiguration = {
   configured: boolean;
@@ -55,6 +56,23 @@ const nav: { id: View; label: string; icon: string }[] = [
   { id: 'security', label: 'Security', icon: '⌾' },
   { id: 'settings', label: 'Settings', icon: '⚙' },
 ];
+
+async function fetchAccessState(): Promise<AccessState> {
+  const response = await fetch('/api/access', { cache: 'no-store' });
+  if (!response.ok) throw new Error('Beta access could not be checked.');
+  return response.json() as Promise<AccessState>;
+}
+
+async function unlockBeta(password: string): Promise<void> {
+  const response = await fetch('/api/access', {
+    method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password }),
+  });
+  const payload = await response.json() as AccessState | { error?: { message?: string } };
+  if (!response.ok || 'error' in payload) {
+    throw new Error('error' in payload ? payload.error?.message || 'Beta access was denied.' : 'Beta access was denied.');
+  }
+}
 
 async function fetchWishlistDashboard(force = false): Promise<WishlistDashboardData> {
   const authorization = await wishlineAuthorizationHeader();
@@ -207,10 +225,12 @@ export default function Home() {
   const [setup, setSetup] = useState<SetupState | null>(null);
   const [setupLoading, setSetupLoading] = useState(false);
   const [setupError, setSetupError] = useState('');
+  const [accessRequired, setAccessRequired] = useState(false);
 
   useEffect(() => {
     let active = true;
     let restoreAttempt = 0;
+    let stopObserving: (() => void) | undefined;
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => undefined);
     const restoreWorkspace = async (authenticated: boolean) => {
       const currentAttempt = ++restoreAttempt;
@@ -254,28 +274,38 @@ export default function Home() {
       }
       setScreen('app');
     };
-    if (!usesFirebaseAuthentication()) {
-      void restoreWorkspace(false);
-      return () => {
-        active = false;
-        restoreAttempt += 1;
-      };
-    }
-    const stopObserving = observeWishlineUser((user) => {
-      if (user) void restoreWorkspace(true);
-      else {
-        restoreAttempt += 1;
-        setSetup(null);
-        setWishlistData(null);
-        setDataError('');
-        setSetupError('');
+    void fetchAccessState().then((access) => {
+      if (!active) return;
+      setAccessRequired(access.required);
+      if (!access.unlocked) {
         setScreen('welcome');
+        return;
       }
+      if (!usesFirebaseAuthentication()) {
+        void restoreWorkspace(false);
+        return;
+      }
+      stopObserving = observeWishlineUser((user) => {
+        if (user) void restoreWorkspace(true);
+        else {
+          restoreAttempt += 1;
+          setSetup(null);
+          setWishlistData(null);
+          setDataError('');
+          setSetupError('');
+          setScreen('welcome');
+        }
+      });
+    }).catch(() => {
+      if (!active) return;
+      setAccessRequired(true);
+      setSetupError('Beta access could not be checked.');
+      setScreen('welcome');
     });
     return () => {
       active = false;
       restoreAttempt += 1;
-      stopObserving();
+      stopObserving?.();
     };
   }, []);
 
@@ -311,9 +341,18 @@ export default function Home() {
     notify(wishlistData?.source === 'steam' ? 'Live Steam workspace is ready' : 'Fixture workspace is ready');
   }
 
-  async function openOnboarding() {
-    setScreen('onboarding');
-    await authenticateAndLoadSetup();
+  async function openOnboarding(password: string) {
+    setSetupLoading(true);
+    setSetupError('');
+    try {
+      if (accessRequired) await unlockBeta(password);
+      setScreen('onboarding');
+      await authenticateAndLoadSetup();
+    } catch (error) {
+      setSetupError(error instanceof Error ? error.message : 'Beta access was denied.');
+    } finally {
+      setSetupLoading(false);
+    }
   }
 
   async function authenticateAndLoadSetup() {
@@ -409,7 +448,7 @@ export default function Home() {
   }
 
   if (screen === 'welcome') {
-    return <Welcome onContinue={openOnboarding} />;
+    return <Welcome accessRequired={accessRequired} error={setupError} loading={setupLoading} onContinue={openOnboarding} />;
   }
 
   if (screen === 'onboarding') {
@@ -479,7 +518,8 @@ function SessionRestore() {
   );
 }
 
-function Welcome({ onContinue }: { onContinue: () => void }) {
+function Welcome({ accessRequired, error, loading, onContinue }: { accessRequired:boolean; error:string; loading:boolean; onContinue:(password:string)=>void }) {
+  const [password, setPassword] = useState('');
   return (
     <main className="welcome-screen">
       <section className="welcome-copy">
@@ -488,7 +528,11 @@ function Welcome({ onContinue }: { onContinue: () => void }) {
           <span className="beta-pill"><i /> PRIVATE BETA DEMO</span>
           <h1>Your Steam wishlists.<br/><em>Finally within reach.</em></h1>
           <p>Track momentum, catch spikes, and celebrate every milestone—without opening another dashboard.</p>
-          <button className="primary-button" onClick={onContinue}>Continue to demo <span>→</span></button>
+          {accessRequired ? <form className="beta-access-form" onSubmit={(event)=>{event.preventDefault();onContinue(password);}}>
+            <label htmlFor="beta-password">Temporary access password</label>
+            <div><input id="beta-password" type="password" autoComplete="current-password" required value={password} onChange={(event)=>setPassword(event.target.value)} placeholder="Enter the private beta password"/><button className="primary-button" disabled={loading || !password}>{loading ? 'Checking…' : 'Enter beta'} <span>→</span></button></div>
+            {error && <p className="beta-access-error" role="alert">{error}</p>}
+          </form> : <button className="primary-button" disabled={loading} onClick={()=>onContinue('')}>Continue to demo <span>→</span></button>}
           <div className="trust-row"><span>⌾ Read-only access</span><span>◆ Encrypted by design</span><span>◉ Unofficial companion</span></div>
         </div>
         <p className="fine-print">Wishline is an unofficial third-party companion and is not affiliated with Valve Corporation.</p>

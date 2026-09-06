@@ -218,6 +218,12 @@ onboarding. Store `WISHLIST_ENCRYPTION_KEY` as a Worker secret, and review Steam
 allowlisting limitations. `WISHLIST_ALLOWED_USER_IDS` remains required only for
 the legacy environment-driven connector.
 
+During the private-beta period, configure `WISHLINE_BETA_PASSWORD` as a
+server-side deployment secret. Invited testers enter it before sign-in; a valid
+password grants browser access for 12 hours through an `HttpOnly` cookie and is
+required before Wishline resolves an identity, creates a workspace, or links a
+Steam account. Removing the secret disables this temporary gate.
+
 The key is sent to Steamworks in the `x-webapi-key` request header, never in the URL. Browser responses contain only the configured App ID, project label, timestamps, normalized aggregate metrics, and safe spike events. Manual refreshes use an authenticated POST action, cannot bypass the server more than once per minute, and normal responses use the configured server cache. After onboarding, refresh requests only yesterday and today's GMT records.
 
 History ranges include both selected endpoints. Wishline enumerates every GMT

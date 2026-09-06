@@ -95,3 +95,11 @@ or client response may have been exposed.
 
 Deleting a leaked value from the latest commit is not sufficient; the key must
 still be rotated.
+# Private-beta access
+
+When `WISHLINE_BETA_PASSWORD` is configured, every user-facing authenticated
+API requires a server-issued 12-hour access cookie before resolving an owner
+identity. Configure a long random value as a deployment secret, share it only
+with invited testers, and rotate it if disclosed. The browser submits it only
+to `/api/access`; Wishline does not log it, return it, or persist it in browser
+storage. Removing the environment value disables this temporary gate.

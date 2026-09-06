@@ -73,3 +73,7 @@ button { color:inherit; }
 
 /* Authenticated account and protected Steam connection */
 .connection-form{display:grid;gap:14px;margin-top:4px}.connection-form label{display:grid;gap:7px;color:#55595c;font-size:9px;font-weight:800}.connection-form label>span{display:flex;justify-content:space-between}.connection-form label em{color:#999c9e;font-size:8px;font-style:normal;font-weight:500}.connection-form input{width:100%;padding:13px 14px;border:1px solid #d9d7d0;border-radius:10px;background:#fbfaf7;color:var(--ink);font:inherit;font-size:11px;outline:none;transition:border-color .2s,box-shadow .2s}.connection-form input:focus{border-color:var(--purple);box-shadow:0 0 0 3px #6755e719}.connection-form input::placeholder{color:#aaa}.setup-submit{width:100%;margin-top:2px}.setup-submit:disabled{cursor:not-allowed;opacity:.58}.setup-actions:has(.setup-submit){display:none}
+
+/* Temporary private-beta access gate */
+.beta-access-form{max-width:520px}.beta-access-form>label{display:block;margin-bottom:8px;color:#aeb2b5;font-size:11px;font-weight:700}.beta-access-form>div{display:flex;gap:10px}.beta-access-form input{min-width:0;flex:1;padding:14px 15px;border:1px solid #41454a;border-radius:11px;outline:none;background:#24272b;color:#fff}.beta-access-form input:focus{border-color:var(--lime);box-shadow:0 0 0 3px #d8ff5217}.beta-access-error{margin:9px 0 0!important;color:#ff9c86!important;font-size:11px!important}
+@media(max-width:560px){.beta-access-form>div{display:grid}.beta-access-form .primary-button{width:100%}}

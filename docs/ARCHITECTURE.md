@@ -10,6 +10,7 @@ project per authenticated workspace.
 
 ```text
 Browser / installed PWA
+  |-- temporary beta access cookie (when configured)
   |-- passwordless platform session
   |-- POST /api/setup ---------> Steam credential validation
   |                               |-- protected credential storage
@@ -87,6 +88,10 @@ mistaken for a reported zero.
   the user ID.
 - Saved connections are resolved only through the authenticated user's
   workspace.
+- During the private beta, `WISHLINE_BETA_PASSWORD` gates identity resolution
+  and therefore both workspace enrollment and Steam connection. The password
+  is verified server-side and exchanged for a 12-hour, `HttpOnly`,
+  `SameSite=Strict` cookie; it is never stored by client JavaScript.
 - The older environment-driven Steam mode remains available for diagnostics;
   hosted access to that path requires `WISHLIST_ALLOWED_USER_IDS`.
 

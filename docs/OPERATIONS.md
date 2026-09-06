@@ -60,6 +60,7 @@ send a user identity header.
 
 | Value | Purpose | Required |
 | --- | --- | --- |
+| `WISHLINE_BETA_PASSWORD` | Temporary shared password for private-beta enrollment and account linking | Private beta only |
 | `WISHLIST_ENCRYPTION_KEY` | Protects saved workspace credentials | Yes for app onboarding |
 | `WISHLIST_ENCRYPTION_KEY_ID` | Non-secret ID written into new credential envelopes | Yes; defaults to `primary` |
 | `WISHLIST_PREVIOUS_ENCRYPTION_KEY` | Temporarily reads old envelopes during a controlled rotation | Rotation window only |
