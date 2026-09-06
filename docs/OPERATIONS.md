@@ -136,6 +136,12 @@ Test pushes use a constant topic/tag so a retry replaces the previous test
 instead of stacking, carry an explicit user-requested timestamp, and expire
 after two minutes.
 
+The in-app **Need help?** disclosure explains each checkpoint and the Chrome
+possible-spam recovery flow. If content is hidden, choose **Show notification
+→ Always show → Mark as safe** and resend. If **Unsubscribe** was selected,
+restore **Site information → Permissions → Notifications → Allow**. Do not
+disable Safe Browsing globally.
+
 Delivery is triggered only when wishlist activity counters differ from the
 previous intraday observation, not merely when a generation timestamp or cron
 run changes. Each observation/subscription pair is recorded once after acceptance

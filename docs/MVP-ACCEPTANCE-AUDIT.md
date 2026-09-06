@@ -129,7 +129,7 @@ Full runtime account isolation and 24-48 hour cadence evidence remain.
 | Dedupe and bounded retry | Meets | D1 ledger deduplicates accepted observation/device pairs; failures retry at most five times and 404/410 removes the device. |
 | Safe content and logs | Meets | Payloads are generic; logs contain only aggregate attempted/sent/expired/failed counts. |
 | Hosted device delivery | Pending device acceptance | Requires browser opt-in, a successful test receipt, and a subsequent Steam change. |
-| Test delivery tutorial | Meets in implementation | Settings separates provider acceptance, device receipt, and click, and can resend after a bounded safety interval. Device acknowledgement uses a 24-hour opaque capability stored only as a hash. |
+| Test delivery tutorial | Meets in implementation | Settings separates provider acceptance, device receipt, and click, can resend after a bounded safety interval, and exposes contextual help for Chrome's possible-spam and unsubscribed states. Device acknowledgement uses a 24-hour opaque capability stored only as a hash. |
 
 ## 5. Non-functional requirements
 

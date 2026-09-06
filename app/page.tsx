@@ -605,6 +605,7 @@ function Settings({ data, milestone, setMilestone, notify, reset, disconnect, de
   const [pushConfiguration, setPushConfiguration] = useState<PushConfiguration | null>(null);
   const [testReceipt, setTestReceipt] = useState<PushTestReceipt | null>(null);
   const [testSending, setTestSending] = useState(false);
+  const [pushHelpOpen, setPushHelpOpen] = useState(false);
   const pendingTestReceiptId = testReceipt?.providerStatus === 'accepted' && !testReceipt.receivedAt
     ? testReceipt.id
     : null;
@@ -738,7 +739,7 @@ function Settings({ data, milestone, setMilestone, notify, reset, disconnect, de
     : testReceipt.clickedAt
       ? '✓ Test notification received and opened on the device.'
       : testReceipt.receivedAt
-        ? '✓ Test reached this device. If Chrome hid it as possible spam, choose Show notification → Always show → Mark as safe.'
+        ? '✓ Test notification reached this device.'
         : testReceipt.providerStatus === 'accepted'
           ? 'Test accepted by the push service; waiting for the device receipt…'
           : testReceipt.providerStatus === 'failed'
@@ -771,7 +772,32 @@ function Settings({ data, milestone, setMilestone, notify, reset, disconnect, de
           <label className="toggle"><input type="checkbox" defaultChecked disabled aria-label="Hourly intraday sync enabled"/><span/></label>
         </div>
         <div className="settings-section">
-          <div><h2>Browser notifications</h2><p>{pushCopy}</p><small className="push-test-status">{testReceiptCopy}</small></div>
+          <div className="push-settings-copy">
+            <h2>Browser notifications</h2>
+            <p>{pushCopy}</p>
+            <small className="push-test-status">{testReceiptCopy}</small>
+            <button
+              type="button"
+              className="push-help-button"
+              aria-expanded={pushHelpOpen}
+              aria-controls="push-notification-help"
+              onClick={() => setPushHelpOpen((open) => !open)}
+            >
+              {pushHelpOpen ? 'Hide help' : 'Need help?'}
+            </button>
+            {pushHelpOpen && <div id="push-notification-help" className="push-help" role="note">
+              <strong>Chrome marked the test as possible spam?</strong>
+              <p>This does not necessarily mean delivery failed. Wishline reports three separate checkpoints:</p>
+              <ul>
+                <li><b>Accepted</b> — the push service accepted the request.</li>
+                <li><b>Reached this device</b> — the service worker asked Chrome to display it.</li>
+                <li><b>Opened</b> — the notification was clicked.</li>
+              </ul>
+              <p>If Chrome hid the content, choose <b>Show notification → Always show → Mark as safe</b>, then send another test.</p>
+              <p>If you chose <b>Unsubscribe</b>, open Chrome&apos;s site information, then <b>Permissions → Notifications → Allow</b>. Do not disable Safe Browsing globally.</p>
+              <a href="https://support.google.com/chrome/answer/3220216?co=GENIE.Platform%3DAndroid&amp;hl=en" target="_blank" rel="noreferrer">Open Chrome notification help ↗</a>
+            </div>}
+          </div>
           {pushState === 'enabled'
             ? <div className="push-controls">
               <button className="primary-button compact" disabled={testSending} onClick={sendAnotherPushTest}>{testSending ? 'Sending…' : 'Send another test'}</button>

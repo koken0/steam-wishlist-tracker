@@ -80,6 +80,13 @@ test('authenticates, onboards, reconnects, loads the dashboard, and renders safe
   await expect(page.getByRole('alert')).toContainText('temporarily unavailable');
 
   await page.getByRole('button', { name: 'Settings' }).click();
+  const pushHelpButton = page.getByRole('button', { name: 'Need help?' });
+  await expect(pushHelpButton).toHaveAttribute('aria-expanded', 'false');
+  await pushHelpButton.click();
+  await expect(page.getByRole('note')).toContainText('This does not necessarily mean delivery failed.');
+  await expect(page.getByRole('note')).toContainText('Reached this device');
+  await expect(page.getByRole('link', { name: /Open Chrome notification help/ })).toHaveAttribute('target', '_blank');
+  await expect(page.getByRole('button', { name: 'Hide help' })).toHaveAttribute('aria-expanded', 'true');
   await page.getByRole('button', { name: 'Update Steam connection' }).click();
   await page.getByLabel('Financial API key').fill('acceptance-key-two');
   await page.getByLabel(/Project name/).fill('Acceptance Harbor Reconnected');

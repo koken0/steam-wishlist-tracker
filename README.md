@@ -313,6 +313,9 @@ test** to repeat the check (tests have a five-second safety interval).
 Test retries replace the previous test and expire after two minutes. If Chrome
 for Android hides the content as possible spam, choose **Show notification →
 Always show → Mark as safe** and resend; do not disable Safe Browsing globally.
+The **Need help?** disclosure beside Browser notifications explains these
+delivery states and how to restore the site permission after choosing
+**Unsubscribe**, without leaving Settings.
 
 On iPhone or iPad, first use Safari's **Add to Home Screen**, open the installed
 Wishline app, and enable notifications there. Desktop Chrome, Edge, Firefox,
