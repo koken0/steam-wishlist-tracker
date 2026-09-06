@@ -9,6 +9,17 @@ export function connectionValidationDates(now = new Date()): [string] {
   return [now.toISOString().slice(0, 10)];
 }
 
+export function shouldReuseWishlistCache(
+  force: boolean,
+  nowMs: number,
+  expiresAtMs: number,
+  fetchedAtMs: number,
+  minForceRefreshMs: number,
+): boolean {
+  if (force) return nowMs - fetchedAtMs < minForceRefreshMs;
+  return expiresAtMs > nowMs;
+}
+
 export function recentBaselineAdds(days: WishlistDay[], beforeDate: string): number | null {
   const values = days
     .filter((day) => day.date < beforeDate)

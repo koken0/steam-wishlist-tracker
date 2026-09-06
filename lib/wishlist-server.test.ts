@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { connectionValidationDates, currentAndPreviousUtcDates, recentBaselineAdds } from './wishlist-polling.ts';
+import {
+  connectionValidationDates,
+  currentAndPreviousUtcDates,
+  recentBaselineAdds,
+  shouldReuseWishlistCache,
+} from './wishlist-polling.ts';
 import type { WishlistDay } from './wishlist-contract.ts';
 
 function day(date: string, adds: number): WishlistDay {
@@ -40,4 +45,14 @@ test('connection validation targets exactly the current GMT date', () => {
     connectionValidationDates(new Date('2026-09-05T23:59:59.000Z')),
     ['2026-09-05'],
   );
+});
+
+test('forced refresh bypasses the normal cache after the one-minute safety window', () => {
+  const now = Date.parse('2026-09-06T04:00:00.000Z');
+  const fetchedAt = now - 60_000;
+  const expiresAt = now + 1_740_000;
+
+  assert.equal(shouldReuseWishlistCache(false, now, expiresAt, fetchedAt, 60_000), true);
+  assert.equal(shouldReuseWishlistCache(true, now, expiresAt, fetchedAt, 60_000), false);
+  assert.equal(shouldReuseWishlistCache(true, now - 1, expiresAt, fetchedAt, 60_000), true);
 });

@@ -211,6 +211,12 @@ identify connector failures; `no_connections`, `no_remote_request`, and
 reserved for rows written before detailed telemetry existed. Preserve this
 distinction whenever scheduler logging changes.
 
+`no_remote_request` is expected only when the same workspace/App cache was
+populated by another forced refresh less than 60 seconds earlier. Consecutive
+hourly occurrences require investigation: verify that the scheduler activity
+object reaches the Steam loader and that forced refreshes bypass the normal
+`STEAM_CACHE_SECONDS` lifetime after the one-minute safety interval.
+
 For a one-shot health check, store `WISHLINE_MONITOR_URL` and the matching
 `WISHLINE_MONITOR_SECRET` in ignored `.env.monitor.local`, then run:
 

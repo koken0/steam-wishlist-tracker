@@ -14,7 +14,12 @@ import {
 } from '@/lib/wishlist-history-store';
 import { WishlistConnectorError } from '@/lib/wishlist-errors';
 import { fetchSteamWishlistDate, requireUsableWishlistDays } from '@/lib/wishlist-steam-client';
-import { connectionValidationDates, currentAndPreviousUtcDates, recentBaselineAdds } from '@/lib/wishlist-polling';
+import {
+  connectionValidationDates,
+  currentAndPreviousUtcDates,
+  recentBaselineAdds,
+  shouldReuseWishlistCache,
+} from '@/lib/wishlist-polling';
 
 const STEAM_STORE_ENDPOINT = 'https://store.steampowered.com/api/appdetails';
 const MIN_FORCE_REFRESH_MS = 60_000;
@@ -55,21 +60,28 @@ export async function getWishlistDashboardData(
   const now = Date.now();
 
   if (cache?.key === cacheKey) {
-    const forceIsTooSoon = force && now - cache.fetchedAtMs < MIN_FORCE_REFRESH_MS;
-    if (cache.expiresAt > now || forceIsTooSoon) {
+    if (shouldReuseWishlistCache(force, now, cache.expiresAt, cache.fetchedAtMs, MIN_FORCE_REFRESH_MS)) {
       return { ...cache.data, cacheHit: true };
     }
   }
 
-  const data = source === 'steam' ? await loadSteamData({
-    apiKey: connection?.apiKey ?? requireSteamKey(),
-    appId,
-    projectName: connection?.projectName,
-    cacheScope: connection?.cacheScope,
-    useEnvironmentMetadata: connection ? connection.useEnvironmentMetadata : true,
-  }) : loadFixtureData();
+  const data = source === 'steam'
+    ? await loadSteamData(prepareSteamConnection(connection, appId))
+    : loadFixtureData();
   cache = { key: cacheKey, expiresAt: now + cacheSeconds * 1000, fetchedAtMs: now, data };
   return data;
+}
+
+function prepareSteamConnection(
+  connection: SteamConnection | undefined,
+  appId: number,
+): SteamConnection {
+  return {
+    ...connection,
+    apiKey: connection?.apiKey ?? requireSteamKey(),
+    appId,
+    useEnvironmentMetadata: connection ? connection.useEnvironmentMetadata : true,
+  };
 }
 
 function loadFixtureData(): WishlistDashboardData {

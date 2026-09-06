@@ -257,7 +257,7 @@ Use the `result` field as the primary diagnosis:
 | `partial_failure` | At least one connection succeeded and at least one failed |
 | `failed` | The run executed, but no configured connection synchronized successfully |
 | `no_connections` | The scheduler worked, but there were no saved connections to process |
-| `no_remote_request` | A connection was processed without starting a new Steam date request, normally because of the refresh safety cache |
+| `no_remote_request` | A connection was processed without starting a new Steam date request; this is expected only when another forced refresh populated the same workspace/App cache less than 60 seconds earlier |
 | `no_usable_records` | Date requests started, but no usable normalized record was retained |
 | `unknown` | The row predates detailed scheduler telemetry |
 
