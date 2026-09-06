@@ -51,8 +51,9 @@ self.addEventListener('push', (event) => {
     : null;
   event.waitUntil((async () => {
     await self.registration.showNotification(title, {
-      body,
-      tag,
+    body,
+    tag,
+    renotify: false,
       icon: '/icon-192.png',
       badge: '/icon-192.png',
       data: { url, receiptId, receiptToken },

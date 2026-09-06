@@ -62,13 +62,15 @@ async function sendTestPush(
   subscription: PushSubscription,
 ): Promise<PushTestResult> {
   const receiptCapability = await createPushTestReceiptInDatabase(database(), workspaceId, subscriptionId);
-  const result = await sendPush(subscription, receiptCapability.id, requireVapidKeys(), {
-    title: 'Wishline test notification',
-    body: 'This test confirms that Wishline notifications reach this device.',
+  const requestedAt = new Date().toISOString().slice(11, 16);
+  const result = await sendPush(subscription, 'wishline-test', requireVapidKeys(), {
+    title: 'Wishline test',
+    body: `Requested from Wishline Settings at ${requestedAt} UTC. No action is required.`,
     url: '/',
-    tag: `wishline-${receiptCapability.id}`,
+    tag: 'wishline-test',
     receiptId: receiptCapability.id,
     receiptToken: receiptCapability.token,
+    ttl: 120,
   });
   await recordPushTestProviderResultInDatabase(database(), receiptCapability.id, result.status === 'sent');
   const receipt = await readPushTestReceiptInDatabase(database(), workspaceId, receiptCapability.id);
@@ -116,13 +118,15 @@ async function sendPush(
     tag: string;
     receiptId?: string;
     receiptToken?: string;
+    ttl?: number;
   },
 ): Promise<PushSendResult> {
   try {
+    const { ttl = 3600, ...notificationData } = data;
     const payload = await buildPushPayload({
-      data,
+      data: notificationData,
       options: {
-        ttl: 3600,
+        ttl,
         urgency: 'normal',
         topic: pushTopic(eventId),
       },

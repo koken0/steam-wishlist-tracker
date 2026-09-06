@@ -738,7 +738,7 @@ function Settings({ data, milestone, setMilestone, notify, reset, disconnect, de
     : testReceipt.clickedAt
       ? '✓ Test notification received and opened on the device.'
       : testReceipt.receivedAt
-        ? '✓ Test notification received by the device.'
+        ? '✓ Test reached this device. If Chrome hid it as possible spam, choose Show notification → Always show → Mark as safe.'
         : testReceipt.providerStatus === 'accepted'
           ? 'Test accepted by the push service; waiting for the device receipt…'
           : testReceipt.providerStatus === 'failed'

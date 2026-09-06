@@ -310,6 +310,9 @@ device receipt, and notification-open confirmation are separate states. The
 service worker acknowledges receipt with an event-specific random capability;
 only its hash is stored, and it expires after 24 hours. Use **Send another
 test** to repeat the check (tests have a five-second safety interval).
+Test retries replace the previous test and expire after two minutes. If Chrome
+for Android hides the content as possible spam, choose **Show notification →
+Always show → Mark as safe** and resend; do not disable Safe Browsing globally.
 
 On iPhone or iPad, first use Safari's **Add to Home Screen**, open the installed
 Wishline app, and enable notifications there. Desktop Chrome, Edge, Firefox,

@@ -132,6 +132,9 @@ device service worker received it and successfully requested display; and
 `clickedAt` means the notification was opened. The latter two are device
 receipts, while none can prove that a human visually noticed the banner.
 **Send another test** repeats the flow after a five-second safety interval.
+Test pushes use a constant topic/tag so a retry replaces the previous test
+instead of stacking, carry an explicit user-requested timestamp, and expire
+after two minutes.
 
 Delivery is triggered only when wishlist activity counters differ from the
 previous intraday observation, not merely when a generation timestamp or cron
@@ -304,6 +307,7 @@ hosting provider.
 | `pushExpired` increases | The push service rejected a stale browser capability and Wishline removed it; enable notifications again on that device. |
 | `pushFailed` increases | Confirm the push service status/network path; the delivery ledger retries up to five times without marking Steam sync failed. |
 | Test remains “waiting for device receipt” | Confirm the latest service worker is active and OS notifications are allowed. Provider acceptance alone does not prove device receipt. Use **Send another test** after reopening the installed PWA. |
+| Chrome says the notification may be spam | Chrome for Android may hide even a delivered notification using its on-device classifier. Choose **Show notification → Always show → Mark as safe**, then use **Send another test**. Do not weaken Safe Browsing globally. |
 
 ## Incident rule
 
