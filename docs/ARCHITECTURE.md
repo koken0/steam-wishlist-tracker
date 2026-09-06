@@ -167,6 +167,11 @@ It also receives Web Push events, displays a generic notification, and focuses
 or opens the same-origin PWA when clicked. The payload has no App ID, counts,
 workspace/user identifiers, or raw Steam data.
 
+The client starts in a neutral session-restoration state. Once the trusted
+identity provider resolves, a connected returning owner is routed directly to
+the dashboard, an incomplete owner resumes at the Steam connection step, and
+only an unauthenticated visitor receives the public landing page.
+
 The Playwright acceptance suite separates browser-flow tests (service worker
 blocked so API doubles remain observable) from PWA tests (real service worker
 enabled). It verifies local sign-in, onboarding, reconnection, dashboard and

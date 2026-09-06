@@ -16,7 +16,7 @@ import {
 } from '@/lib/wishlist-history';
 
 type View = 'overview' | 'projects' | 'widget' | 'security' | 'settings';
-type Screen = 'welcome' | 'onboarding' | 'app';
+type Screen = 'restoring' | 'welcome' | 'onboarding' | 'app';
 type PushState = 'checking' | 'unsupported' | 'unconfigured' | 'disabled' | 'denied' | 'working' | 'enabled' | 'error';
 
 type PushConfiguration = {
@@ -195,7 +195,7 @@ function base64UrlToUint8Array(value: string): Uint8Array<ArrayBuffer> {
 }
 
 export default function Home() {
-  const [screen, setScreen] = useState<Screen>('welcome');
+  const [screen, setScreen] = useState<Screen>('restoring');
   const [view, setView] = useState<View>('overview');
   const [onboardingStep, setOnboardingStep] = useState(1);
   const [refreshing, setRefreshing] = useState(false);
@@ -209,25 +209,74 @@ export default function Home() {
   const [setupError, setSetupError] = useState('');
 
   useEffect(() => {
+    let active = true;
+    let restoreAttempt = 0;
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => undefined);
-    const loadWorkspace = () => {
-      fetchWishlistDashboard()
-        .then((data) => { setWishlistData(data); setDataError(''); })
-        .catch((error: Error) => setDataError(error.message));
-      fetchSetup().then(setSetup).catch(() => undefined);
-    };
-    if (!usesFirebaseAuthentication()) {
-      loadWorkspace();
-      return;
-    }
-    return observeWishlineUser((user) => {
-      if (user) loadWorkspace();
-      else {
+    const restoreWorkspace = async (authenticated: boolean) => {
+      const currentAttempt = ++restoreAttempt;
+      const [setupResult, dashboardResult] = await Promise.allSettled([
+        fetchSetup(),
+        fetchWishlistDashboard(),
+      ]);
+      if (!active || currentAttempt !== restoreAttempt) return;
+
+      if (setupResult.status === 'rejected') {
         setSetup(null);
         setWishlistData(null);
         setDataError('');
+        if (authenticated) {
+          setSetupError(setupResult.reason instanceof Error ? setupResult.reason.message : 'Workspace could not be loaded.');
+          setOnboardingStep(1);
+          setScreen('onboarding');
+        } else {
+          setScreen('welcome');
+        }
+        return;
+      }
+
+      const restoredSetup = setupResult.value;
+      setSetup(restoredSetup);
+      setSetupError('');
+      if (!restoredSetup.workspace.connected) {
+        setWishlistData(null);
+        setDataError('');
+        setOnboardingStep(2);
+        setScreen('onboarding');
+        return;
+      }
+
+      if (dashboardResult.status === 'fulfilled') {
+        setWishlistData(dashboardResult.value);
+        setDataError('');
+      } else {
+        setWishlistData(null);
+        setDataError(dashboardResult.reason instanceof Error ? dashboardResult.reason.message : 'Wishlist data could not be loaded.');
+      }
+      setScreen('app');
+    };
+    if (!usesFirebaseAuthentication()) {
+      void restoreWorkspace(false);
+      return () => {
+        active = false;
+        restoreAttempt += 1;
+      };
+    }
+    const stopObserving = observeWishlineUser((user) => {
+      if (user) void restoreWorkspace(true);
+      else {
+        restoreAttempt += 1;
+        setSetup(null);
+        setWishlistData(null);
+        setDataError('');
+        setSetupError('');
+        setScreen('welcome');
       }
     });
+    return () => {
+      active = false;
+      restoreAttempt += 1;
+      stopObserving();
+    };
   }, []);
 
   const progress = useMemo(() => {
@@ -274,7 +323,19 @@ export default function Home() {
       if (usesFirebaseAuthentication()) await signInToWishline();
       const value = await fetchSetup();
       setSetup(value);
-      setOnboardingStep(value.workspace.connected ? 3 : 1);
+      if (value.workspace.connected) {
+        setScreen('app');
+        setView('overview');
+        try {
+          const data = await fetchWishlistDashboard();
+          setWishlistData(data);
+          setDataError('');
+        } catch (error) {
+          setDataError(error instanceof Error ? error.message : 'Wishlist data could not be loaded.');
+        }
+      } else {
+        setOnboardingStep(2);
+      }
     } catch (error) {
       setSetupError(error instanceof Error ? error.message : 'Sign in is required.');
     } finally {
@@ -343,6 +404,10 @@ export default function Home() {
     }
   }
 
+  if (screen === 'restoring') {
+    return <SessionRestore />;
+  }
+
   if (screen === 'welcome') {
     return <Welcome onContinue={openOnboarding} />;
   }
@@ -397,6 +462,19 @@ export default function Home() {
         </div>
       </section>
       {toast && <div className="toast" role="status"><span>✓</span>{toast}</div>}
+    </main>
+  );
+}
+
+function SessionRestore() {
+  return (
+    <main className="session-restore" aria-busy="true" aria-live="polite">
+      <div className="session-restore-card">
+        <div className="brand"><span className="brand-mark">W</span><span>Wishline</span></div>
+        <span className="session-spinner" aria-hidden="true" />
+        <h1>Identifying you…</h1>
+        <p>Checking your saved Wishline session and workspace.</p>
+      </div>
     </main>
   );
 }

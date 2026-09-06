@@ -63,8 +63,8 @@ Full runtime account isolation and 24-48 hour cadence evidence remain.
 | TypeScript (`tsc --noEmit`) | Meets |
 | Anonymous fixture validation | Meets - 14 daily records |
 | Production build | Meets |
-| Chromium browser/PWA suite | Meets - 4 scenarios at desktop and phone sizes |
-| Browser landing page | Meets |
+| Chromium browser/PWA suite | Meets - returning-session, onboarding, desktop, phone, deletion, and PWA scenarios |
+| Browser landing page | Meets - shown only after session restoration confirms there is no owner |
 | Hosted Google sign-in and authenticated setup | Meets |
 | Authorized hosted Steam onboarding | Meets - 24 normalized days, sanitized evidence |
 | Browser onboarding entry | Meets for hosted staging and local scripted identity |
@@ -75,6 +75,7 @@ Full runtime account isolation and 24-48 hour cadence evidence remain.
 | Requirement | Status | Evidence / gap |
 | --- | --- | --- |
 | Saved workspace requires authentication | Meets | `/api/setup` requires a platform identity and saved connections are resolved through that identity. |
+| Returning-owner routing | Meets | A neutral identifying state prevents a landing-page flash; connected owners open the dashboard directly and incomplete owners resume at the connection step. |
 | Stable local owner; no browser-supplied user ID | Meets | The authorized local script completed through the Sites sign-in cookie. The simulated identity branch is limited to development loopback requests; staging requires Firebase. |
 | Exact positive numeric App ID and bounded key | Meets | Setup validates integer App ID, key presence/length/newlines, JSON type, and body size. |
 | Safe errors for invalid, unauthorized, limited, malformed, empty, and mismatched responses | Meets | Connector tests cover access denial, rate limiting, malformed JSON, empty data, network failure, upstream failure, and App-ID mismatch without exposing secrets. |

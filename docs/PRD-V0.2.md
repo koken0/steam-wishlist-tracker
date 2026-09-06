@@ -238,6 +238,10 @@ Policy and customer terms.
 Accepted when:
 
 - an unauthenticated visitor cannot access a saved workspace;
+- while authentication is being restored, the browser shows a neutral loading
+  state instead of flashing the public landing page;
+- a returning authenticated owner opens a connected workspace directly, while
+  an incomplete workspace opens at the connection step;
 - local sign-in resolves a stable test owner without accepting a user ID from
   browser JavaScript;
 - the connection form requires an exact numeric App ID and a Financial API key;

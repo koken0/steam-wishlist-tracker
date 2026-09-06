@@ -53,9 +53,7 @@ test('authenticates, onboards, reconnects, loads the dashboard, and renders safe
   await expect(page.getByText('Account required.')).toBeVisible();
   await page.getByRole('link', { name: /Open local workspace/ }).click();
   await waitForReact(page);
-  await page.getByRole('button', { name: /Continue to demo/ }).click();
-  await expect(page.getByText("Seedy's workspace")).toBeVisible();
-  await page.getByRole('button', { name: /Continue/ }).click();
+  await expect(page.getByRole('heading', { name: 'Connect your Steam project' })).toBeVisible();
 
   await page.getByLabel('Steam App ID').fill('1234567');
   await page.getByLabel('Financial API key').fill('acceptance-key-one');
@@ -96,13 +94,31 @@ test('authenticates, onboards, reconnects, loads the dashboard, and renders safe
   await expect(page.locator('body')).not.toContainText('acceptance-key-two');
 });
 
+test('restores a connected owner without flashing the public landing page', async ({ page }) => {
+  let releaseSetup!: () => void;
+  const setupGate = new Promise<void>((resolve) => { releaseSetup = resolve; });
+
+  await page.context().addCookies([{ name: '__sites_local_auth', value: '1', url: 'http://localhost:3100' }]);
+  await page.route('**/api/setup', async (route) => {
+    await setupGate;
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(connectedSetup()) });
+  });
+  await page.route('**/api/wishlist', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(dashboardFixture) }));
+
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Identifying you…' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Continue to demo/ })).toHaveCount(0);
+  releaseSetup();
+
+  await expect(page.getByText('Stored wishlist total').first()).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Your Steam wishlists/ })).toHaveCount(0);
+});
+
 test('dashboard remains usable at a phone-sized viewport', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.route('**/api/setup', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(connectedSetup()) }));
   await page.route('**/api/wishlist', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(dashboardFixture) }));
   await signInLocally(page);
-  await page.getByRole('button', { name: /Continue to demo/ }).click();
-  await page.getByRole('button', { name: /Open dashboard/ }).click();
   await expect(page.getByText('Stored wishlist total').first()).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(1);
@@ -120,8 +136,6 @@ test('account deletion requires browser confirmation and returns to the welcome 
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ deleted: true }) });
   });
   await signInLocally(page);
-  await page.getByRole('button', { name: /Continue to demo/ }).click();
-  await page.getByRole('button', { name: /Open dashboard/ }).click();
   await page.getByRole('button', { name: 'Settings' }).click();
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: 'Delete Wishline account' }).click();

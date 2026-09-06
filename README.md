@@ -331,6 +331,11 @@ and supported Safari versions can enable them from the hosted HTTPS app.
 6. Use Refresh to exercise the throttled server cache.
 7. On a compatible browser, use **Add to Home Screen** to install the PWA.
 
+On later visits, Wishline briefly displays **Identifying you…** while restoring
+the session. A connected owner opens the dashboard directly; an owner who has
+not connected Steam resumes at the connection form. The landing page is shown
+only when no authenticated owner is available.
+
 ## What remains simulated
 
 - Read-only app token issuance and revocation
