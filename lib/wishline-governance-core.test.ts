@@ -130,21 +130,29 @@ test('rotation re-wraps every old envelope before retiring the previous key', as
     delete mutableEnv.WISHLIST_PREVIOUS_ENCRYPTION_KEY_ID;
     const firstOld = await encryptSecret('first-secret');
     const secondOld = await encryptSecret('second-secret');
+    const pushOld = await encryptSecret('{"endpoint":"sealed"}');
     await createConnection(db, 'ws_111111111111111111111111', 101, firstOld);
     await createConnection(db, 'ws_222222222222222222222222', 202, secondOld);
+    await db.prepare(`INSERT INTO push_subscriptions
+      (id, workspace_id, endpoint_hash, encrypted_subscription, created_at, updated_at)
+      VALUES ('push-test', 'ws_111111111111111111111111', 'hash', ?, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')`).bind(pushOld).run();
 
     mutableEnv.WISHLIST_PREVIOUS_ENCRYPTION_KEY = mutableEnv.WISHLIST_ENCRYPTION_KEY;
     mutableEnv.WISHLIST_PREVIOUS_ENCRYPTION_KEY_ID = 'key-old';
     mutableEnv.WISHLIST_ENCRYPTION_KEY = Buffer.alloc(32, 4).toString('base64');
     mutableEnv.WISHLIST_ENCRYPTION_KEY_ID = 'key-new';
     const result = await rewrapStoredConnectionsInDatabase(db, new Date('2026-09-05T00:00:00.000Z'));
-    assert.deepEqual(result, { scanned: 2, rewrapped: 2, alreadyCurrent: 0, keyId: 'key-new', auditRecorded: true });
+    assert.deepEqual(result, { scanned: 3, rewrapped: 3, alreadyCurrent: 0, keyId: 'key-new', auditRecorded: true });
 
     const rows = (await db.prepare('SELECT encrypted_api_key FROM steam_connections ORDER BY workspace_id').all<{ encrypted_api_key: string }>()).results;
     assert.equal(rows.every((row) => secretEnvelopeKeyId(row.encrypted_api_key) === 'key-new'), true);
     assert.equal(await decryptSecret(rows[0].encrypted_api_key), 'first-secret');
     assert.equal(await decryptSecret(rows[1].encrypted_api_key), 'second-secret');
     assert.equal(rows.some((row) => row.encrypted_api_key.includes('secret')), false);
+    const pushRow = await db.prepare('SELECT encrypted_subscription FROM push_subscriptions WHERE id = ?')
+      .bind('push-test').first<{ encrypted_subscription: string }>();
+    assert.equal(secretEnvelopeKeyId(pushRow?.encrypted_subscription || ''), 'key-new');
+    assert.equal(await decryptSecret(pushRow?.encrypted_subscription || ''), '{"endpoint":"sealed"}');
 
     delete mutableEnv.WISHLIST_PREVIOUS_ENCRYPTION_KEY;
     delete mutableEnv.WISHLIST_PREVIOUS_ENCRYPTION_KEY_ID;
@@ -185,6 +193,7 @@ async function createProductTables(db: D1Database) {
     CREATE TABLE steam_connections (workspace_id TEXT PRIMARY KEY, app_id INTEGER NOT NULL, project_name TEXT NOT NULL, encrypted_api_key TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE);
     CREATE TABLE wishlist_intraday_snapshots (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, app_id INTEGER NOT NULL, report_date TEXT NOT NULL, adds INTEGER NOT NULL, deletes INTEGER NOT NULL, purchases INTEGER NOT NULL, gifts INTEGER NOT NULL, generated_at TEXT, fetched_at TEXT NOT NULL, FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE);
     CREATE TABLE wishlist_alerts (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, app_id INTEGER NOT NULL, report_date TEXT NOT NULL, kind TEXT NOT NULL, title TEXT NOT NULL, message TEXT NOT NULL, created_at TEXT NOT NULL, read_at TEXT, FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE);
+    CREATE TABLE push_subscriptions (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, endpoint_hash TEXT NOT NULL, encrypted_subscription TEXT NOT NULL, expires_at INTEGER, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE, UNIQUE (workspace_id, endpoint_hash));
   `);
 }
 

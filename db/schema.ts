@@ -7,4 +7,6 @@ export const schema = {
   auditEvents: ['id', 'workspace_id', 'app_id', 'event_type', 'outcome', 'reason_code', 'occurred_at'],
   syncRuns: ['id', 'started_at', 'completed_at', 'attempted', 'succeeded', 'failed'],
   syncRunActivity: ['sync_run_id', 'report_dates_requested', 'records_received', 'changes_detected'],
+  pushSubscriptions: ['id', 'workspace_id', 'endpoint_hash', 'encrypted_subscription', 'expires_at', 'created_at', 'updated_at'],
+  pushDeliveries: ['observation_id', 'subscription_id', 'attempts', 'sent_at', 'last_attempt_at', 'last_error_code'],
 } as const;

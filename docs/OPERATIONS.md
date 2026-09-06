@@ -69,6 +69,9 @@ send a user identity header.
 | `STEAM_CACHE_SECONDS` | Server cache lifetime, bounded by the connector | Optional |
 | `WISHLINE_SYNC_SECRET` | Bearer secret accepted only by the private scheduler endpoint | Required for external scheduler |
 | `WISHLINE_MONITOR_SECRET` | Bearer secret accepted only by the aggregate scheduler-health endpoint | Required for external health monitoring |
+| `VAPID_PUBLIC_KEY` | P-256 application-server public key returned to authenticated browsers | Required for Web Push |
+| `VAPID_PRIVATE_KEY` | P-256 application-server private key used only by the Worker | Required for Web Push |
+| `VAPID_SUBJECT` | VAPID contact/origin, currently the deployed HTTPS Worker URL | Required for Web Push |
 | `WISHLIST_DATA_SOURCE` | Selects fixture or legacy environment-driven Steam mode | Optional |
 | `STEAM_FINANCIAL_API_KEY` | Legacy connector and local acceptance script | Legacy/test only |
 | `STEAM_APP_ID` | Legacy connector and local acceptance script | Legacy/test only |
@@ -93,12 +96,43 @@ Each scheduled run records separate aggregate activity counters:
 - `reportDatesRequested`: reporting dates for which a Steam request was started;
 - `recordsReceived`: valid normalized daily records returned by Steam;
 - `changesDetected`: new current-day intraday observations stored because at
-  least one counter or Steam's generation timestamp differed.
+  least one counter or Steam's generation timestamp differed;
+- `pushAttempted`, `pushSent`, `pushExpired`, and `pushFailed`: generic browser
+  deliveries attempted, accepted by a push service, removed as expired, or
+  left for bounded retry.
 
 A successful run with records received and `changesDetected: 0` means Steam
 responded but the current-day observation was unchanged. It is not a sync
 failure. The counters contain no App ID, wishlist value, credential, request
 header, or response body.
+
+`unchanged` with `pushAttempted: 0` means the job and Steam request worked but
+there was nothing new to notify. `changed` with `pushSent > 0` means at least
+one subscribed device was accepted by its push service. `pushFailed > 0` means
+Steam sync and notification delivery must be diagnosed separately; delivery
+retries up to five hourly runs. Never add endpoints, browser keys, payloads,
+App IDs, wishlist values, or upstream bodies to these logs.
+
+## Browser Web Push
+
+Create one P-256 VAPID pair for the deployment and store all three VAPID values
+with Wrangler secrets; the private key must never enter Git or command output.
+Until Wishline has a support mailbox/domain, use the deployed HTTPS Worker
+origin as `VAPID_SUBJECT`. Apply `0005_web_push.sql` before deploying.
+
+After deployment, the owner opts in per browser from **Settings → Browser
+notifications**. The server stores the subscription encrypted and attempts a
+generic test message. iPhone/iPad users must add Wishline to the Home Screen
+from Safari and enable notifications inside that installed PWA. Browser
+permission cannot be granted by an operator or background job.
+
+Delivery is triggered only when wishlist activity counters differ from the
+previous intraday observation, not merely when a generation timestamp or cron
+run changes. Each observation/subscription pair is recorded once after acceptance
+by the push service. HTTP 404/410 deletes that expired subscription; other
+failures retain a sanitized status code and retry up to five times. Acceptance
+by the push service does not prove the operating system visibly displayed the
+notification, so the activation test is the device-level check.
 
 ## Hosted-environment readiness checklist
 
@@ -157,7 +191,8 @@ Never replace the current key in one step. Use this controlled sequence:
 7. Only after that verification, remove both previous-key variables. Retain the
    retired key according to the private recovery procedure, never in source.
 
-Runs are capped at 100 connections. A larger installation must add a reviewed
+Runs are capped at 100 protected envelopes across Steam connections and push
+subscriptions. A larger installation must add a reviewed
 cursor/batch plan before rotation rather than silently accepting a partial
 run.
 
@@ -165,8 +200,9 @@ run.
 
 The owner can choose **Disconnect and delete all data** in Settings. After an
 explicit browser confirmation, Wishline deletes the encrypted Steam credential,
-daily history, intraday observations, and alerts for that workspace in one D1
-batch. The empty owner workspace remains available for reconnection. This
+encrypted push subscriptions, delivery ledger, daily history, intraday
+observations, and alerts for that workspace in one D1 batch. The empty owner
+workspace remains available for reconnection. This
 action is irreversible in Wishline and does not revoke the key in Steamworks.
 
 **Delete Wishline account** is a separate confirmed Settings action. It removes
@@ -176,7 +212,8 @@ workspace. See `DATA-RETENTION.md` for active-store lifetimes and backup limits.
 
 ## Audit, scheduler health, and retention
 
-Migration `0003_governance.sql` adds sanitized `audit_events` and `sync_runs`.
+Migration `0003_governance.sql` adds sanitized `audit_events` and `sync_runs`;
+`0005_web_push.sql` adds encrypted subscriptions and the delivery ledger.
 Audit inspection must select only the defined columns; there is deliberately no
 request, response, header, credential, or free-form message payload. The hourly
 job persists attempted/succeeded/failed counts, then deletes expired intraday
@@ -198,7 +235,8 @@ npm run logs:scheduler
 ```
 
 The `wishline.scheduler.completed` event contains only timestamps, connection
-outcomes, requested/received record counts, and the number of detected changes.
+outcomes, requested/received record counts, the number of detected changes,
+and aggregate push-delivery counts.
 `wishline.scheduler.failed` contains only a fixed safe reason code. For retained
 historical logs, open Cloudflare **Workers & Pages → wishline → Observability**
 and filter for `wishline.scheduler`; observability is already enabled in
@@ -253,6 +291,10 @@ hosting provider.
 | Local workspace disappeared | Confirm the project-local `.wrangler/` state still exists |
 | Local dev runtime rejects the compatibility date | Upgrade the local Cloudflare runtime or lower `compatibility_date` to the newest date it explicitly supports, then rerun the full validation suite |
 | Local scripted onboarding returns `AUTH_REQUIRED` | Confirm `npm run dev` is current and the test URL is loopback. The Worker accepts Sites' exact simulated identity only in development; staging still requires Firebase. |
+| Settings says push is not configured | Confirm all three VAPID values exist in the Worker, then redeploy. Never inspect or print the private value. |
+| Test notification was not confirmed | Check browser/OS permission and try disabling and enabling again; do not log the subscription endpoint or keys. |
+| `pushExpired` increases | The push service rejected a stale browser capability and Wishline removed it; enable notifications again on that device. |
+| `pushFailed` increases | Confirm the push service status/network path; the delivery ledger retries up to five times without marking Steam sync failed. |
 
 ## Incident rule
 

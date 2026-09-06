@@ -4,6 +4,8 @@ import { WishlistConnectorError } from '@/lib/wishlist-errors';
 import { enforceRetention, persistSyncRun, recordAuditEventSafely } from '@/lib/wishline-governance';
 import type { WishlistSyncActivity } from '@/lib/wishlist-server';
 import { classifySchedulerRun } from '@/lib/wishline-governance-core';
+import { deliverPendingPushNotifications } from '@/lib/push-notifications';
+import type { PushDeliverySummary } from '@/lib/push-notifications-core';
 
 export type WishlistSyncSummary = {
   startedAt: string;
@@ -12,6 +14,7 @@ export type WishlistSyncSummary = {
   succeeded: number;
   failed: number;
   activity: WishlistSyncActivity;
+  push: PushDeliverySummary;
   retention: {
     intradayDeleted: number;
     alertsDeleted: number;
@@ -31,6 +34,7 @@ export async function syncAllWishlistConnections(): Promise<WishlistSyncSummary>
     recordsReceived: 0,
     changesDetected: 0,
   };
+  const push: PushDeliverySummary = { attempted: 0, sent: 0, expired: 0, failed: 0 };
 
   for (const connection of connections) {
     const connectionActivity: WishlistSyncActivity = {
@@ -67,6 +71,32 @@ export async function syncAllWishlistConnections(): Promise<WishlistSyncSummary>
       activity.recordsReceived += connectionActivity.recordsReceived;
       activity.changesDetected += connectionActivity.changesDetected;
     }
+    try {
+      const delivery = await deliverPendingPushNotifications(connection.workspaceId);
+      push.attempted += delivery.attempted;
+      push.sent += delivery.sent;
+      push.expired += delivery.expired;
+      push.failed += delivery.failed;
+      if (delivery.attempted > 0) {
+        await recordAuditEventSafely({
+          workspaceId: connection.workspaceId,
+          appId: connection.appId,
+          eventType: 'push.delivery',
+          outcome: delivery.failed > 0 ? 'failure' : 'success',
+          reasonCode: delivery.failed > 0 ? 'DELIVERY_PARTIAL' : 'DELIVERY_COMPLETED',
+        });
+      }
+    } catch {
+      push.failed += 1;
+      console.error('wishline.push.failed', { reasonCode: 'PUSH_DELIVERY_FAILED' });
+      await recordAuditEventSafely({
+        workspaceId: connection.workspaceId,
+        appId: connection.appId,
+        eventType: 'push.delivery',
+        outcome: 'failure',
+        reasonCode: 'DELIVERY_FAILED',
+      });
+    }
   }
 
   const completedAt = new Date().toISOString();
@@ -80,7 +110,7 @@ export async function syncAllWishlistConnections(): Promise<WishlistSyncSummary>
   };
   await persistSyncRun(run);
   const retention = await enforceRetention(new Date(completedAt));
-  return { ...run, retention };
+  return { ...run, push, retention };
 }
 
 export async function runScheduledWishlistSync(): Promise<WishlistSyncSummary> {
@@ -105,6 +135,10 @@ export async function runScheduledWishlistSync(): Promise<WishlistSyncSummary> {
       reportDatesRequested: summary.activity.reportDatesRequested,
       recordsReceived: summary.activity.recordsReceived,
       changesDetected: summary.activity.changesDetected,
+      pushAttempted: summary.push.attempted,
+      pushSent: summary.push.sent,
+      pushExpired: summary.push.expired,
+      pushFailed: summary.push.failed,
     });
     return summary;
   } catch {

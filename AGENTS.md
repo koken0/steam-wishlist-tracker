@@ -17,8 +17,9 @@ whenever a change affects that conclusion or its mitigations.
 
 The current MVP is the mobile-responsive PWA defined in `docs/PRD-V0.2.md`,
 backed by a private server connector, D1 history, and hourly intraday sync.
-Native Android/iOS apps, native widgets, external push delivery, teams, exports,
-billing, and public commercial production remain deferred.
+Browser Web Push for changed intraday observations is included in the private
+prototype. Native Android/iOS apps, native widgets, email/digests, teams,
+exports, billing, and public commercial production remain deferred.
 
 Do not add a separately entered or "official" wishlist total. Wishline derives
 the stored wishlist total exclusively from retained daily records and must

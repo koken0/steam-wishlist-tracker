@@ -23,6 +23,7 @@
     "steam:capture": "node --env-file-if-exists=.env.local scripts/capture-steam-wishlist.mjs"
   },
   "dependencies": {
+    "@block65/webcrypto-web-push": "2.0.0",
     "firebase": "^12.18.0",
     "jose": "^6.2.11",
     "next": "16.3.3",

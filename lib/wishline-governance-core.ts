@@ -8,6 +8,9 @@ export type AuditEventType =
   | 'connection.validation_failed'
   | 'connection.disconnected'
   | 'encryption.rewrapped'
+  | 'push.subscribed'
+  | 'push.unsubscribed'
+  | 'push.delivery'
   | 'retention.executed'
   | 'sync.failure'
   | 'sync.success';
@@ -78,8 +81,8 @@ export const DEFAULT_RETENTION_POLICY: RetentionPolicy = {
   syncRunDays: 365,
 };
 
-type EncryptedConnectionRow = { workspace_id: string; encrypted_api_key: string };
-const MAX_ROTATION_CONNECTIONS = 100;
+type EncryptedSecretRow = { kind: 'connection' | 'push'; id: string; envelope: string };
+const MAX_ROTATION_SECRETS = 100;
 const schemaReady = new WeakMap<object, Promise<void>>();
 
 export async function recordAuditEventInDatabase(db: D1Database, event: AuditEvent): Promise<void> {
@@ -225,27 +228,32 @@ export async function rewrapStoredConnectionsInDatabase(
   now = new Date(),
 ): Promise<{ scanned: number; rewrapped: number; alreadyCurrent: number; keyId: string; auditRecorded: boolean }> {
   await ensureGovernanceSchema(db);
-  const result = await db.prepare(
-    `SELECT workspace_id, encrypted_api_key
-       FROM steam_connections
-      ORDER BY workspace_id
-      LIMIT ?`,
-  ).bind(MAX_ROTATION_CONNECTIONS + 1).all<EncryptedConnectionRow>();
-  const rows = result.results || [];
-  if (rows.length > MAX_ROTATION_CONNECTIONS) {
-    throw new WishlistConnectorError('ROTATION_BATCH_TOO_LARGE', `Key rotation is limited to ${MAX_ROTATION_CONNECTIONS} connections per controlled run.`, 409);
+  const [connections, subscriptions] = await Promise.all([
+    db.prepare(
+      `SELECT 'connection' AS kind, workspace_id AS id, encrypted_api_key AS envelope
+         FROM steam_connections ORDER BY workspace_id LIMIT ?`,
+    ).bind(MAX_ROTATION_SECRETS + 1).all<EncryptedSecretRow>(),
+    db.prepare(
+      `SELECT 'push' AS kind, id, encrypted_subscription AS envelope
+         FROM push_subscriptions ORDER BY id LIMIT ?`,
+    ).bind(MAX_ROTATION_SECRETS + 1).all<EncryptedSecretRow>(),
+  ]);
+  const rows = [...(connections.results || []), ...(subscriptions.results || [])];
+  if (rows.length > MAX_ROTATION_SECRETS) {
+    throw new WishlistConnectorError('ROTATION_BATCH_TOO_LARGE', `Key rotation is limited to ${MAX_ROTATION_SECRETS} encrypted records per controlled run.`, 409);
   }
 
   const keyId = currentSecretKeyId();
-  const pending = rows.filter((row) => secretEnvelopeKeyId(row.encrypted_api_key) !== keyId);
+  const pending = rows.filter((row) => secretEnvelopeKeyId(row.envelope) !== keyId);
   const rewrapped = await Promise.all(pending.map(async (row) => ({
-    workspaceId: row.workspace_id,
-    envelope: await encryptSecret(await decryptSecret(row.encrypted_api_key)),
+    kind: row.kind,
+    id: row.id,
+    envelope: await encryptSecret(await decryptSecret(row.envelope)),
   })));
   if (rewrapped.length) {
-    await db.batch(rewrapped.map((row) => db.prepare(
-      'UPDATE steam_connections SET encrypted_api_key = ? WHERE workspace_id = ?',
-    ).bind(row.envelope, row.workspaceId)));
+    await db.batch(rewrapped.map((row) => row.kind === 'connection'
+      ? db.prepare('UPDATE steam_connections SET encrypted_api_key = ? WHERE workspace_id = ?').bind(row.envelope, row.id)
+      : db.prepare('UPDATE push_subscriptions SET encrypted_subscription = ? WHERE id = ?').bind(row.envelope, row.id)));
   }
   let auditRecorded = true;
   try {
@@ -300,6 +308,17 @@ export async function ensureGovernanceSchema(db: D1Database): Promise<void> {
       records_received INTEGER NOT NULL CHECK (records_received >= 0),
       changes_detected INTEGER NOT NULL CHECK (changes_detected >= 0),
       FOREIGN KEY (sync_run_id) REFERENCES sync_runs(id) ON DELETE CASCADE
+    )`),
+    db.prepare(`CREATE TABLE IF NOT EXISTS push_subscriptions (
+      id TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL,
+      endpoint_hash TEXT NOT NULL,
+      encrypted_subscription TEXT NOT NULL,
+      expires_at INTEGER,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+      UNIQUE (workspace_id, endpoint_hash)
     )`),
   ]).then(() => undefined).catch((error) => {
     schemaReady.delete(db as object);

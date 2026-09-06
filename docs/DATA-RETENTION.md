@@ -15,6 +15,8 @@ privacy notice. Paid production remains blocked by `STEAM-COMPLIANCE.md`.
 | Sanitized audit events | 365 days | Hourly scheduled retention |
 | Scheduled-run summaries | 365 days | Hourly scheduled retention |
 | Scheduled-run activity counts | 365 days | Deleted with their scheduled-run summary |
+| Encrypted browser push subscription | Until browser opt-out, owner disconnect/account deletion, expiration, or push-service 404/410 | Owner action and delivery cleanup |
+| Push delivery ledger | Same as its intraday observation (at most 90 days), or earlier when the subscription is removed | Foreign-key cascade |
 
 Retention runs after each scheduled wishlist synchronization and records only a
 sanitized `retention.executed` audit event. It never records credentials, raw
@@ -23,8 +25,9 @@ Steam responses, user emails, request bodies, or arbitrary error text.
 ## Owner actions
 
 **Disconnect and delete all data** removes the encrypted Steam connection,
-daily history, intraday observations, and alerts in one workspace-scoped D1
-batch. It retains the empty account workspace so the owner may reconnect.
+encrypted push subscriptions, delivery ledger, daily history, intraday
+observations, and alerts in one workspace-scoped D1 batch. It retains the
+empty account workspace so the owner may reconnect.
 
 **Delete Wishline account** requires a separate explicit browser confirmation
 and action header. It removes the connection, all wishlist data, and the

@@ -16,7 +16,7 @@ Wishline is an English-language Phase 1 acceptance build for the Studio Wishlist
 | UI runtime | React 19.2.8 | Interactive onboarding, navigation, settings, refresh, and token flows |
 | Identity | Local simulated identity; Firebase Auth on staging | Passwordless Google sign-in and workspace isolation |
 | Persistence | Cloudflare D1 | Durable owner workspace, encrypted Steam connection, and normalized daily wishlist history |
-| Secret protection | Web Crypto AES-256-GCM | API keys are encrypted before D1 storage and never returned to clients |
+| Secret protection | Web Crypto AES-256-GCM | API keys and push capabilities are encrypted before D1 storage and never returned to clients |
 | Language | TypeScript 5.9.3 | Typed application source and build-time checks |
 | Styling | Tailwind CSS 4.2.1 + project CSS | Responsive layout, design system, charts, and mobile presentation |
 | Development/build | Vinext 1.0 beta + Vite 8 | Local development server and production bundle |
@@ -62,10 +62,14 @@ Browser / installed PWA
                            +-- partner.steam-api.com
                            +-- response normalization
                            +-- workspace-scoped throttled cache
+        +-- GET/POST/DELETE /api/push
+                     +-- per-device opt-in and encrypted subscription
+                     +-- generic test notification on activation
         |
         +-- Service worker cache
         |     +-- application shell
         |     +-- offline fallback
+        |     +-- generic push display and app navigation
 ```
 
 The server connector, D1 workspace, encrypted live Steamworks connection,
@@ -74,9 +78,11 @@ and last-known-good fallback are implemented. The staging Worker and D1 database
 are deployed at `wishline.celkoken.workers.dev`, and Cloudflare registered the
 hourly cron. Firebase identity, the hosted encryption secret, and authorized
 real-data onboarding are verified. Owner disconnect deletes the encrypted
-credential and all stored wishlist data for that workspace. External Web Push
-and managed KMS/HSM custody remain pending; application-level dual-key
-re-wrapping is implemented but has not been run against deployed data.
+credential, push subscriptions, and all stored wishlist data for that workspace.
+Browser Web Push is implemented for changed intraday observations; managed
+KMS/HSM custody remains pending. Application-level dual-key re-wrapping covers
+both Steam credentials and push subscriptions but has not been run against
+deployed data.
 
 > **Commercial launch gate:** do not enable billing or accept customer Financial
 > Web API keys in paid production until Valve has confirmed the hosted SaaS
@@ -92,6 +98,7 @@ app/
   globals.css       Responsive visual system and component styles
   api/wishlist/     Private, no-store server endpoint
   api/setup/        Authenticated connection, disconnect, and deletion endpoint
+  api/push/         Authenticated per-device Web Push subscription endpoint
   api/account/      Owner-confirmed full account deletion
   api/internal/     Scheduled sync, read-only health, and privileged key re-wrapping
 lib/
@@ -104,6 +111,7 @@ lib/
   wishlist-history-store.ts  D1 daily wishlist history
   wishlist-polling.ts  GMT date targeting and spike baseline rules
   wishlist-sync.ts     Hourly synchronization across saved workspaces
+  push-notifications.ts  Encrypted subscriptions and bounded Web Push delivery
   secret-crypto.ts      Versioned dual-key AES-256-GCM envelope
 worker.ts               Web requests plus the hourly scheduled handler
 db/
@@ -114,6 +122,7 @@ drizzle/
   0002_intraday_sync_and_alerts.sql  Changed observations and spike events
   0003_governance.sql        Sanitized audit and scheduled-run health
   0004_scheduler_activity.sql  Safe fetch and detected-change counts
+  0005_web_push.sql          Encrypted subscriptions and delivery ledger
 fixtures/
   steam-wishlist.sample.json  Anonymous contract fixture
 scripts/
@@ -267,6 +276,13 @@ data: `reportDatesRequested` proves date requests were started,
 `changesDetected` proves a distinct current-day observation was stored. Do not
 treat `unchanged` as a failure.
 
+The same completed event includes `pushAttempted`, `pushSent`, `pushExpired`,
+and `pushFailed`. A changed observation with `pushSent: 1` was delivered to one
+device. `pushFailed` means delivery itself needs investigation; it does not turn
+a successful Steam synchronization into a failed sync. Expired browser
+subscriptions are removed automatically. Logs never contain the push endpoint,
+browser keys, notification payload, App ID, or wishlist values.
+
 To watch new scheduler events in real time:
 
 ```bash
@@ -278,6 +294,19 @@ Observability** and filter for `wishline.scheduler`. Every completed event has
 the same explicit `result` plus sanitized counts. A fatal event is emitted as
 `wishline.scheduler.failed` with only a fixed reason code. Logs must never add
 credentials, request headers, App IDs, wishlist values, or upstream bodies.
+
+## Enable browser notifications
+
+Configure the three VAPID values from `.env.example`, apply migration `0005`,
+and deploy. Then sign in on the device, open **Settings → Browser
+notifications**, and choose **Enable notifications**. Wishline attempts a
+generic test notification immediately and later sends a generic alert only
+when Steam produces changed wishlist activity counters. A generation-timestamp-
+only update or a healthy hourly run with no changed counters sends nothing.
+
+On iPhone or iPad, first use Safari's **Add to Home Screen**, open the installed
+Wishline app, and enable notifications there. Desktop Chrome, Edge, Firefox,
+and supported Safari versions can enable them from the hosted HTTPS app.
 
 ## Suggested demo walkthrough
 
@@ -292,9 +321,8 @@ credentials, request headers, App IDs, wishlist values, or upstream bodies.
 ## What remains simulated
 
 - Read-only app token issuance and revocation
-- External Web Push delivery for stored spike events
 - Managed KMS/HSM custody for the server-side encryption key
-- Push notifications and native Android widget delivery
+- Email/digests and native Android widget delivery
 
 The generated demo app token remains only in browser memory. The project has no Stripe integration because billing belongs to Phase 2 of the PRD.
 
@@ -307,4 +335,4 @@ managed-key launch gates.
 
 ## Production seams
 
-The UI is organized around the production boundaries described by the PRD: passwordless platform identity, a durable owner workspace and per-date history in D1, versioned AES-256-GCM credential storage, a per-App-ID response cache, scoped client tokens, and a reader-only mobile experience. Managed KMS/HSM custody, provider backup guarantees, production alerting, and a native Android widget remain follow-up work.
+The UI is organized around the production boundaries described by the PRD: passwordless platform identity, a durable owner workspace and per-date history in D1, versioned AES-256-GCM credential and push-capability storage, a per-App-ID response cache, scoped client tokens, and a reader-only mobile experience. Managed KMS/HSM custody, provider backup guarantees, email/escalation alerting, and a native Android widget remain follow-up work.

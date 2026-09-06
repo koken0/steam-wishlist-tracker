@@ -200,6 +200,9 @@ contractual gate.
 
 Wishline now has versioned dual-key envelopes, bounded application re-wrapping,
 sanitized D1 audit events, active-store retention, and full account deletion.
+The private prototype also offers explicit browser Web Push opt-in: the browser
+subscription is encrypted and notifications contain only a generic prompt to
+open Wishline, never Steam counts, App IDs, or raw reporting data.
 The checklist remains open because managed key custody, provider-level access
 auditing, backup recovery/deletion evidence, and a production incident drill
 are not established.

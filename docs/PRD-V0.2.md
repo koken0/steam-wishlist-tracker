@@ -31,7 +31,8 @@ Wishline is a mobile-responsive Progressive Web App (PWA) for owners of Steam
 games. It turns Steamworks wishlist reporting into a private, focused dashboard
 that can be installed from a compatible browser.
 
-The PWA is the official MVP. A native Android application and Android home
+The PWA is the official MVP and includes an opt-in Web Push prototype for
+changed wishlist activity counters. A native Android application and Android home
 screen widget are later-phase features and are not required to validate the
 current prototype. Native iOS is also deferred.
 
@@ -65,15 +66,17 @@ Technical feasibility and product usefulness remain separate acceptance gates.
 - Security view explaining the credential boundary.
 - Local settings and Steam connection replacement.
 - Anonymous fixture mode and authorized real-data test mode.
+- Per-device Web Push opt-in with generic change notifications.
 
 ## 2. Product phases and technology decisions
 
 ### 2.1 Phase 1 - Local PWA prototype
 
-The implemented architecture uses Next.js, a local Cloudflare D1 environment,
-protected server-side credential storage, and a process-memory cache. Billing,
-durable scheduled polling, real companion tokens, notifications, exports,
-teams, and native widgets are not part of this phase.
+The implemented architecture uses Next.js, Cloudflare D1, protected server-side
+credential storage, and a process-memory cache. Hosted staging supplies durable
+hourly polling and prototype Web Push so the intraday premise can be tested.
+Billing, real companion tokens, email/digests, exports, teams, and native
+widgets are not part of this phase.
 
 ### 2.2 Phase 2 - Private hosted pilot
 
@@ -87,8 +90,8 @@ of customer Financial Web API keys is unresolved.
 
 ### 2.3 Phase 3 - Commercialization hypothesis
 
-Supabase/Postgres, Redis or Cloudflare KV, Stripe, scheduled workers, push
-delivery, team roles, exports, and native mobile applications remain candidate
+Supabase/Postgres, Redis or Cloudflare KV, Stripe, production notification
+orchestration, team roles, exports, and native mobile applications remain candidate
 production technologies and features. They are not commitments for the current
 prototype. Selection occurs only after the prototype is validated with official
 data and user tests, and after the applicable compliance gate is cleared.
@@ -298,7 +301,7 @@ Financial API key; show reporting date and freshness; survive process restart;
 redraw after a valid sync; deep-link to the correct project; and pass a
 reader-only store-compliance review. This is not an MVP acceptance condition.
 
-### 4.6 Alerts and notifications - Later phase
+### 4.6 Alerts and notifications - Prototype Web Push implemented; full policy later
 
 Accepted when spike detection follows Section 3.5; milestone alerts are emitted
 once per threshold crossing; duplicate polling cannot duplicate an alert;
@@ -306,8 +309,11 @@ quiet hours and per-project opt-in are honored; delivery failure is retried with
 bounded backoff; notification content contains no credential or sensitive raw
 payload; the alert identifies the provisional reporting date and generation
 time; and the event and delivery outcome are auditable. Alerts are intraday but
-may lag Steam activity by one or several hours. External push delivery is not
-an MVP acceptance condition.
+may lag Steam activity by one or several hours. The current private prototype
+sends one generic Web Push per changed activity observation/device, stores an
+encrypted subscription, deduplicates accepted deliveries, removes expired
+subscriptions, and retries other failures at most five times. Milestone policy,
+quiet hours, email/digests, and production delivery guarantees remain later.
 
 ### 4.7 Export - Later phase
 
@@ -413,8 +419,10 @@ The current prototype runs locally. Its Wishline database, cache, and encrypted
 connection data remain in the local project environment. The only intended
 external data transfer during an authorized real-data test is the server-side
 request to Steamworks and the authentication/platform traffic required by the
-chosen local runtime. No analytics, advertising, billing, team messaging, push
-provider, or customer-support processor is part of the MVP.
+chosen local runtime. The hosted prototype also contacts the browser-selected
+Web Push provider after explicit opt-in; payloads are generic and subscription
+capabilities are encrypted. No analytics, advertising, billing, team messaging,
+email, or customer-support processor is part of the MVP.
 
 Before any server-hosted test with real user data, the team must document:
 
@@ -431,11 +439,11 @@ prototype behavior.
 ## 7. Explicitly deferred scope
 
 - Native Android and iOS applications and widgets.
-- Push notifications, digests, quiet hours, and webhooks.
+- Email notifications, digests, quiet hours, webhooks, and production push SLAs.
 - Real companion tokens and multi-device revocation.
 - Multiple projects, team invitations, and roles.
 - CSV/JSON export.
-- External Web Push delivery and production retry orchestration.
+- Production notification escalation and provider delivery guarantees.
 - Hosted production infrastructure and production service levels.
 - Stripe, subscriptions, plan enforcement, and paid launch.
 - Final pricing and any polling cadence differentiation.

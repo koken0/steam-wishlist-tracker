@@ -17,6 +17,13 @@ import {
 
 type View = 'overview' | 'projects' | 'widget' | 'security' | 'settings';
 type Screen = 'welcome' | 'onboarding' | 'app';
+type PushState = 'checking' | 'unsupported' | 'unconfigured' | 'disabled' | 'denied' | 'working' | 'enabled' | 'error';
+
+type PushConfiguration = {
+  configured: boolean;
+  publicKey: string | null;
+  subscribed: boolean;
+};
 
 type SetupState = {
   user: { email: string | null; name: string | null };
@@ -106,6 +113,56 @@ async function deleteAccount(): Promise<void> {
   if (!response.ok || !payload.deleted) {
     throw new Error(payload.error?.message || 'Wishline account could not be deleted.');
   }
+}
+
+async function fetchPushConfiguration(): Promise<PushConfiguration> {
+  const response = await fetch('/api/push', {
+    cache: 'no-store',
+    headers: await wishlineAuthorizationHeader(),
+  });
+  const payload = await response.json() as PushConfiguration | { error?: { message?: string } };
+  if (!response.ok || 'error' in payload) {
+    throw new Error('error' in payload ? payload.error?.message || 'Notification settings could not be loaded.' : 'Notification settings could not be loaded.');
+  }
+  return payload as PushConfiguration;
+}
+
+async function saveBrowserPushSubscription(subscription: PushSubscription): Promise<{ testDelivered: boolean }> {
+  const response = await fetch('/api/push', {
+    method: 'POST',
+    cache: 'no-store',
+    headers: {
+      ...await wishlineAuthorizationHeader(),
+      'Content-Type': 'application/json',
+      'X-Wishline-Action': 'subscribe-push',
+    },
+    body: JSON.stringify(subscription.toJSON()),
+  });
+  const payload = await response.json() as { subscribed?: boolean; testDelivered?: boolean; error?: { message?: string } };
+  if (!response.ok || !payload.subscribed) throw new Error(payload.error?.message || 'Notifications could not be enabled.');
+  return { testDelivered: Boolean(payload.testDelivered) };
+}
+
+async function deleteBrowserPushSubscription(endpoint: string): Promise<void> {
+  const response = await fetch('/api/push', {
+    method: 'DELETE',
+    cache: 'no-store',
+    headers: {
+      ...await wishlineAuthorizationHeader(),
+      'Content-Type': 'application/json',
+      'X-Wishline-Action': 'unsubscribe-push',
+    },
+    body: JSON.stringify({ endpoint }),
+  });
+  const payload = await response.json() as { subscribed?: boolean; error?: { message?: string } };
+  if (!response.ok) throw new Error(payload.error?.message || 'Notifications could not be disabled.');
+}
+
+function base64UrlToUint8Array(value: string): Uint8Array<ArrayBuffer> {
+  const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+  const binary = window.atob(padded);
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
 }
 
 export default function Home() {
@@ -515,7 +572,139 @@ function Security({ data, token, setToken, notify }: { data:WishlistDashboardDat
 }
 
 function Settings({ data, milestone, setMilestone, notify, reset, disconnect, deleteAccount, disconnecting }: { data:WishlistDashboardData|null; milestone:string; setMilestone:(s:string)=>void; notify:(s:string)=>void; reset:()=>void; disconnect:()=>void; deleteAccount:()=>void; disconnecting:boolean }) {
-  return <><PageHeading eyebrow="PREFERENCES" title="Workspace settings" copy={`Configure the local experience for ${data?.projectName || 'the current project'}.`} /><div className="settings-layout"><article className="panel settings-panel"><div className="settings-section"><div><h2>Milestone target</h2><p>Choose the next round-number goal shown on the dashboard.</p></div><select value={milestone} onChange={(e)=>setMilestone(e.target.value)} aria-label="Milestone target"><option value="15000">15,000 wishlists</option><option value="25000">25,000 wishlists</option><option value="50000">50,000 wishlists</option><option value="100000">100,000 wishlists</option></select></div><div className="settings-section"><div><h2>Data source</h2><p>{data?.source === 'steam' ? 'Live server-side Steamworks adapter with a protected key.' : 'Deterministic anonymous data for contract validation.'}</p></div><span className={`demo-badge ${data?.source === 'steam' ? 'live' : ''}`}>{data?.source === 'steam' ? 'LIVE STEAM' : 'FIXTURE'}</span></div><div className="settings-section"><div><h2>Hourly intraday sync</h2><p>The backend checks today&apos;s GMT record once per hour; Steam may publish changes in batches.</p></div><label className="toggle"><input type="checkbox" defaultChecked disabled aria-label="Hourly intraday sync enabled"/><span/></label></div><div className="settings-actions"><button className="primary-button compact" onClick={()=>notify('Settings saved locally')}>Save changes</button></div></article><aside className="panel about-card"><span className="brand-mark">W</span><h2>Wishline MVP</h2><p>Local real-data acceptance build<br/>Version 0.2.0</p><hr/><p>{data?.source === 'steam' ? `Connected to App ID ${data.appId}.` : 'Ready to connect a Steamworks project through onboarding.'}</p><button className="danger-text" onClick={reset}>Update Steam connection</button><button className="danger-button" disabled={disconnecting} onClick={disconnect}>{disconnecting ? 'Deleting…' : 'Disconnect and delete all data'}</button><button className="danger-text" disabled={disconnecting} onClick={deleteAccount}>Delete Wishline account</button></aside></div></>;
+  const [pushState, setPushState] = useState<PushState>('checking');
+  const [pushConfiguration, setPushConfiguration] = useState<PushConfiguration | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    async function checkPush() {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+        if (active) setPushState('unsupported');
+        return;
+      }
+      try {
+        const configuration = await fetchPushConfiguration();
+        if (!active) return;
+        setPushConfiguration(configuration);
+        if (!configuration.configured || !configuration.publicKey) {
+          setPushState('unconfigured');
+          return;
+        }
+        const registration = await navigator.serviceWorker.register('/sw.js');
+        const subscription = await registration.pushManager.getSubscription();
+        if (!active) return;
+        setPushState(subscription ? 'enabled' : Notification.permission === 'denied' ? 'denied' : 'disabled');
+      } catch {
+        if (active) setPushState('error');
+      }
+    }
+    void checkPush();
+    return () => { active = false; };
+  }, []);
+
+  async function enablePush() {
+    if (!pushConfiguration?.publicKey) return;
+    setPushState('working');
+    let created = false;
+    let subscription: PushSubscription | null = null;
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        setPushState(permission === 'denied' ? 'denied' : 'disabled');
+        return;
+      }
+      const registration = await navigator.serviceWorker.ready;
+      subscription = await registration.pushManager.getSubscription();
+      if (!subscription) {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: base64UrlToUint8Array(pushConfiguration.publicKey),
+        });
+        created = true;
+      }
+      const result = await saveBrowserPushSubscription(subscription);
+      setPushState('enabled');
+      notify(result.testDelivered ? 'Test notification sent' : 'Notifications enabled; the test delivery was not confirmed');
+    } catch (error) {
+      if (created && subscription) await subscription.unsubscribe().catch(() => false);
+      setPushState('error');
+      notify(error instanceof Error ? error.message : 'Notifications could not be enabled.');
+    }
+  }
+
+  async function disablePush() {
+    setPushState('working');
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      const subscription = await registration.pushManager.getSubscription();
+      if (subscription) {
+        await deleteBrowserPushSubscription(subscription.endpoint);
+        await subscription.unsubscribe();
+      }
+      setPushState('disabled');
+      notify('Browser notifications disabled');
+    } catch (error) {
+      setPushState('error');
+      notify(error instanceof Error ? error.message : 'Notifications could not be disabled.');
+    }
+  }
+
+  const pushCopy = {
+    checking: 'Checking this browser and the server configuration…',
+    unsupported: 'This browser does not support Web Push.',
+    unconfigured: 'The server push keys have not been configured yet.',
+    disabled: 'Receive an alert when Steam publishes changed wishlist activity.',
+    denied: 'Notification permission is blocked in this device’s settings.',
+    working: 'Updating this device’s notification subscription…',
+    enabled: 'This device will be notified after Steam reports a change.',
+    error: 'Notification settings could not be verified. Try again.',
+  }[pushState];
+
+  return <>
+    <PageHeading
+      eyebrow="PREFERENCES"
+      title="Workspace settings"
+      copy={`Configure the local experience for ${data?.projectName || 'the current project'}.`}
+    />
+    <div className="settings-layout">
+      <article className="panel settings-panel">
+        <div className="settings-section">
+          <div><h2>Milestone target</h2><p>Choose the next round-number goal shown on the dashboard.</p></div>
+          <select value={milestone} onChange={(event) => setMilestone(event.target.value)} aria-label="Milestone target">
+            <option value="15000">15,000 wishlists</option>
+            <option value="25000">25,000 wishlists</option>
+            <option value="50000">50,000 wishlists</option>
+            <option value="100000">100,000 wishlists</option>
+          </select>
+        </div>
+        <div className="settings-section">
+          <div><h2>Data source</h2><p>{data?.source === 'steam' ? 'Live server-side Steamworks adapter with a protected key.' : 'Deterministic anonymous data for contract validation.'}</p></div>
+          <span className={`demo-badge ${data?.source === 'steam' ? 'live' : ''}`}>{data?.source === 'steam' ? 'LIVE STEAM' : 'FIXTURE'}</span>
+        </div>
+        <div className="settings-section">
+          <div><h2>Hourly intraday sync</h2><p>The backend checks today&apos;s GMT record once per hour; Steam may publish changes in batches.</p></div>
+          <label className="toggle"><input type="checkbox" defaultChecked disabled aria-label="Hourly intraday sync enabled"/><span/></label>
+        </div>
+        <div className="settings-section">
+          <div><h2>Browser notifications</h2><p>{pushCopy}</p></div>
+          {pushState === 'enabled'
+            ? <button className="secondary-button" onClick={disablePush}>Disable</button>
+            : <button className="primary-button compact" disabled={!['disabled', 'error'].includes(pushState) || data?.source !== 'steam'} onClick={enablePush}>{pushState === 'working' ? 'Updating…' : 'Enable notifications'}</button>}
+        </div>
+        <div className="settings-actions"><button className="primary-button compact" onClick={() => notify('Settings saved locally')}>Save changes</button></div>
+      </article>
+      <aside className="panel about-card">
+        <span className="brand-mark">W</span>
+        <h2>Wishline MVP</h2>
+        <p>Local real-data acceptance build<br/>Version 0.2.0</p>
+        <hr/>
+        <p>{data?.source === 'steam' ? `Connected to App ID ${data.appId}.` : 'Ready to connect a Steamworks project through onboarding.'}</p>
+        <button className="danger-text" onClick={reset}>Update Steam connection</button>
+        <button className="danger-button" disabled={disconnecting} onClick={disconnect}>{disconnecting ? 'Deleting…' : 'Disconnect and delete all data'}</button>
+        <button className="danger-text" disabled={disconnecting} onClick={deleteAccount}>Delete Wishline account</button>
+      </aside>
+    </div>
+  </>;
 }
 
 function utcToday(): string {

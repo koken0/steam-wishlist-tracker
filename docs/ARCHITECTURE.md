@@ -148,8 +148,14 @@ by workspace and App ID. Normal responses use `STEAM_CACHE_SECONDS`; forced
 refreshes cannot bypass the one-minute safety window. A restart clears only the
 response cache, not the normalized daily snapshots.
 
-External Web Push delivery and bounded retry orchestration remain follow-up
-work; detected spike events are already stored and shown in the PWA.
+After each connection sync, the Worker selects intraday observations created
+after a device subscribed whose wishlist activity counters differ from their
+preceding same-day observation. `push_deliveries` provides one row per
+observation/device, five bounded attempts, and sent-state deduplication.
+Subscriptions are validated, encrypted with the same versioned envelope as the
+Steam credential, and stored in `push_subscriptions`; only an endpoint hash is
+queryable. HTTP 404/410 removes an expired capability. Push delivery failure is
+audited separately and never changes a successful Steam sync into a failure.
 
 ## PWA boundary
 
@@ -157,6 +163,9 @@ The service worker caches only successful same-origin HTTP(S) shell and asset
 responses. Requests below `/api/`, cross-origin requests, and browser-extension
 schemes are never cached. This keeps private API data out of offline storage and
 prevents unsupported request schemes from causing rejected cache operations.
+It also receives Web Push events, displays a generic notification, and focuses
+or opens the same-origin PWA when clicked. The payload has no App ID, counts,
+workspace/user identifiers, or raw Steam data.
 
 The Playwright acceptance suite separates browser-flow tests (service worker
 blocked so API doubles remain observable) from PWA tests (real service worker
@@ -166,10 +175,15 @@ manifest metadata, required icons, an offline navigation fallback, and absence
 of `/api/` entries from Cache Storage. Screenshots, video, and traces are
 disabled because onboarding fields must not be retained as artifacts.
 
+The authenticated `/api/push` route lets the owner opt one browser in or out.
+It requires explicit action headers, bounded JSON, private no-store responses,
+and a connected project. A successful opt-in attempts a generic test message.
+
 Owner disconnect uses an authenticated `DELETE /api/setup` request with an
 explicit action header. One D1 batch removes alerts, intraday observations,
-daily snapshots, and the encrypted Steam connection before returning the empty
-workspace status. The owner workspace record remains available for a later
+daily snapshots, encrypted push subscriptions, and the encrypted Steam
+connection before returning the empty workspace status. The owner workspace
+record remains available for a later
 reconnection. Wishline deletion does not revoke the source key in Steamworks.
 
 `audit_events` accepts only enumerated event types, success/failure, scoped IDs,

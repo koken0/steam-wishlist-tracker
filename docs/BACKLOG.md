@@ -27,6 +27,8 @@ reliable, useful intraday updates without excessive Steam requests.
    are not routinely requested again.
 6. If Steam fails or rate-limits a run, confirm the dashboard serves the last
    known good history with a safe warning.
+7. Enable Web Push on one device and confirm a changed observation produces one
+   generic notification while an unchanged run produces none.
 
 **Done when:** At least 24 hours, preferably 48, of sanitized evidence shows
 the cron running at the intended cadence, no duplicate daily rows, bounded
@@ -99,3 +101,6 @@ commercial access.
   changing the deployed key or existing data.
 - Scheduler telemetry distinguishes dates requested, usable records received,
   and changed intraday observations without retaining Steam values or payloads.
+- Web Push stores encrypted per-device capabilities, sends a generic activation
+  test, deduplicates changed-observation delivery, removes expired endpoints,
+  and retries sanitized failures at most five times.

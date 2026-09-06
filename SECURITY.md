@@ -17,6 +17,8 @@ data. Treat both as sensitive even though the current product is an MVP.
   decrypted secrets.
 - Treat `WISHLINE_SYNC_SECRET` like a credential. Send it only in the private
   scheduler endpoint's Authorization header, never in a URL or browser code.
+- Treat `VAPID_PRIVATE_KEY` as a server credential. Never commit, log, or expose
+  it to browser code; only the public VAPID key may cross `/api/push`.
 - Keep `.env.local`, `.wrangler/`, captures, and local database state out of Git.
 
 ## Security boundaries
@@ -31,12 +33,17 @@ data. Treat both as sensitive even though the current product is an MVP.
 - The hourly Worker reads all saved connections only inside the server runtime;
   its HTTP fallback rejects requests without the scheduler bearer secret.
 - Intraday snapshots and alerts remain scoped by workspace and App ID.
+- Web Push endpoints and browser key material are bearer capabilities. Wishline
+  validates known HTTPS push-service hosts, encrypts the complete subscription
+  at rest, and stores only a one-way endpoint hash separately.
+- Push messages are generic and contain no App ID, wishlist value, credential,
+  user identifier, or raw Steam field.
 - Persistent audit rows contain only event type, outcome, sanitized reason
   code, timestamp, and optional workspace/App ID scope. They have no free-form
   payload column and never contain request bodies or upstream responses.
 - Owner-confirmed disconnect deletes the encrypted Steam connection and all
-  daily, intraday, and alert data scoped to that workspace. It does not revoke
-  the source key in Steamworks.
+  daily, intraday, alert, push-subscription, and delivery data scoped to that
+  workspace. It does not revoke the source key in Steamworks.
 
 ## Production controls
 
@@ -61,9 +68,10 @@ controlled rotation window. New writes always use the current key; reads select
 the matching key and legacy envelopes try the controlled pair.
 
 Rotation is authorized by a separate bearer secret and explicit action header,
-and is capped at 100 saved connections per run. It prepares every replacement
+and is capped at 100 protected envelopes per run. It prepares every replacement
 envelope before changing a row, records no plaintext or ciphertext in audit,
-and is idempotent. Do not remove the previous key until a second run reports
+and re-wraps both Steam credentials and browser push subscriptions. It is
+idempotent. Do not remove the previous key until a second run reports
 every scanned envelope already current and live reads have been verified.
 
 ## Reporting a vulnerability

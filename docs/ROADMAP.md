@@ -24,6 +24,8 @@ Steamworks report. This does not clear the separate hosted-key compliance gate.
 - Throttled manual refresh with workspace-scoped cache
 - Overview, date-range history, projects, widget preview, security, and settings
 - Redacted real-data acceptance script
+- Opt-in Web Push for changed wishlist activity observations with encrypted
+  subscriptions, deduplication, and bounded retry
 
 ## Now: private hosted pilot
 
@@ -109,12 +111,13 @@ Acceptance criteria:
 - Per-workspace refresh quotas and abuse controls
 - Data export for owner-controlled aggregate history
 - Full account deletion, backup behavior, and production retention guarantees
+- Production notification telemetry, quiet hours, and delivery guarantees
 
 ## Later: companion experience
 
 - Real scoped and revocable companion tokens
 - Durable mobile/widget read endpoint
-- Web Push delivery for stored intraday spike and milestone events
+- Email/digests and milestone-specific notification policy
 - Native Android widget after the PWA behavior is proven
 - Multiple projects and team roles only after single-project isolation is solid
 

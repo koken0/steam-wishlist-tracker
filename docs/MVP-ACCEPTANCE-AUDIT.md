@@ -31,6 +31,11 @@ onboarding and loaded 24 normalized days without exposing its credential.
 Hourly synchronization is deployed with that saved connection; its 24-48 hour
 cadence evidence remains pending.
 
+Opt-in browser Web Push is implemented with encrypted subscriptions, a generic
+activation test, one delivery ledger row per changed activity observation/device,
+bounded retries, expired-subscription cleanup, and aggregate safe logs. Hosted
+device-level delivery remains pending until the owner enables one browser.
+
 Status meanings:
 
 - **Meets:** implemented and supported by direct evidence.
@@ -113,6 +118,17 @@ Full runtime account isolation and 24-48 hour cadence evidence remain.
 | Private API data excluded from service-worker cache | Meets | Browser inspection finds no `/api/` entries in any Cache Storage bucket, and offline API fetches fail at the network boundary. |
 | Preview uses normalized data and correct labels | Meets | It uses dashboard data and displays total kind, latest reported movement, coverage, and freshness. |
 | Preview is not presented as a delivered native widget | Meets | The surface explicitly identifies itself as a future native concept outside the MVP. |
+
+### 4.5 Browser notifications
+
+| Requirement | Status | Evidence / gap |
+| --- | --- | --- |
+| Explicit per-device opt-in | Meets in implementation | Settings requests browser permission only after the owner clicks Enable and supports disable/unsubscribe. |
+| Sensitive capability protected | Meets | Endpoint and browser keys are validated and encrypted in D1; only an endpoint hash is queryable. |
+| Notify only on a difference | Meets in implementation | Delivery jobs require a wishlist activity counter change after subscription; timestamp-only observations do not notify. |
+| Dedupe and bounded retry | Meets | D1 ledger deduplicates accepted observation/device pairs; failures retry at most five times and 404/410 removes the device. |
+| Safe content and logs | Meets | Payloads are generic; logs contain only aggregate attempted/sent/expired/failed counts. |
+| Hosted device delivery | Pending real data | Requires migration/deployment, browser opt-in, and a subsequent Steam change. |
 
 ## 5. Non-functional requirements
 
