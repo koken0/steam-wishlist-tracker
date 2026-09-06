@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { syncAllWishlistConnections } from '@/lib/wishlist-sync';
+import { runScheduledWishlistSync } from '@/lib/wishlist-sync';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const summary = await syncAllWishlistConnections();
+  const summary = await runScheduledWishlistSync();
   return NextResponse.json(summary, { headers: privateHeaders() });
 }
 

@@ -152,7 +152,9 @@ a production rotation drill remain launch controls.
 
 Persistent allowlisted events cover connection, sync, deletion, retention, and
 re-wrapping actions without a payload column. Scheduled runs retain aggregate
-health counts, and sync failures retain only safe reason codes. External
+health and change-detection counts, and sync failures retain only safe reason
+codes. A dedicated read-only health endpoint exposes the latest aggregate runs
+without App IDs, wishlist values, or upstream payloads. External
 alerting and provider privileged-access logs remain hosted-pilot controls.
 
 ## MVP closure backlog

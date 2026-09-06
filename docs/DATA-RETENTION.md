@@ -14,6 +14,7 @@ privacy notice. Paid production remains blocked by `STEAM-COMPLIANCE.md`.
 | Spike alerts | 365 days | Hourly scheduled retention |
 | Sanitized audit events | 365 days | Hourly scheduled retention |
 | Scheduled-run summaries | 365 days | Hourly scheduled retention |
+| Scheduled-run activity counts | 365 days | Deleted with their scheduled-run summary |
 
 Retention runs after each scheduled wishlist synchronization and records only a
 sanitized `retention.executed` audit event. It never records credentials, raw

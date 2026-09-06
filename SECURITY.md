@@ -45,6 +45,9 @@ Before using a real key outside local acceptance:
 - Require private authenticated Site access.
 - Configure server secrets through the hosting environment.
 - Restrict access to logs, D1 data, and deployment settings.
+- Protect `/api/internal/scheduler-health` with a dedicated
+  `WISHLINE_MONITOR_SECRET`. Never reuse the sync or rotation secret; the route
+  returns only aggregate run activity and cannot trigger synchronization.
 - Use the Steamworks IP allowlist when a stable egress IP is available.
 - Keep the two-owner D1 isolation and replacement tests passing.
 - Establish managed key custody, complete a production rotation drill, and

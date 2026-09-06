@@ -402,8 +402,10 @@ validation failure, disconnect, account deletion, sync outcome, retention, and
 key re-wrapping. Events accept only scoped identifiers and sanitized reason
 codes—never credentials, request bodies, arbitrary messages, or raw Steam
 responses. Scheduled-run summaries distinguish attempted, successful, and
-failed work. External alerting and privileged-access-provider logs remain a
-hosted-pilot control.
+failed work plus the number of reporting dates requested, usable records
+received, and changed current-day observations. A separate bearer-protected
+read-only endpoint exposes only those aggregate health fields. External
+alerting and privileged-access-provider logs remain a hosted-pilot control.
 
 ## 6. Local privacy and operating boundary
 

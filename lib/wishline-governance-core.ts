@@ -27,6 +27,30 @@ export type SyncRunRecord = {
   attempted: number;
   succeeded: number;
   failed: number;
+  activity?: SyncRunActivity;
+};
+
+export type SyncRunActivity = {
+  reportDatesRequested: number;
+  recordsReceived: number;
+  changesDetected: number;
+};
+
+export type SchedulerHealthRun = SyncRunActivity & {
+  startedAt: string;
+  completedAt: string;
+  attempted: number;
+  succeeded: number;
+  failed: number;
+  telemetryAvailable: boolean;
+};
+
+export type SchedulerHealth = {
+  status: 'healthy' | 'degraded' | 'stale' | 'unknown';
+  checkedAt: string;
+  staleAfterMinutes: number;
+  latest: SchedulerHealthRun | null;
+  recent: SchedulerHealthRun[];
 };
 
 export type RetentionPolicy = {
@@ -57,10 +81,79 @@ export async function recordSyncRunInDatabase(db: D1Database, run: SyncRunRecord
   validateCount(run.attempted);
   validateCount(run.succeeded);
   validateCount(run.failed);
-  await db.prepare(
-    `INSERT INTO sync_runs (id, started_at, completed_at, attempted, succeeded, failed)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-  ).bind(crypto.randomUUID(), run.startedAt, run.completedAt, run.attempted, run.succeeded, run.failed).run();
+  const activity = run.activity || { reportDatesRequested: 0, recordsReceived: 0, changesDetected: 0 };
+  validateCount(activity.reportDatesRequested);
+  validateCount(activity.recordsReceived);
+  validateCount(activity.changesDetected);
+  const id = crypto.randomUUID();
+  await db.batch([
+    db.prepare(
+      `INSERT INTO sync_runs (id, started_at, completed_at, attempted, succeeded, failed)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    ).bind(id, run.startedAt, run.completedAt, run.attempted, run.succeeded, run.failed),
+    db.prepare(
+      `INSERT INTO sync_run_activity (
+         sync_run_id, report_dates_requested, records_received, changes_detected
+       ) VALUES (?, ?, ?, ?)`,
+    ).bind(id, activity.reportDatesRequested, activity.recordsReceived, activity.changesDetected),
+  ]);
+}
+
+export async function readSchedulerHealthInDatabase(
+  db: D1Database,
+  now = new Date(),
+  recentLimit = 24,
+  staleAfterMinutes = 90,
+): Promise<SchedulerHealth> {
+  await ensureGovernanceSchema(db);
+  const limit = Math.min(48, Math.max(1, Math.trunc(recentLimit)));
+  const staleMinutes = Math.min(1_440, Math.max(1, Math.trunc(staleAfterMinutes)));
+  const result = await db.prepare(
+    `SELECT s.started_at, s.completed_at, s.attempted, s.succeeded, s.failed,
+            a.sync_run_id,
+            COALESCE(a.report_dates_requested, 0) AS report_dates_requested,
+            COALESCE(a.records_received, 0) AS records_received,
+            COALESCE(a.changes_detected, 0) AS changes_detected
+       FROM sync_runs s
+       LEFT JOIN sync_run_activity a ON a.sync_run_id = s.id
+      ORDER BY s.completed_at DESC
+      LIMIT ?`,
+  ).bind(limit).all<{
+    started_at: string;
+    completed_at: string;
+    attempted: number;
+    succeeded: number;
+    failed: number;
+    sync_run_id: string | null;
+    report_dates_requested: number;
+    records_received: number;
+    changes_detected: number;
+  }>();
+  const recent = (result.results || []).map((row): SchedulerHealthRun => ({
+    startedAt: row.started_at,
+    completedAt: row.completed_at,
+    attempted: row.attempted,
+    succeeded: row.succeeded,
+    failed: row.failed,
+    reportDatesRequested: row.report_dates_requested,
+    recordsReceived: row.records_received,
+    changesDetected: row.changes_detected,
+    telemetryAvailable: row.sync_run_id != null,
+  }));
+  const latest = recent[0] || null;
+  let status: SchedulerHealth['status'] = 'unknown';
+  if (latest) {
+    const completedAt = new Date(latest.completedAt).valueOf();
+    const stale = !Number.isFinite(completedAt) || now.valueOf() - completedAt > staleMinutes * 60_000;
+    status = stale ? 'stale' : latest.failed > 0 ? 'degraded' : 'healthy';
+  }
+  return {
+    status,
+    checkedAt: now.toISOString(),
+    staleAfterMinutes: staleMinutes,
+    latest,
+    recent,
+  };
 }
 
 export async function enforceRetentionInDatabase(
@@ -71,11 +164,15 @@ export async function enforceRetentionInDatabase(
   await ensureGovernanceSchema(db);
   validatePolicy(policy);
   const cutoff = (days: number) => new Date(now.valueOf() - days * 86_400_000).toISOString();
-  const [intraday, alerts, audits, syncRuns] = await db.batch([
+  const syncRunCutoff = cutoff(policy.syncRunDays);
+  const expiredSyncRuns = await db.prepare(
+    'SELECT COUNT(*) AS count FROM sync_runs WHERE completed_at < ?',
+  ).bind(syncRunCutoff).first<{ count: number }>();
+  const [intraday, alerts, audits] = await db.batch([
     db.prepare('DELETE FROM wishlist_intraday_snapshots WHERE fetched_at < ?').bind(cutoff(policy.intradayDays)),
     db.prepare('DELETE FROM wishlist_alerts WHERE created_at < ?').bind(cutoff(policy.alertDays)),
     db.prepare('DELETE FROM audit_events WHERE occurred_at < ?').bind(cutoff(policy.auditDays)),
-    db.prepare('DELETE FROM sync_runs WHERE completed_at < ?').bind(cutoff(policy.syncRunDays)),
+    db.prepare('DELETE FROM sync_runs WHERE completed_at < ?').bind(syncRunCutoff),
   ]);
   let auditRecorded = true;
   try {
@@ -94,7 +191,7 @@ export async function enforceRetentionInDatabase(
     intradayDeleted: changes(intraday),
     alertsDeleted: changes(alerts),
     auditsDeleted: changes(audits),
-    syncRunsDeleted: changes(syncRuns),
+    syncRunsDeleted: Number(expiredSyncRuns?.count || 0),
     auditRecorded,
   };
 }
@@ -173,6 +270,13 @@ export async function ensureGovernanceSchema(db: D1Database): Promise<void> {
       failed INTEGER NOT NULL CHECK (failed >= 0)
     )`),
     db.prepare('CREATE INDEX IF NOT EXISTS idx_sync_runs_completed ON sync_runs(completed_at)'),
+    db.prepare(`CREATE TABLE IF NOT EXISTS sync_run_activity (
+      sync_run_id TEXT PRIMARY KEY,
+      report_dates_requested INTEGER NOT NULL CHECK (report_dates_requested >= 0),
+      records_received INTEGER NOT NULL CHECK (records_received >= 0),
+      changes_detected INTEGER NOT NULL CHECK (changes_detected >= 0),
+      FOREIGN KEY (sync_run_id) REFERENCES sync_runs(id) ON DELETE CASCADE
+    )`),
   ]).then(() => undefined).catch((error) => {
     schemaReady.delete(db as object);
     throw error;

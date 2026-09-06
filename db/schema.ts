@@ -6,4 +6,5 @@ export const schema = {
   wishlistAlerts: ['id', 'workspace_id', 'app_id', 'report_date', 'kind', 'title', 'message', 'created_at', 'read_at'],
   auditEvents: ['id', 'workspace_id', 'app_id', 'event_type', 'outcome', 'reason_code', 'occurred_at'],
   syncRuns: ['id', 'started_at', 'completed_at', 'attempted', 'succeeded', 'failed'],
+  syncRunActivity: ['sync_run_id', 'report_dates_requested', 'records_received', 'changes_detected'],
 } as const;

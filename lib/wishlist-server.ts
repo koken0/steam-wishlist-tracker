@@ -33,6 +33,13 @@ export type SteamConnection = {
   projectName?: string;
   cacheScope?: string;
   useEnvironmentMetadata?: boolean;
+  syncActivity?: WishlistSyncActivity;
+};
+
+export type WishlistSyncActivity = {
+  reportDatesRequested: number;
+  recordsReceived: number;
+  changesDetected: number;
 };
 
 export { WishlistConnectorError } from '@/lib/wishlist-errors';
@@ -101,18 +108,21 @@ async function loadSteamData(connection: SteamConnection): Promise<WishlistDashb
       ? await readWishlistHistory(connection.cacheScope, appId)
       : { daily: [], fetchedAt: null };
     const dates = existing.daily.length ? currentAndPreviousUtcDates() : utcDatesEndingToday(lookbackDays);
+    if (connection.syncActivity) connection.syncActivity.reportDatesRequested += dates.length;
     const [payloads, fetchedProjectName] = await Promise.all([
       mapWithConcurrency(dates, 4, (date) => fetchSteamWishlistDate(key, appId, date)),
       connection.projectName?.trim() ? Promise.resolve(null) : fetchSteamProjectName(appId),
     ]);
     storeProjectName = fetchedProjectName;
     const fetchedDaily = requireUsableWishlistDays(payloads);
+    if (connection.syncActivity) connection.syncActivity.recordsReceived += fetchedDaily.length;
 
     if (connection.cacheScope) {
       const currentDate = utcDate(0);
       const currentDay = fetchedDaily.find((day) => day.date === currentDate);
       if (currentDay) {
         const changed = await saveWishlistObservation(connection.cacheScope, appId, currentDay, fetchedAt);
+        if (changed && connection.syncActivity) connection.syncActivity.changesDetected += 1;
         if (changed) {
           const baseline = recentBaselineAdds(existing.daily, currentDate);
           if (baseline != null) {

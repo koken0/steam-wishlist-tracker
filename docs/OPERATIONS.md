@@ -68,6 +68,7 @@ send a user identity header.
 | `STEAM_LOOKBACK_DAYS` | Initial onboarding backfill, capped at 90 days | Optional |
 | `STEAM_CACHE_SECONDS` | Server cache lifetime, bounded by the connector | Optional |
 | `WISHLINE_SYNC_SECRET` | Bearer secret accepted only by the private scheduler endpoint | Required for external scheduler |
+| `WISHLINE_MONITOR_SECRET` | Bearer secret accepted only by the aggregate scheduler-health endpoint | Required for external health monitoring |
 | `WISHLIST_DATA_SOURCE` | Selects fixture or legacy environment-driven Steam mode | Optional |
 | `STEAM_FINANCIAL_API_KEY` | Legacy connector and local acceptance script | Legacy/test only |
 | `STEAM_APP_ID` | Legacy connector and local acceptance script | Legacy/test only |
@@ -86,6 +87,18 @@ The Cloudflare Worker exports an hourly scheduled handler. Environments that do
 not attach Worker cron triggers can POST to `/api/internal/hourly-sync` with
 `Authorization: Bearer <WISHLINE_SYNC_SECRET>`. Never place that secret in the
 browser, a URL, source control, or scheduler logs.
+
+Each scheduled run records separate aggregate activity counters:
+
+- `reportDatesRequested`: reporting dates for which a Steam request was started;
+- `recordsReceived`: valid normalized daily records returned by Steam;
+- `changesDetected`: new current-day intraday observations stored because at
+  least one counter or Steam's generation timestamp differed.
+
+A successful run with records received and `changesDetected: 0` means Steam
+responded but the current-day observation was unchanged. It is not a sync
+failure. The counters contain no App ID, wishlist value, credential, request
+header, or response body.
 
 ## Hosted-environment readiness checklist
 
@@ -170,6 +183,26 @@ job persists attempted/succeeded/failed counts, then deletes expired intraday
 observations (90 days), alerts (365 days), audit events (365 days), and sync
 summaries (365 days). Daily history and connections remain until an owner
 deletion action so retention never changes the stored total silently.
+
+`GET /api/internal/scheduler-health` returns the latest 24 sanitized run
+summaries and a top-level `healthy`, `degraded`, `stale`, or `unknown` status.
+It requires `Authorization: Bearer <WISHLINE_MONITOR_SECRET>`, uses private
+no-store response headers, and cannot trigger a sync. Configure a unique secret
+with `npx wrangler secret put WISHLINE_MONITOR_SECRET`; do not reuse the sync or
+rotation secrets. A run is stale after 90 minutes without a completion.
+
+To watch future hourly calls in real time from an authorized operator shell:
+
+```bash
+npx wrangler tail wishline --format pretty --search wishline.scheduler
+```
+
+The `wishline.scheduler.completed` event contains only timestamps, connection
+outcomes, requested/received record counts, and the number of detected changes.
+`wishline.scheduler.failed` contains only a fixed safe reason code. For retained
+historical logs, open Cloudflare **Workers & Pages → wishline → Observability**
+and filter for `wishline.scheduler`; observability is already enabled in
+`wrangler.jsonc`.
 
 Apply the forward migration before deploying this code:
 

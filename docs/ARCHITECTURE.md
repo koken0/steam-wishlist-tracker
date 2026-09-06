@@ -32,6 +32,7 @@ timestamps. It never receives the saved Financial API key.
 | `app/page.tsx` | Onboarding, dashboard views, refresh interactions, and client rendering |
 | `app/api/setup/route.ts` | Authenticated connection validation, persistence, disconnect, and deletion |
 | `app/api/wishlist/route.ts` | Private normalized dashboard endpoint and refresh action |
+| `app/api/internal/scheduler-health/route.ts` | Secret-protected read-only aggregate scheduler health |
 | `lib/wishline-auth.ts` | Reads the platform-provided authenticated identity |
 | `lib/wishline-store.ts` | Creates owner workspaces and reads/writes Steam connections in D1 |
 | `lib/wishline-store-core.ts` | Database-injected connection store used by runtime and isolated D1 integration tests |
@@ -50,6 +51,11 @@ workspace, App ID, and Steam reporting date. A repeated date is updated, so
 late Steam corrections recalculate the stored history. The committed schema
 reference is in `db/schema.ts`; forward-only D1 migrations are under
 `drizzle/`.
+
+`sync_runs` stores one aggregate outcome per scheduler invocation.
+`sync_run_activity` adds only requested-date, valid-record, and detected-change
+counts for that run. It deliberately contains no workspace identifier, App ID,
+wishlist value, upstream payload, or credential.
 
 The Financial API key is never stored as plaintext in D1. The server requires
 `WISHLIST_ENCRYPTION_KEY` to read or update a saved connection.
@@ -127,6 +133,12 @@ The direct Cloudflare staging Worker has an active `0 * * * *` cron trigger. A
 secret-protected HTTP route supports other hosting environments that attach an
 external scheduler instead.
 
+The scheduler emits one sanitized `wishline.scheduler.completed` console event
+per completed invocation. Its activity counts distinguish a successful Steam
+response with no new values from a response that produced a new intraday
+observation. A separate read-only bearer-protected health route exposes the
+latest 24 aggregate runs and cannot invoke the scheduler.
+
 ## Caching and freshness
 
 Normalized Steam dates are upserted into D1 before a live workspace response is
@@ -162,7 +174,8 @@ reconnection. Wishline deletion does not revoke the source key in Steamworks.
 
 `audit_events` accepts only enumerated event types, success/failure, scoped IDs,
 and sanitized reason codes; it has no payload or message column. `sync_runs`
-stores aggregate scheduler health. The hourly handler enforces 90-day intraday
+and `sync_run_activity` store aggregate scheduler health. The hourly handler
+enforces 90-day intraday
 and 365-day alert/audit/health retention after synchronization. Daily history
 is owner-action retained because rolling deletion would silently alter the
 stored total. Full account deletion removes the workspace itself as well as

@@ -1,6 +1,7 @@
 import { env } from 'cloudflare:workers';
 import {
   enforceRetentionInDatabase,
+  readSchedulerHealthInDatabase,
   recordAuditEventInDatabase,
   recordSyncRunInDatabase,
   rewrapStoredConnectionsInDatabase,
@@ -23,6 +24,10 @@ export async function recordAuditEventSafely(event: AuditEvent): Promise<void> {
 
 export async function persistSyncRun(run: SyncRunRecord): Promise<void> {
   return recordSyncRunInDatabase(database(), run);
+}
+
+export async function readSchedulerHealth(now = new Date()) {
+  return readSchedulerHealthInDatabase(database(), now);
 }
 
 export async function enforceRetention(now = new Date()) {

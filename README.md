@@ -93,14 +93,14 @@ app/
   api/wishlist/     Private, no-store server endpoint
   api/setup/        Authenticated connection, disconnect, and deletion endpoint
   api/account/      Owner-confirmed full account deletion
-  api/internal/     Scheduled sync and privileged key re-wrapping
+  api/internal/     Scheduled sync, read-only health, and privileged key re-wrapping
 lib/
   wishlist-contract.ts  Shared response contract and normalizer
   wishlist-server.ts    Fixture/live adapter, Steam client, and server cache
   wishline-auth.ts      Platform identity extraction
   wishline-store.ts     Runtime D1 binding adapter
   wishline-store-core.ts  Testable workspace and connection persistence
-  wishline-governance-core.ts  Audit, retention, and key re-wrapping
+  wishline-governance-core.ts  Audit, scheduler health, retention, and key re-wrapping
   wishlist-history-store.ts  D1 daily wishlist history
   wishlist-polling.ts  GMT date targeting and spike baseline rules
   wishlist-sync.ts     Hourly synchronization across saved workspaces
@@ -113,6 +113,7 @@ drizzle/
   0001_wishlist_history.sql   Durable per-date history
   0002_intraday_sync_and_alerts.sql  Changed observations and spike events
   0003_governance.sql        Sanitized audit and scheduled-run health
+  0004_scheduler_activity.sql  Safe fetch and detected-change counts
 fixtures/
   steam-wishlist.sample.json  Anonymous contract fixture
 scripts/
@@ -256,7 +257,8 @@ To capture another number of days, set `STEAM_CAPTURE_DAYS` in `.env.local` betw
 The generated demo app token remains only in browser memory. The project has no Stripe integration because billing belongs to Phase 2 of the PRD.
 
 Application-level retention, full account deletion, sanitized audit events,
-scheduled-run summaries, and controlled dual-key re-wrapping are implemented.
+scheduled-run activity summaries, a read-only health endpoint, and controlled
+dual-key re-wrapping are implemented.
 See [data retention](docs/DATA-RETENTION.md) and the operator runbook in
 [operations](docs/OPERATIONS.md). These controls do not clear the Valve or
 managed-key launch gates.

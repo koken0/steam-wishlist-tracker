@@ -60,6 +60,8 @@ Acceptance criteria:
 - Onboarding performs one bounded historical backfill.
 - Later refreshes request only yesterday and today in GMT.
 - A scheduled job runs once per hour and stores changed observations.
+- Sanitized run telemetry distinguishes requested dates, records received, and
+  changed current-day observations.
 - Yesterday is finalized during the following day; older dates are not
   routinely downloaded again.
 - Failed Steam requests do not replace the last valid result.

@@ -4,6 +4,7 @@ import { Miniflare } from 'miniflare';
 import { decryptSecret, encryptSecret, secretEnvelopeKeyId } from './secret-crypto.ts';
 import {
   enforceRetentionInDatabase,
+  readSchedulerHealthInDatabase,
   recordAuditEventInDatabase,
   recordSyncRunInDatabase,
   rewrapStoredConnectionsInDatabase,
@@ -49,6 +50,49 @@ test('audit fields are allowlisted and retention removes only expired operationa
     assert.deepEqual((await db.prepare('SELECT id FROM wishlist_intraday_snapshots ORDER BY id').all()).results, [{ id: 'new' }]);
     const auditRows = await db.prepare('SELECT event_type, outcome, reason_code FROM audit_events').all();
     assert.deepEqual(auditRows.results, [{ event_type: 'retention.executed', outcome: 'success', reason_code: 'SCHEDULED_POLICY' }]);
+  } finally {
+    await dispose();
+  }
+});
+
+test('scheduler health distinguishes successful fetches, detected changes, and staleness', async () => {
+  const { db, dispose } = await testDatabase();
+  try {
+    await createProductTables(db);
+    await recordSyncRunInDatabase(db, {
+      startedAt: '2026-09-05T01:00:00.000Z',
+      completedAt: '2026-09-05T01:00:01.000Z',
+      attempted: 1,
+      succeeded: 1,
+      failed: 0,
+      activity: { reportDatesRequested: 2, recordsReceived: 2, changesDetected: 0 },
+    });
+    await recordSyncRunInDatabase(db, {
+      startedAt: '2026-09-05T02:00:00.000Z',
+      completedAt: '2026-09-05T02:00:01.000Z',
+      attempted: 1,
+      succeeded: 1,
+      failed: 0,
+      activity: { reportDatesRequested: 2, recordsReceived: 2, changesDetected: 1 },
+    });
+
+    const healthy = await readSchedulerHealthInDatabase(db, new Date('2026-09-05T02:30:00.000Z'));
+    assert.equal(healthy.status, 'healthy');
+    assert.equal(healthy.recent.length, 2);
+    assert.deepEqual(healthy.latest, {
+      startedAt: '2026-09-05T02:00:00.000Z',
+      completedAt: '2026-09-05T02:00:01.000Z',
+      attempted: 1,
+      succeeded: 1,
+      failed: 0,
+      reportDatesRequested: 2,
+      recordsReceived: 2,
+      changesDetected: 1,
+      telemetryAvailable: true,
+    });
+
+    const stale = await readSchedulerHealthInDatabase(db, new Date('2026-09-05T04:00:02.000Z'));
+    assert.equal(stale.status, 'stale');
   } finally {
     await dispose();
   }
