@@ -11,6 +11,8 @@
     "build": "vinext build",
     "deploy:cloudflare": "npm run build && wrangler deploy",
     "db:migrate:cloudflare": "wrangler d1 migrations apply wishline --remote",
+    "monitor:scheduler": "node --env-file-if-exists=.env.monitor.local scripts/check-scheduler-health.mjs",
+    "logs:scheduler": "wrangler tail wishline --format pretty --search wishline.scheduler",
     "start": "vinext start",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "setup:local": "node scripts/ensure-local-encryption-key.mjs",

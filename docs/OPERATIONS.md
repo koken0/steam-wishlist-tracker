@@ -194,7 +194,7 @@ rotation secrets. A run is stale after 90 minutes without a completion.
 To watch future hourly calls in real time from an authorized operator shell:
 
 ```bash
-npx wrangler tail wishline --format pretty --search wishline.scheduler
+npm run logs:scheduler
 ```
 
 The `wishline.scheduler.completed` event contains only timestamps, connection
@@ -203,6 +203,16 @@ outcomes, requested/received record counts, and the number of detected changes.
 historical logs, open Cloudflare **Workers & Pages → wishline → Observability**
 and filter for `wishline.scheduler`; observability is already enabled in
 `wrangler.jsonc`.
+
+For a one-shot health check, store `WISHLINE_MONITOR_URL` and the matching
+`WISHLINE_MONITOR_SECRET` in ignored `.env.monitor.local`, then run:
+
+```bash
+npm run monitor:scheduler
+```
+
+The helper sends the secret only in the authorization header and prints only
+the sanitized health response. It never prints the configured secret.
 
 Apply the forward migration before deploying this code:
 

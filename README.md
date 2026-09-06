@@ -121,6 +121,7 @@ scripts/
   capture-steam-wishlist.mjs  Sanitized real-response capture
   ensure-local-encryption-key.mjs  Safe ignored local wrapping-key setup
   verify-local-onboarding.mjs      Redacted end-to-end acceptance check
+  check-scheduler-health.mjs       Secret-safe aggregate cron health check
 public/
   manifest.webmanifest
   sw.js             Service worker and offline cache behavior
