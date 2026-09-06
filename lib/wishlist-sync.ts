@@ -3,6 +3,7 @@ import { getWishlistDashboardData } from '@/lib/wishlist-server';
 import { WishlistConnectorError } from '@/lib/wishlist-errors';
 import { enforceRetention, persistSyncRun, recordAuditEventSafely } from '@/lib/wishline-governance';
 import type { WishlistSyncActivity } from '@/lib/wishlist-server';
+import { classifySchedulerRun } from '@/lib/wishline-governance-core';
 
 export type WishlistSyncSummary = {
   startedAt: string;
@@ -85,7 +86,17 @@ export async function syncAllWishlistConnections(): Promise<WishlistSyncSummary>
 export async function runScheduledWishlistSync(): Promise<WishlistSyncSummary> {
   try {
     const summary = await syncAllWishlistConnections();
+    const result = classifySchedulerRun({
+      startedAt: summary.startedAt,
+      completedAt: summary.completedAt,
+      attempted: summary.attempted,
+      succeeded: summary.succeeded,
+      failed: summary.failed,
+      ...summary.activity,
+      telemetryAvailable: true,
+    });
     console.info('wishline.scheduler.completed', {
+      result,
       startedAt: summary.startedAt,
       completedAt: summary.completedAt,
       attempted: summary.attempted,

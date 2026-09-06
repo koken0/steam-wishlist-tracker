@@ -238,6 +238,47 @@ The script queries up to seven recent days by default and writes `tmp/steam-wish
 
 To capture another number of days, set `STEAM_CAPTURE_DAYS` in `.env.local` between 1 and 30.
 
+## Inspect hourly scheduler health and logs
+
+Wishline records sanitized scheduler activity separately from wishlist values.
+The read-only health check uses the dedicated secret in ignored
+`.env.monitor.local` and never triggers a Steam synchronization:
+
+```bash
+npm run monitor:scheduler
+```
+
+Use the `result` field as the primary diagnosis:
+
+| Result | Meaning |
+| --- | --- |
+| `changed` | Steam returned usable records and a current-day counter or `time_generated` changed |
+| `unchanged` | Steam returned usable records, but the current-day observation did not change |
+| `partial_failure` | At least one connection succeeded and at least one failed |
+| `failed` | The run executed, but no configured connection synchronized successfully |
+| `no_connections` | The scheduler worked, but there were no saved connections to process |
+| `no_remote_request` | A connection was processed without starting a new Steam date request, normally because of the refresh safety cache |
+| `no_usable_records` | Date requests started, but no usable normalized record was retained |
+| `unknown` | The row predates detailed scheduler telemetry |
+
+The supporting counters make the diagnosis auditable without exposing business
+data: `reportDatesRequested` proves date requests were started,
+`recordsReceived` proves Steam returned usable normalized records, and
+`changesDetected` proves a distinct current-day observation was stored. Do not
+treat `unchanged` as a failure.
+
+To watch new scheduler events in real time:
+
+```bash
+npm run logs:scheduler
+```
+
+For retained history, open Cloudflare **Workers & Pages → wishline →
+Observability** and filter for `wishline.scheduler`. Every completed event has
+the same explicit `result` plus sanitized counts. A fatal event is emitted as
+`wishline.scheduler.failed` with only a fixed reason code. Logs must never add
+credentials, request headers, App IDs, wishlist values, or upstream bodies.
+
 ## Suggested demo walkthrough
 
 1. Select **Continue to demo** and sign in.

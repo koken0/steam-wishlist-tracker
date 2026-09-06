@@ -43,7 +43,18 @@ export type SchedulerHealthRun = SyncRunActivity & {
   succeeded: number;
   failed: number;
   telemetryAvailable: boolean;
+  result: SchedulerRunResult;
 };
+
+export type SchedulerRunResult =
+  | 'changed'
+  | 'unchanged'
+  | 'partial_failure'
+  | 'failed'
+  | 'no_connections'
+  | 'no_remote_request'
+  | 'no_usable_records'
+  | 'unknown';
 
 export type SchedulerHealth = {
   status: 'healthy' | 'degraded' | 'stale' | 'unknown';
@@ -129,17 +140,20 @@ export async function readSchedulerHealthInDatabase(
     records_received: number;
     changes_detected: number;
   }>();
-  const recent = (result.results || []).map((row): SchedulerHealthRun => ({
-    startedAt: row.started_at,
-    completedAt: row.completed_at,
-    attempted: row.attempted,
-    succeeded: row.succeeded,
-    failed: row.failed,
-    reportDatesRequested: row.report_dates_requested,
-    recordsReceived: row.records_received,
-    changesDetected: row.changes_detected,
-    telemetryAvailable: row.sync_run_id != null,
-  }));
+  const recent = (result.results || []).map((row): SchedulerHealthRun => {
+    const run = {
+      startedAt: row.started_at,
+      completedAt: row.completed_at,
+      attempted: row.attempted,
+      succeeded: row.succeeded,
+      failed: row.failed,
+      reportDatesRequested: row.report_dates_requested,
+      recordsReceived: row.records_received,
+      changesDetected: row.changes_detected,
+      telemetryAvailable: row.sync_run_id != null,
+    };
+    return { ...run, result: classifySchedulerRun(run) };
+  });
   const latest = recent[0] || null;
   let status: SchedulerHealth['status'] = 'unknown';
   if (latest) {
@@ -154,6 +168,16 @@ export async function readSchedulerHealthInDatabase(
     latest,
     recent,
   };
+}
+
+export function classifySchedulerRun(run: Omit<SchedulerHealthRun, 'result'>): SchedulerRunResult {
+  if (run.failed > 0 && run.succeeded > 0) return 'partial_failure';
+  if (run.failed > 0) return 'failed';
+  if (!run.telemetryAvailable) return 'unknown';
+  if (run.attempted === 0) return 'no_connections';
+  if (run.reportDatesRequested === 0) return 'no_remote_request';
+  if (run.recordsReceived === 0) return 'no_usable_records';
+  return run.changesDetected > 0 ? 'changed' : 'unchanged';
 }
 
 export async function enforceRetentionInDatabase(

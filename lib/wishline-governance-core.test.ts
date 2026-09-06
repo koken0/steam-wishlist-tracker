@@ -3,6 +3,7 @@ import test from 'node:test';
 import { Miniflare } from 'miniflare';
 import { decryptSecret, encryptSecret, secretEnvelopeKeyId } from './secret-crypto.ts';
 import {
+  classifySchedulerRun,
   enforceRetentionInDatabase,
   readSchedulerHealthInDatabase,
   recordAuditEventInDatabase,
@@ -89,6 +90,7 @@ test('scheduler health distinguishes successful fetches, detected changes, and s
       recordsReceived: 2,
       changesDetected: 1,
       telemetryAvailable: true,
+      result: 'changed',
     });
 
     const stale = await readSchedulerHealthInDatabase(db, new Date('2026-09-05T04:00:02.000Z'));
@@ -96,6 +98,25 @@ test('scheduler health distinguishes successful fetches, detected changes, and s
   } finally {
     await dispose();
   }
+});
+
+test('scheduler result labels keep unchanged runs distinct from failures', () => {
+  const base = {
+    startedAt: '2026-09-05T02:00:00.000Z',
+    completedAt: '2026-09-05T02:00:01.000Z',
+    attempted: 1,
+    succeeded: 1,
+    failed: 0,
+    reportDatesRequested: 2,
+    recordsReceived: 2,
+    changesDetected: 0,
+    telemetryAvailable: true,
+  };
+  assert.equal(classifySchedulerRun(base), 'unchanged');
+  assert.equal(classifySchedulerRun({ ...base, changesDetected: 1 }), 'changed');
+  assert.equal(classifySchedulerRun({ ...base, succeeded: 0, failed: 1, recordsReceived: 0 }), 'failed');
+  assert.equal(classifySchedulerRun({ ...base, failed: 1 }), 'partial_failure');
+  assert.equal(classifySchedulerRun({ ...base, telemetryAvailable: false }), 'unknown');
 });
 
 test('rotation re-wraps every old envelope before retiring the previous key', async () => {

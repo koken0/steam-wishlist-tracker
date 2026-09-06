@@ -204,6 +204,13 @@ historical logs, open Cloudflare **Workers & Pages → wishline → Observabilit
 and filter for `wishline.scheduler`; observability is already enabled in
 `wrangler.jsonc`.
 
+Use the event's `result` as the primary diagnosis: `changed` and `unchanged`
+both prove a successful usable response; `partial_failure` and `failed`
+identify connector failures; `no_connections`, `no_remote_request`, and
+`no_usable_records` identify distinct non-change conditions; `unknown` is
+reserved for rows written before detailed telemetry existed. Preserve this
+distinction whenever scheduler logging changes.
+
 For a one-shot health check, store `WISHLINE_MONITOR_URL` and the matching
 `WISHLINE_MONITOR_SECRET` in ignored `.env.monitor.local`, then run:
 
