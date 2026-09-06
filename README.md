@@ -123,6 +123,7 @@ drizzle/
   0003_governance.sql        Sanitized audit and scheduled-run health
   0004_scheduler_activity.sql  Safe fetch and detected-change counts
   0005_web_push.sql          Encrypted subscriptions and delivery ledger
+  0006_push_test_receipts.sql  Provider, device-receipt, and click test state
 fixtures/
   steam-wishlist.sample.json  Anonymous contract fixture
 scripts/
@@ -297,12 +298,18 @@ credentials, request headers, App IDs, wishlist values, or upstream bodies.
 
 ## Enable browser notifications
 
-Configure the three VAPID values from `.env.example`, apply migration `0005`,
-and deploy. Then sign in on the device, open **Settings → Browser
+Configure the three VAPID values from `.env.example`, apply all pending
+migrations, and deploy. Then sign in on the device, open **Settings → Browser
 notifications**, and choose **Enable notifications**. Wishline attempts a
 generic test notification immediately and later sends a generic alert only
 when Steam produces changed wishlist activity counters. A generation-timestamp-
 only update or a healthy hourly run with no changed counters sends nothing.
+
+Settings presents the test as a short delivery tutorial: provider acceptance,
+device receipt, and notification-open confirmation are separate states. The
+service worker acknowledges receipt with an event-specific random capability;
+only its hash is stored, and it expires after 24 hours. Use **Send another
+test** to repeat the check (tests have a five-second safety interval).
 
 On iPhone or iPad, first use Safari's **Add to Home Screen**, open the installed
 Wishline app, and enable notifications there. Desktop Chrome, Edge, Firefox,

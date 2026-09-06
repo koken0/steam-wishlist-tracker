@@ -17,6 +17,7 @@ privacy notice. Paid production remains blocked by `STEAM-COMPLIANCE.md`.
 | Scheduled-run activity counts | 365 days | Deleted with their scheduled-run summary |
 | Encrypted browser push subscription | Until browser opt-out, owner disconnect/account deletion, expiration, or push-service 404/410 | Owner action and delivery cleanup |
 | Push delivery ledger | Same as its intraday observation (at most 90 days), or earlier when the subscription is removed | Foreign-key cascade |
+| Push test receipt and hashed acknowledgement capability | 24 hours, or earlier when the subscription/workspace is removed | Hourly/test-creation cleanup and foreign-key cascade |
 
 Retention runs after each scheduled wishlist synchronization and records only a
 sanitized `retention.executed` audit event. It never records credentials, raw

@@ -104,3 +104,5 @@ commercial access.
 - Web Push stores encrypted per-device capabilities, sends a generic activation
   test, deduplicates changed-observation delivery, removes expired endpoints,
   and retries sanitized failures at most five times.
+- Test Push delivery distinguishes provider acceptance, device receipt, and
+  notification click, with a bounded resend action in Settings.

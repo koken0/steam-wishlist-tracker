@@ -5,6 +5,8 @@ import {
   deletePushSubscription,
   hasPushSubscriptions,
   publicPushConfiguration,
+  readPushTestReceipt,
+  sendTestPushNotification,
   savePushSubscription,
 } from '@/lib/push-notifications';
 import { recordAuditEventSafely } from '@/lib/wishline-governance';
@@ -18,9 +20,14 @@ export async function GET(request: Request) {
   try {
     const workspace = await getWorkspaceStatus(user);
     const configuration = publicPushConfiguration();
+    const receiptId = new URL(request.url).searchParams.get('receiptId') || undefined;
+    if (receiptId && !/^receipt_[0-9a-f]{32}$/.test(receiptId)) {
+      throw new WishlistConnectorError('INVALID_PUSH_RECEIPT', 'The notification receipt was not accepted.', 400);
+    }
     return response({
       ...configuration,
       subscribed: configuration.configured && await hasPushSubscriptions(workspace.workspaceId),
+      latestTest: await readPushTestReceipt(workspace.workspaceId, receiptId),
     }, 200);
   } catch (error) {
     return safeError(error);
@@ -30,7 +37,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const user = await getWishlineUser(request);
   if (!user) return response({ error: { code: 'AUTH_REQUIRED', message: 'Sign in to enable notifications.' } }, 401);
-  if (request.headers.get('x-wishline-action') !== 'subscribe-push') {
+  const action = request.headers.get('x-wishline-action');
+  if (action !== 'subscribe-push' && action !== 'send-test-push') {
     return response({ error: { code: 'INVALID_PUSH_ACTION', message: 'The notification action was not accepted.' } }, 400);
   }
   if (!request.headers.get('content-type')?.toLowerCase().startsWith('application/json')) {
@@ -42,15 +50,22 @@ export async function POST(request: Request) {
     if (!workspace.connected) {
       throw new WishlistConnectorError('PUSH_REQUIRES_CONNECTION', 'Connect a Steam project before enabling notifications.', 409);
     }
-    const testDelivered = await savePushSubscription(workspace.workspaceId, raw);
+    const test = action === 'subscribe-push'
+      ? await savePushSubscription(workspace.workspaceId, raw)
+      : await sendTestPushNotification(
+        workspace.workspaceId,
+        typeof (raw as { endpoint?: unknown })?.endpoint === 'string'
+          ? (raw as { endpoint: string }).endpoint
+          : '',
+      );
     await recordAuditEventSafely({
       workspaceId: workspace.workspaceId,
       appId: workspace.appId,
-      eventType: 'push.subscribed',
-      outcome: 'success',
-      reasonCode: testDelivered ? 'TEST_DELIVERED' : 'TEST_NOT_DELIVERED',
+      eventType: action === 'subscribe-push' ? 'push.subscribed' : 'push.test_sent',
+      outcome: action === 'subscribe-push' || test.accepted ? 'success' : 'failure',
+      reasonCode: test.accepted ? 'PROVIDER_ACCEPTED' : 'PROVIDER_NOT_ACCEPTED',
     });
-    return response({ subscribed: true, testDelivered }, 200);
+    return response({ subscribed: true, testAccepted: test.accepted, testReceipt: test.receipt }, 200);
   } catch (error) {
     return safeError(error);
   }

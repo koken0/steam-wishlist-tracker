@@ -1,4 +1,4 @@
-const CACHE_NAME = 'wishline-demo-v4';
+const CACHE_NAME = 'wishline-demo-v5';
 const APP_SHELL = ['/', '/manifest.webmanifest', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', (event) => {
@@ -43,26 +43,59 @@ self.addEventListener('push', (event) => {
     : 'Steam published new wishlist activity. Open Wishline to review it.';
   const tag = typeof data.tag === 'string' ? data.tag : 'wishline-update';
   const url = typeof data.url === 'string' && data.url.startsWith('/') ? data.url : '/';
-  event.waitUntil(self.registration.showNotification(title, {
-    body,
-    tag,
-    icon: '/icon-192.png',
-    badge: '/icon-192.png',
-    data: { url },
-  }));
+  const receiptId = typeof data.receiptId === 'string' && /^receipt_[0-9a-f]{32}$/.test(data.receiptId)
+    ? data.receiptId
+    : null;
+  const receiptToken = typeof data.receiptToken === 'string' && /^[A-Za-z0-9_-]{43}$/.test(data.receiptToken)
+    ? data.receiptToken
+    : null;
+  event.waitUntil((async () => {
+    await self.registration.showNotification(title, {
+      body,
+      tag,
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      data: { url, receiptId, receiptToken },
+    });
+    await acknowledgeTestNotification(receiptId, receiptToken, 'received');
+  })());
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const targetUrl = new URL(event.notification.data?.url || '/', self.location.origin).href;
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (clients) => {
+    (async () => {
+      await acknowledgeTestNotification(
+        event.notification.data?.receiptId,
+        event.notification.data?.receiptToken,
+        'clicked',
+      );
+      const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
       const existing = clients.find((client) => client.url.startsWith(self.location.origin));
       if (existing) {
         await existing.navigate(targetUrl);
         return existing.focus();
       }
       return self.clients.openWindow(targetUrl);
-    }),
+    })(),
   );
 });
+
+async function acknowledgeTestNotification(receiptId, receiptToken, state) {
+  if (!/^receipt_[0-9a-f]{32}$/.test(receiptId || '') || !/^[A-Za-z0-9_-]{43}$/.test(receiptToken || '')) return;
+  try {
+    await fetch('/api/push/receipt', {
+      method: 'POST',
+      cache: 'no-store',
+      credentials: 'omit',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Wishline-Action': 'acknowledge-push-test',
+      },
+      body: JSON.stringify({ receiptId, receiptToken, state }),
+    });
+  } catch {
+    // A failed acknowledgement must not suppress or break the notification.
+  }
+}

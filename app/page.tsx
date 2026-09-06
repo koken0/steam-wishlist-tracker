@@ -23,6 +23,15 @@ type PushConfiguration = {
   configured: boolean;
   publicKey: string | null;
   subscribed: boolean;
+  latestTest: PushTestReceipt | null;
+};
+
+type PushTestReceipt = {
+  id: string;
+  providerStatus: 'pending' | 'accepted' | 'failed';
+  receivedAt: string | null;
+  clickedAt: string | null;
+  createdAt: string;
 };
 
 type SetupState = {
@@ -115,8 +124,9 @@ async function deleteAccount(): Promise<void> {
   }
 }
 
-async function fetchPushConfiguration(): Promise<PushConfiguration> {
-  const response = await fetch('/api/push', {
+async function fetchPushConfiguration(receiptId?: string): Promise<PushConfiguration> {
+  const path = receiptId ? `/api/push?receiptId=${encodeURIComponent(receiptId)}` : '/api/push';
+  const response = await fetch(path, {
     cache: 'no-store',
     headers: await wishlineAuthorizationHeader(),
   });
@@ -127,7 +137,7 @@ async function fetchPushConfiguration(): Promise<PushConfiguration> {
   return payload as PushConfiguration;
 }
 
-async function saveBrowserPushSubscription(subscription: PushSubscription): Promise<{ testDelivered: boolean }> {
+async function saveBrowserPushSubscription(subscription: PushSubscription): Promise<{ testAccepted: boolean; testReceipt: PushTestReceipt }> {
   const response = await fetch('/api/push', {
     method: 'POST',
     cache: 'no-store',
@@ -138,9 +148,28 @@ async function saveBrowserPushSubscription(subscription: PushSubscription): Prom
     },
     body: JSON.stringify(subscription.toJSON()),
   });
-  const payload = await response.json() as { subscribed?: boolean; testDelivered?: boolean; error?: { message?: string } };
+  const payload = await response.json() as { subscribed?: boolean; testAccepted?: boolean; testReceipt?: PushTestReceipt; error?: { message?: string } };
   if (!response.ok || !payload.subscribed) throw new Error(payload.error?.message || 'Notifications could not be enabled.');
-  return { testDelivered: Boolean(payload.testDelivered) };
+  if (!payload.testReceipt) throw new Error('The notification test receipt was not returned.');
+  return { testAccepted: Boolean(payload.testAccepted), testReceipt: payload.testReceipt };
+}
+
+async function sendBrowserPushTest(endpoint: string): Promise<{ testAccepted: boolean; testReceipt: PushTestReceipt }> {
+  const response = await fetch('/api/push', {
+    method: 'POST',
+    cache: 'no-store',
+    headers: {
+      ...await wishlineAuthorizationHeader(),
+      'Content-Type': 'application/json',
+      'X-Wishline-Action': 'send-test-push',
+    },
+    body: JSON.stringify({ endpoint }),
+  });
+  const payload = await response.json() as { subscribed?: boolean; testAccepted?: boolean; testReceipt?: PushTestReceipt; error?: { message?: string } };
+  if (!response.ok || !payload.subscribed || !payload.testReceipt) {
+    throw new Error(payload.error?.message || 'The test notification could not be sent.');
+  }
+  return { testAccepted: Boolean(payload.testAccepted), testReceipt: payload.testReceipt };
 }
 
 async function deleteBrowserPushSubscription(endpoint: string): Promise<void> {
@@ -574,6 +603,11 @@ function Security({ data, token, setToken, notify }: { data:WishlistDashboardDat
 function Settings({ data, milestone, setMilestone, notify, reset, disconnect, deleteAccount, disconnecting }: { data:WishlistDashboardData|null; milestone:string; setMilestone:(s:string)=>void; notify:(s:string)=>void; reset:()=>void; disconnect:()=>void; deleteAccount:()=>void; disconnecting:boolean }) {
   const [pushState, setPushState] = useState<PushState>('checking');
   const [pushConfiguration, setPushConfiguration] = useState<PushConfiguration | null>(null);
+  const [testReceipt, setTestReceipt] = useState<PushTestReceipt | null>(null);
+  const [testSending, setTestSending] = useState(false);
+  const pendingTestReceiptId = testReceipt?.providerStatus === 'accepted' && !testReceipt.receivedAt
+    ? testReceipt.id
+    : null;
 
   useEffect(() => {
     let active = true;
@@ -586,6 +620,7 @@ function Settings({ data, milestone, setMilestone, notify, reset, disconnect, de
         const configuration = await fetchPushConfiguration();
         if (!active) return;
         setPushConfiguration(configuration);
+        setTestReceipt(configuration.latestTest);
         if (!configuration.configured || !configuration.publicKey) {
           setPushState('unconfigured');
           return;
@@ -601,6 +636,26 @@ function Settings({ data, milestone, setMilestone, notify, reset, disconnect, de
     void checkPush();
     return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    if (!pendingTestReceiptId) return;
+    let active = true;
+    let checks = 0;
+    const timer = window.setInterval(async () => {
+      checks += 1;
+      try {
+        const configuration = await fetchPushConfiguration(pendingTestReceiptId);
+        if (active && configuration.latestTest) setTestReceipt(configuration.latestTest);
+      } catch {
+        // Keep the last verified state; a later Settings visit reloads it.
+      }
+      if (checks >= 40) window.clearInterval(timer);
+    }, 1_500);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [pendingTestReceiptId]);
 
   async function enablePush() {
     if (!pushConfiguration?.publicKey) return;
@@ -623,12 +678,29 @@ function Settings({ data, milestone, setMilestone, notify, reset, disconnect, de
         created = true;
       }
       const result = await saveBrowserPushSubscription(subscription);
+      setTestReceipt(result.testReceipt);
       setPushState('enabled');
-      notify(result.testDelivered ? 'Test notification sent' : 'Notifications enabled; the test delivery was not confirmed');
+      notify(result.testAccepted ? 'A test notification has been sent.' : 'Notifications are enabled, but the test was not accepted by the push service.');
     } catch (error) {
       if (created && subscription) await subscription.unsubscribe().catch(() => false);
       setPushState('error');
       notify(error instanceof Error ? error.message : 'Notifications could not be enabled.');
+    }
+  }
+
+  async function sendAnotherPushTest() {
+    setTestSending(true);
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      const subscription = await registration.pushManager.getSubscription();
+      if (!subscription) throw new Error('Enable notifications on this device before sending a test.');
+      const result = await sendBrowserPushTest(subscription.endpoint);
+      setTestReceipt(result.testReceipt);
+      notify(result.testAccepted ? 'A test notification has been sent.' : 'The test was not accepted by the push service.');
+    } catch (error) {
+      notify(error instanceof Error ? error.message : 'The test notification could not be sent.');
+    } finally {
+      setTestSending(false);
     }
   }
 
@@ -641,6 +713,7 @@ function Settings({ data, milestone, setMilestone, notify, reset, disconnect, de
         await deleteBrowserPushSubscription(subscription.endpoint);
         await subscription.unsubscribe();
       }
+      setTestReceipt(null);
       setPushState('disabled');
       notify('Browser notifications disabled');
     } catch (error) {
@@ -659,6 +732,18 @@ function Settings({ data, milestone, setMilestone, notify, reset, disconnect, de
     enabled: 'This device will be notified after Steam reports a change.',
     error: 'Notification settings could not be verified. Try again.',
   }[pushState];
+
+  const testReceiptCopy = !testReceipt
+    ? 'Enable notifications to start the delivery test.'
+    : testReceipt.clickedAt
+      ? '✓ Test notification received and opened on the device.'
+      : testReceipt.receivedAt
+        ? '✓ Test notification received by the device.'
+        : testReceipt.providerStatus === 'accepted'
+          ? 'Test accepted by the push service; waiting for the device receipt…'
+          : testReceipt.providerStatus === 'failed'
+            ? 'The push service did not accept the latest test. Try again.'
+            : 'Sending the test notification…';
 
   return <>
     <PageHeading
@@ -686,9 +771,12 @@ function Settings({ data, milestone, setMilestone, notify, reset, disconnect, de
           <label className="toggle"><input type="checkbox" defaultChecked disabled aria-label="Hourly intraday sync enabled"/><span/></label>
         </div>
         <div className="settings-section">
-          <div><h2>Browser notifications</h2><p>{pushCopy}</p></div>
+          <div><h2>Browser notifications</h2><p>{pushCopy}</p><small className="push-test-status">{testReceiptCopy}</small></div>
           {pushState === 'enabled'
-            ? <button className="secondary-button" onClick={disablePush}>Disable</button>
+            ? <div className="push-controls">
+              <button className="primary-button compact" disabled={testSending} onClick={sendAnotherPushTest}>{testSending ? 'Sending…' : 'Send another test'}</button>
+              <button className="secondary-button" disabled={testSending} onClick={disablePush}>Disable</button>
+            </div>
             : <button className="primary-button compact" disabled={!['disabled', 'error'].includes(pushState) || data?.source !== 'steam'} onClick={enablePush}>{pushState === 'working' ? 'Updating…' : 'Enable notifications'}</button>}
         </div>
         <div className="settings-actions"><button className="primary-button compact" onClick={() => notify('Settings saved locally')}>Save changes</button></div>

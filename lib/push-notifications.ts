@@ -2,12 +2,18 @@ import { env } from 'cloudflare:workers';
 import { buildPushPayload, type PushSubscription, type VapidKeys } from '@block65/webcrypto-web-push';
 import { decryptSecret, encryptSecret } from '@/lib/secret-crypto';
 import {
+  acknowledgePushTestReceiptInDatabase,
+  createPushTestReceiptInDatabase,
   deletePushSubscriptionInDatabase,
   deliverPendingPushNotificationsInDatabase,
   hasPushSubscriptionsInDatabase,
+  readPushSubscriptionInDatabase,
+  readPushTestReceiptInDatabase,
+  recordPushTestProviderResultInDatabase,
   savePushSubscriptionInDatabase,
   type PushDeliverySummary,
   type PushSendResult,
+  type PushTestReceipt,
   validatePushSubscription,
 } from '@/lib/push-notifications-core';
 import { WishlistConnectorError } from '@/lib/wishlist-errors';
@@ -22,20 +28,57 @@ export function publicPushConfiguration(): { configured: boolean; publicKey: str
   };
 }
 
-export async function savePushSubscription(workspaceId: string, value: unknown): Promise<boolean> {
-  const vapid = requireVapidKeys();
+export type PushTestResult = {
+  accepted: boolean;
+  receipt: PushTestReceipt;
+};
+
+export async function savePushSubscription(workspaceId: string, value: unknown): Promise<PushTestResult> {
   const subscription = validatePushSubscription(value);
-  await savePushSubscriptionInDatabase(database(), workspaceId, subscription, codec);
-  const result = await sendPush(subscription, 'subscription-test', vapid, {
-    title: 'Wishline notifications enabled',
-    body: 'You will be notified when Steam publishes a wishlist update.',
+  const subscriptionId = await savePushSubscriptionInDatabase(database(), workspaceId, subscription, codec);
+  return sendTestPush(workspaceId, subscriptionId, subscription);
+}
+
+export async function sendTestPushNotification(workspaceId: string, endpoint: string): Promise<PushTestResult> {
+  const stored = await readPushSubscriptionInDatabase(database(), workspaceId, endpoint, codec);
+  return sendTestPush(workspaceId, stored.id, stored.subscription);
+}
+
+export async function readPushTestReceipt(workspaceId: string, receiptId?: string): Promise<PushTestReceipt | null> {
+  return readPushTestReceiptInDatabase(database(), workspaceId, receiptId);
+}
+
+export async function acknowledgePushTestReceipt(
+  receiptId: string,
+  token: string,
+  state: 'received' | 'clicked',
+): Promise<boolean> {
+  return acknowledgePushTestReceiptInDatabase(database(), receiptId, token, state);
+}
+
+async function sendTestPush(
+  workspaceId: string,
+  subscriptionId: string,
+  subscription: PushSubscription,
+): Promise<PushTestResult> {
+  const receiptCapability = await createPushTestReceiptInDatabase(database(), workspaceId, subscriptionId);
+  const result = await sendPush(subscription, receiptCapability.id, requireVapidKeys(), {
+    title: 'Wishline test notification',
+    body: 'This test confirms that Wishline notifications reach this device.',
     url: '/',
-    tag: 'wishline-subscription-test',
+    tag: `wishline-${receiptCapability.id}`,
+    receiptId: receiptCapability.id,
+    receiptToken: receiptCapability.token,
   });
+  await recordPushTestProviderResultInDatabase(database(), receiptCapability.id, result.status === 'sent');
+  const receipt = await readPushTestReceiptInDatabase(database(), workspaceId, receiptCapability.id);
+  if (!receipt) {
+    throw new WishlistConnectorError('PUSH_TEST_NOT_RECORDED', 'The notification test could not be recorded.', 500);
+  }
   if (result.status === 'expired') {
     await deletePushSubscriptionInDatabase(database(), workspaceId, subscription.endpoint);
   }
-  return result.status === 'sent';
+  return { accepted: result.status === 'sent', receipt };
 }
 
 export async function deletePushSubscription(workspaceId: string, endpoint: string): Promise<boolean> {
@@ -66,7 +109,14 @@ async function sendPush(
   subscription: PushSubscription,
   eventId: string,
   vapid: VapidKeys,
-  data: { title: string; body: string; url: string; tag: string },
+  data: {
+    title: string;
+    body: string;
+    url: string;
+    tag: string;
+    receiptId?: string;
+    receiptToken?: string;
+  },
 ): Promise<PushSendResult> {
   try {
     const payload = await buildPushPayload({

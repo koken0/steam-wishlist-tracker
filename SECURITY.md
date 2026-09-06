@@ -38,6 +38,9 @@ data. Treat both as sensitive even though the current product is an MVP.
   at rest, and stores only a one-way endpoint hash separately.
 - Push messages are generic and contain no App ID, wishlist value, credential,
   user identifier, or raw Steam field.
+- Test-delivery acknowledgements use a random per-message capability carried in
+  the encrypted Push payload. D1 stores only its SHA-256 hash; the capability
+  expires after 24 hours and cannot read workspace data.
 - Persistent audit rows contain only event type, outcome, sanitized reason
   code, timestamp, and optional workspace/App ID scope. They have no free-form
   payload column and never contain request bodies or upstream responses.

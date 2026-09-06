@@ -118,13 +118,20 @@ App IDs, wishlist values, or upstream bodies to these logs.
 Create one P-256 VAPID pair for the deployment and store all three VAPID values
 with Wrangler secrets; the private key must never enter Git or command output.
 Until Wishline has a support mailbox/domain, use the deployed HTTPS Worker
-origin as `VAPID_SUBJECT`. Apply `0005_web_push.sql` before deploying.
+origin as `VAPID_SUBJECT`. Apply all pending D1 migrations before deploying.
 
 After deployment, the owner opts in per browser from **Settings → Browser
 notifications**. The server stores the subscription encrypted and attempts a
 generic test message. iPhone/iPad users must add Wishline to the Home Screen
 from Safari and enable notifications inside that installed PWA. Browser
 permission cannot be granted by an operator or background job.
+
+The Settings test flow reports three different milestones: `accepted` means
+the remote push service accepted the encrypted request; `receivedAt` means the
+device service worker received it and successfully requested display; and
+`clickedAt` means the notification was opened. The latter two are device
+receipts, while none can prove that a human visually noticed the banner.
+**Send another test** repeats the flow after a five-second safety interval.
 
 Delivery is triggered only when wishlist activity counters differ from the
 previous intraday observation, not merely when a generation timestamp or cron
@@ -213,7 +220,8 @@ workspace. See `DATA-RETENTION.md` for active-store lifetimes and backup limits.
 ## Audit, scheduler health, and retention
 
 Migration `0003_governance.sql` adds sanitized `audit_events` and `sync_runs`;
-`0005_web_push.sql` adds encrypted subscriptions and the delivery ledger.
+`0005_web_push.sql` adds encrypted subscriptions and the delivery ledger;
+`0006_push_test_receipts.sql` adds short-lived test delivery receipts.
 Audit inspection must select only the defined columns; there is deliberately no
 request, response, header, credential, or free-form message payload. The hourly
 job persists attempted/succeeded/failed counts, then deletes expired intraday
@@ -295,6 +303,7 @@ hosting provider.
 | Test notification was not confirmed | Check browser/OS permission and try disabling and enabling again; do not log the subscription endpoint or keys. |
 | `pushExpired` increases | The push service rejected a stale browser capability and Wishline removed it; enable notifications again on that device. |
 | `pushFailed` increases | Confirm the push service status/network path; the delivery ledger retries up to five times without marking Steam sync failed. |
+| Test remains “waiting for device receipt” | Confirm the latest service worker is active and OS notifications are allowed. Provider acceptance alone does not prove device receipt. Use **Send another test** after reopening the installed PWA. |
 
 ## Incident rule
 

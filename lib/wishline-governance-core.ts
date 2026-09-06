@@ -11,6 +11,7 @@ export type AuditEventType =
   | 'push.subscribed'
   | 'push.unsubscribed'
   | 'push.delivery'
+  | 'push.test_sent'
   | 'retention.executed'
   | 'sync.failure'
   | 'sync.success';

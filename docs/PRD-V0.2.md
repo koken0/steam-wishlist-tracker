@@ -314,6 +314,8 @@ sends one generic Web Push per changed activity observation/device, stores an
 encrypted subscription, deduplicates accepted deliveries, removes expired
 subscriptions, and retries other failures at most five times. Milestone policy,
 quiet hours, email/digests, and production delivery guarantees remain later.
+The Settings tutorial distinguishes push-service acceptance, service-worker
+receipt, and notification click, and lets the owner send another bounded test.
 
 ### 4.7 Export - Later phase
 

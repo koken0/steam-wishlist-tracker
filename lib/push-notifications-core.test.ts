@@ -2,9 +2,13 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Miniflare } from 'miniflare';
 import {
+  acknowledgePushTestReceiptInDatabase,
+  createPushTestReceiptInDatabase,
   deletePushSubscriptionInDatabase,
   deliverPendingPushNotificationsInDatabase,
   hasPushSubscriptionsInDatabase,
+  readPushTestReceiptInDatabase,
+  recordPushTestProviderResultInDatabase,
   savePushSubscriptionInDatabase,
   validatePushSubscription,
 } from './push-notifications-core.ts';
@@ -125,6 +129,71 @@ test('new observations are delivered once and failed deliveries remain retryable
     );
     assert.deepEqual(fourth, { attempted: 1, sent: 1, expired: 0, failed: 0 });
     assert.equal(calls, 3);
+  } finally {
+    await dispose();
+  }
+});
+
+test('test receipts distinguish provider acceptance, device receipt, and notification click', async () => {
+  const { db, dispose } = await testDatabase();
+  try {
+    await createProductTables(db);
+    const workspaceId = 'ws_333333333333333333333333';
+    await createWorkspace(db, workspaceId);
+    const subscriptionId = await savePushSubscriptionInDatabase(
+      db,
+      workspaceId,
+      subscription('https://fcm.googleapis.com/fcm/send/device-three'),
+      codec,
+      new Date('2026-09-06T14:00:00.000Z'),
+    );
+    const capability = await createPushTestReceiptInDatabase(
+      db,
+      workspaceId,
+      subscriptionId,
+      new Date('2026-09-06T14:01:00.000Z'),
+    );
+    assert.match(capability.id, /^receipt_[0-9a-f]{32}$/);
+    assert.equal(capability.token.length, 43);
+    assert.equal((await readPushTestReceiptInDatabase(db, workspaceId, capability.id))?.providerStatus, 'pending');
+    await assert.rejects(
+      createPushTestReceiptInDatabase(
+        db,
+        workspaceId,
+        subscriptionId,
+        new Date('2026-09-06T14:01:01.000Z'),
+      ),
+      /Wait a few seconds/,
+    );
+
+    await recordPushTestProviderResultInDatabase(db, capability.id, true);
+    assert.equal(await acknowledgePushTestReceiptInDatabase(
+      db,
+      capability.id,
+      'A'.repeat(43),
+      'received',
+      new Date('2026-09-06T14:01:05.000Z'),
+    ), false);
+    assert.equal(await acknowledgePushTestReceiptInDatabase(
+      db,
+      capability.id,
+      capability.token,
+      'received',
+      new Date('2026-09-06T14:01:06.000Z'),
+    ), true);
+    assert.equal(await acknowledgePushTestReceiptInDatabase(
+      db,
+      capability.id,
+      capability.token,
+      'clicked',
+      new Date('2026-09-06T14:01:07.000Z'),
+    ), true);
+
+    const receipt = await readPushTestReceiptInDatabase(db, workspaceId, capability.id);
+    assert.equal(receipt?.providerStatus, 'accepted');
+    assert.equal(receipt?.receivedAt, '2026-09-06T14:01:06.000Z');
+    assert.equal(receipt?.clickedAt, '2026-09-06T14:01:07.000Z');
+    assert.equal(await readPushTestReceiptInDatabase(db, 'ws_444444444444444444444444', capability.id), null);
   } finally {
     await dispose();
   }

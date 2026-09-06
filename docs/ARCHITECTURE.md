@@ -178,6 +178,11 @@ disabled because onboarding fields must not be retained as artifacts.
 The authenticated `/api/push` route lets the owner opt one browser in or out.
 It requires explicit action headers, bounded JSON, private no-store responses,
 and a connected project. A successful opt-in attempts a generic test message.
+For tests, `push_test_receipts` separates provider acceptance, service-worker
+receipt after `showNotification`, and notification click. The background
+service worker authenticates its write-only acknowledgement with an opaque
+per-event capability whose hash is stored in D1; authenticated Settings reads
+the resulting status and polls briefly while awaiting receipt.
 
 Owner disconnect uses an authenticated `DELETE /api/setup` request with an
 explicit action header. One D1 batch removes alerts, intraday observations,

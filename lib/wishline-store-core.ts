@@ -197,6 +197,14 @@ export function createWishlineStore(db: D1Database) {
         FOREIGN KEY (observation_id) REFERENCES wishlist_intraday_snapshots(id) ON DELETE CASCADE,
         FOREIGN KEY (subscription_id) REFERENCES push_subscriptions(id) ON DELETE CASCADE)`),
       db.prepare('CREATE INDEX IF NOT EXISTS idx_push_deliveries_pending ON push_deliveries(subscription_id, sent_at, attempts)'),
+      db.prepare(`CREATE TABLE IF NOT EXISTS push_test_receipts (
+        id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, subscription_id TEXT NOT NULL,
+        ack_token_hash TEXT NOT NULL UNIQUE,
+        provider_status TEXT NOT NULL CHECK (provider_status IN ('pending', 'accepted', 'failed')),
+        received_at TEXT, clicked_at TEXT, expires_at TEXT NOT NULL, created_at TEXT NOT NULL,
+        FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+        FOREIGN KEY (subscription_id) REFERENCES push_subscriptions(id) ON DELETE CASCADE)`),
+      db.prepare('CREATE INDEX IF NOT EXISTS idx_push_test_receipts_workspace_created ON push_test_receipts(workspace_id, created_at)'),
     ]).then(() => undefined).catch((error) => {
       schemaReady.delete(db as object);
       throw error;
