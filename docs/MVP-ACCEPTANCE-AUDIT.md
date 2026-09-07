@@ -96,6 +96,7 @@ Full runtime account isolation and 24-48 hour cadence evidence remain.
 | Missing dates differ from zero | Meets | Every selected calendar date becomes a recorded or missing entry. The UI shows incomplete coverage, lists missing dates, draws striped gaps, and preserves a zero-activity point. |
 | Late corrections recalculate dependent metrics | Meets | Daily records are upserted by workspace, App ID, and reporting date; tests show corrected input recalculates range aggregates and every running total. |
 | Phone and desktop usability | Meets for MVP | Chromium acceptance verifies the dashboard at desktop and 390 × 844 without horizontal overflow. A broader accessibility audit remains future hardening. |
+| Configurable milestone target | Meets | Settings accepts any positive whole-number wishlist target, stores it per App ID in the browser, and browser acceptance verifies that it survives a reload. |
 
 ## 4.3 Refresh and caching
 

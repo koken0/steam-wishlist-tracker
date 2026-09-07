@@ -8,6 +8,14 @@ import {
   waitForReact,
 } from './fixtures';
 
+test.beforeEach(async ({ page }) => {
+  await page.route('**/api/access', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ required: false, unlocked: true }),
+  }));
+});
+
 test('authenticates, onboards, reconnects, loads the dashboard, and renders safe 429/503 errors', async ({ page }) => {
   let setup = disconnectedSetup();
   let refreshFailure: { status: number; message: string } | null = null;
@@ -64,8 +72,8 @@ test('authenticates, onboards, reconnects, loads the dashboard, and renders safe
 
   await expect(page.getByText('Stored wishlist total').first()).toBeVisible();
   await expect(page.getByText('Acceptance Harbor').first()).toBeVisible();
-  await expect(page.getByText('Cobertura incompleta')).toBeVisible();
-  await expect(page.getByText(/faltan 2026-09-04/)).toBeVisible();
+  await expect(page.getByText('Incomplete coverage')).toBeVisible();
+  await expect(page.getByText(/missing 2026-09-04/)).toBeVisible();
   await expect(page.locator('circle title').filter({ hasText: '+0 net' })).toHaveCount(1);
   await expect(page.locator('body')).not.toContainText('acceptance-key-one');
 
@@ -77,6 +85,15 @@ test('authenticates, onboards, reconnects, loads the dashboard, and renders safe
   await page.getByRole('button', { name: 'Retry' }).click();
   await expect(page.getByRole('alert')).toContainText('temporarily unavailable');
 
+  await page.getByRole('button', { name: 'Settings' }).click();
+  await page.getByLabel('Milestone target').fill('23456');
+  await page.getByRole('button', { name: 'Save changes' }).click();
+  await expect(page.getByRole('status')).toContainText('Milestone target saved');
+  await page.getByRole('button', { name: 'Overview' }).click();
+  await expect(page.locator('.milestone-panel')).toContainText('23.5K');
+  await page.reload();
+  await waitForReact(page);
+  await expect(page.locator('.milestone-panel')).toContainText('23.5K');
   await page.getByRole('button', { name: 'Settings' }).click();
   const pushHelpButton = page.getByRole('button', { name: 'Need help?' });
   await expect(pushHelpButton).toHaveAttribute('aria-expanded', 'false');

@@ -162,6 +162,9 @@ the records currently stored for the project.
   product does not request or maintain a separately entered official total.
 - When no stored history exists, milestone progress based on a total is
   unavailable rather than fabricated.
+- Owners may configure any positive whole-number wishlist target as the next
+  milestone. The browser stores that preference per project for the beta; it is
+  not part of the reconstructed Steam total.
 
 ### 3.4 Latest-day delta
 

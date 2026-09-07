@@ -48,6 +48,7 @@ type SetupState = {
 };
 
 const previewPoints = [32, 40, 37, 55, 51, 72];
+const DEFAULT_MILESTONE = 15_000;
 
 const nav: { id: View; label: string; icon: string }[] = [
   { id: 'overview', label: 'Overview', icon: '⌂' },
@@ -219,7 +220,7 @@ export default function Home() {
   const [refreshing, setRefreshing] = useState(false);
   const [toast, setToast] = useState('');
   const [token, setToken] = useState('');
-  const [milestone, setMilestone] = useState('15000');
+  const [milestone, setMilestone] = useState(String(DEFAULT_MILESTONE));
   const [wishlistData, setWishlistData] = useState<WishlistDashboardData | null>(null);
   const [dataError, setDataError] = useState('');
   const [setup, setSetup] = useState<SetupState | null>(null);
@@ -309,10 +310,29 @@ export default function Home() {
     };
   }, []);
 
+  const milestoneProjectId = setup?.workspace.appId ?? wishlistData?.appId ?? null;
+
+  useEffect(() => {
+    if (!milestoneProjectId) return;
+    const savedMilestone = window.localStorage.getItem(milestoneStorageKey(milestoneProjectId));
+    const timer = window.setTimeout(() => {
+      setMilestone(savedMilestone && validMilestone(savedMilestone) ? savedMilestone : String(DEFAULT_MILESTONE));
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [milestoneProjectId]);
+
   const progress = useMemo(() => {
     if (wishlistData?.currentWishlists == null) return 0;
-    return Math.min(100, Math.round((wishlistData.currentWishlists / Number(milestone || 15000)) * 100));
+    return Math.min(100, Math.round((wishlistData.currentWishlists / milestoneValue(milestone)) * 100));
   }, [milestone, wishlistData]);
+
+  function saveMilestone() {
+    if (!milestoneProjectId || !validMilestone(milestone)) return;
+    const normalized = String(Math.round(Number(milestone)));
+    window.localStorage.setItem(milestoneStorageKey(milestoneProjectId), normalized);
+    setMilestone(normalized);
+    notify('Milestone target saved');
+  }
 
   function notify(message: string) {
     setToast(message);
@@ -493,11 +513,11 @@ export default function Home() {
           {dataError && <div className="data-error" role="alert"><span>!</span><p><b>Data connection needs attention</b><small>{dataError}</small></p><button onClick={refreshData}>Retry</button></div>}
           {wishlistData?.syncWarning && <div className="data-warning" role="status"><span>!</span><p><b>Showing last stored data</b><small>{wishlistData.syncWarning.message}</small></p></div>}
           {!wishlistData && !dataError && <div className="loading-card"><span/><p>Loading the server-side data source…</p></div>}
-          {view === 'overview' && wishlistData && <Overview data={wishlistData} progress={progress} milestone={Number(milestone || 15000)} />}
+          {view === 'overview' && wishlistData && <Overview data={wishlistData} progress={progress} milestone={milestoneValue(milestone)} />}
           {view === 'projects' && wishlistData && <Projects data={wishlistData} onOpen={() => setView('overview')} notify={notify} />}
           {view === 'widget' && wishlistData && <WidgetPreview data={wishlistData} refreshing={refreshing} onRefresh={refreshData} />}
           {view === 'security' && <Security data={wishlistData} token={token} setToken={setToken} notify={notify} />}
-          {view === 'settings' && <Settings data={wishlistData} milestone={milestone} setMilestone={setMilestone} notify={notify} reset={() => { setScreen('onboarding'); setOnboardingStep(2); setSetupError(''); }} disconnect={disconnectAndDelete} deleteAccount={deleteAccountAndData} disconnecting={setupLoading} />}
+          {view === 'settings' && <Settings data={wishlistData} milestone={milestone} setMilestone={setMilestone} saveMilestone={saveMilestone} notify={notify} reset={() => { setScreen('onboarding'); setOnboardingStep(2); setSetupError(''); }} disconnect={disconnectAndDelete} deleteAccount={deleteAccountAndData} disconnecting={setupLoading} />}
         </div>
       </section>
       {toast && <div className="toast" role="status"><span>✓</span>{toast}</div>}
@@ -633,11 +653,11 @@ function Overview({ data, progress, milestone }: { data:WishlistDashboardData; p
       <article className="stat-card"><p>7-day net average</p><strong>{formatCount(Math.round(average))}</strong><div className={`delta ${pace >= 0 ? 'positive' : 'negative'}`}>{pace >= 0 ? '↗' : '↘'} {Math.abs(pace).toFixed(1)}% <span>vs previous week</span></div></article>
     </div>
     <article className="panel range-panel">
-      <div className="range-head"><div><p className="panel-title">Histórico entre fechas</p><p className="panel-subtitle">Movimiento neto diario y evolución estimada del total</p></div><div className="date-range"><label>Desde<input type="date" min={firstDate} max={toDate || lastDate} value={fromDate} onChange={(event)=>setFromDate(event.target.value)} /></label><span>→</span><label>Hasta<input type="date" min={fromDate || firstDate} max={lastDate} value={toDate} onChange={(event)=>setToDate(event.target.value)} /></label></div></div>
-      {selected.expectedDays ? <><div className={`range-coverage ${selected.complete ? 'complete' : 'incomplete'}`} role="status"><b>{selected.complete ? 'Cobertura completa' : 'Cobertura incompleta'}</b><span>{selected.complete ? `${selected.recordedDays} días reportados` : `${selected.recordedDays} de ${selected.expectedDays} días con datos · faltan ${selected.missingDates.join(', ')}`}</span></div><div className="range-summary"><div><small>PERÍODO INCLUSIVO</small><b>{selected.expectedDays} {selected.expectedDays === 1 ? 'día' : 'días'}</b></div><div><small>ALTAS REPORTADAS</small><b className="green">+{formatCount(selected.adds)}</b></div><div><small>BAJAS REPORTADAS</small><b>-{formatCount(selected.deletes)}</b></div><div><small>CRECIMIENTO NETO REPORTADO</small><b className={selected.net >= 0 ? 'green' : ''}>{signedCount(selected.net)}</b></div></div>{selected.recordedDays ? <WishlistRangeChart entries={selected.entries} /> : <div className="empty-range">No hay registros en este rango. Los días se muestran como faltantes, no como actividad cero.</div>}</> : <div className="empty-range">Elegí un rango válido dentro del histórico disponible.</div>}
+      <div className="range-head"><div><p className="panel-title">History by date range</p><p className="panel-subtitle">Daily net movement and estimated total progression</p></div><div className="date-range"><label>From<input type="date" min={firstDate} max={toDate || lastDate} value={fromDate} onChange={(event)=>setFromDate(event.target.value)} /></label><span>→</span><label>To<input type="date" min={fromDate || firstDate} max={lastDate} value={toDate} onChange={(event)=>setToDate(event.target.value)} /></label></div></div>
+      {selected.expectedDays ? <><div className={`range-coverage ${selected.complete ? 'complete' : 'incomplete'}`} role="status"><b>{selected.complete ? 'Complete coverage' : 'Incomplete coverage'}</b><span>{selected.complete ? `${selected.recordedDays} reported days` : `${selected.recordedDays} of ${selected.expectedDays} days have data · missing ${selected.missingDates.join(', ')}`}</span></div><div className="range-summary"><div><small>INCLUSIVE PERIOD</small><b>{selected.expectedDays} {selected.expectedDays === 1 ? 'day' : 'days'}</b></div><div><small>REPORTED ADDS</small><b className="green">+{formatCount(selected.adds)}</b></div><div><small>REPORTED DELETES</small><b>-{formatCount(selected.deletes)}</b></div><div><small>REPORTED NET GROWTH</small><b className={selected.net >= 0 ? 'green' : ''}>{signedCount(selected.net)}</b></div></div>{selected.recordedDays ? <WishlistRangeChart entries={selected.entries} /> : <div className="empty-range">There are no records in this range. Days are shown as missing, not as zero activity.</div>}</> : <div className="empty-range">Choose a valid range within the available history.</div>}
     </article>
     <div className="dashboard-grid">
-      <article className="panel trend-panel"><div className="panel-head"><div><p className="panel-title">Últimos 7 días</p><p className="panel-subtitle">Altas, bajas y neto reportado por Steam</p></div><div className="legend"><span><i className="legend-now" />Neto</span></div></div><div className="daily-table">{recent.slice().reverse().map(day=><div key={day.date}><time>{formatShortDate(day.date)}</time><span className="daily-adds">+{formatCount(day.adds)}</span><span className="daily-deletes">-{formatCount(day.deletes)}</span><b>{signedCount(day.net)}</b></div>)}</div></article>
+      <article className="panel trend-panel"><div className="panel-head"><div><p className="panel-title">Last 7 days</p><p className="panel-subtitle">Adds, deletes, and net movement reported by Steam</p></div><div className="legend"><span><i className="legend-now" />Net</span></div></div><div className="daily-table">{recent.slice().reverse().map(day=><div key={day.date}><time>{formatShortDate(day.date)}</time><span className="daily-adds">+{formatCount(day.adds)}</span><span className="daily-deletes">-{formatCount(day.deletes)}</span><b>{signedCount(day.net)}</b></div>)}</div></article>
       <article className="panel milestone-panel"><div className="panel-head"><div><p className="panel-title">Next milestone</p><p className="panel-subtitle">Based on stored coverage</p></div><span className="spark">✦</span></div><div className="milestone-number"><strong>{compactCount(milestone)}</strong><span>{toGo == null ? 'Stored total unavailable' : `${formatCount(toGo)} to go`}</span></div><div className="progress"><span style={{width:`${progress}%`}} /></div><p className="prediction"><b>{estimatedDays ? `Estimated in ${estimatedDays} days` : 'Estimate unavailable'}</b><br/>{coverageLabel(data)}</p></article>
     </div>
     <div className="activity-row"><article className="panel compact-panel"><div className="panel-head"><div><p className="panel-title">Latest Steam record</p><p className="panel-subtitle">All values come from the normalized response</p></div></div><div className="activity-list"><div><span className="activity-icon purple">↗</span><p><b>{formatCount(latest?.adds ?? 0)} wishlist additions</b><small>{formatCount(latest?.addsWindows ?? 0)} Windows · {formatCount(latest?.addsMac ?? 0)} Mac · {formatCount(latest?.addsLinux ?? 0)} Linux</small></p><time>{latest?.date}</time></div><div><span className="activity-icon lime">✓</span><p><b>{formatCount(latest?.purchases ?? 0)} purchases · {formatCount(latest?.gifts ?? 0)} gifts</b><small>{formatCount(latest?.deletes ?? 0)} wishlist deletions</small></p><time>{formatRelativeTime(latest?.generatedAt)}</time></div></div></article><article className="panel compact-panel health"><p className="panel-title">Data health</p><div className="health-status"><span>✓</span><p><b>{data.syncWarning ? 'Steam sync needs attention' : data.source === 'steam' ? 'Steam connector is responding' : 'Contract fixture is valid'}</b><small>{freshnessLabel(data.freshness)} · Browser API caching is disabled</small></p></div><dl><div><dt>Source</dt><dd>{data.source === 'steam' ? 'Steamworks partner API' : 'Anonymous fixture'}</dd></div><div><dt>Coverage</dt><dd>{data.coverageStart || 'Unknown'} → {data.coverageEnd || 'Unknown'}</dd></div><div><dt>Records</dt><dd>{data.daily.length} normalized days</dd></div></dl></article></div>
@@ -672,7 +692,7 @@ function WishlistRangeChart({ entries }: { entries: WishlistRangeEntry[] }) {
   return (
     <div className="history-chart">
       <div className="history-scale"><span>{formatCount(max)}</span><span>{formatCount(min)}</span></div>
-      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Evolución de wishlists en el período seleccionado; los bloques rayados indican fechas sin datos">
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Wishlist progression over the selected period; striped blocks indicate dates without data">
         <defs>
           <linearGradient id="historyFill" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0" stopColor="#6755e7" stopOpacity=".28"/>
@@ -687,7 +707,7 @@ function WishlistRangeChart({ entries }: { entries: WishlistRangeEntry[] }) {
         <line x1={padding} y1={height-padding} x2={width-padding} y2={height-padding}/>
         {entries.map((entry, index) => entry.status === 'missing' ? (
           <rect className="history-missing" key={entry.date} x={xForIndex(index)-8} y={padding} width="16" height={height-padding*2}>
-            <title>{formatShortDate(entry.date)} · sin dato reportado</title>
+            <title>{formatShortDate(entry.date)} · no reported data</title>
           </rect>
         ) : null)}
         {segments.map((segment, index) => {
@@ -700,7 +720,7 @@ function WishlistRangeChart({ entries }: { entries: WishlistRangeEntry[] }) {
       <div className="history-dates">
         {entries.map((entry, index) => <span className={entry.status === 'missing' ? 'missing' : ''} key={entry.date} style={{left:`${(xForIndex(index)/width)*100}%`}}>{index % labelEvery === 0 || index === entries.length-1 || entry.status === 'missing' ? formatChartDate(entry.date) : ''}</span>)}
       </div>
-      <p className="chart-note">La línea usa sólo fechas reportadas y se interrumpe ante datos faltantes; un día reportado con cero actividad conserva su punto. El total se reconstruye únicamente desde el histórico guardado por Wishline.</p>
+      <p className="chart-note">The line uses only reported dates and breaks where data is missing; a reported day with zero activity keeps its point. The total is reconstructed only from history stored by Wishline.</p>
     </div>
   );
 }
@@ -722,7 +742,7 @@ function Security({ data, token, setToken, notify }: { data:WishlistDashboardDat
   return <><PageHeading eyebrow="SECURITY CENTER" title="Access without exposing keys" copy="Verify the protected credential boundary and simulate companion access." /><div className="security-grid"><article className="panel security-main"><div className="security-hero"><span>◆</span><div><h2>Financial key isolation</h2><p>The authenticated setup endpoint validates and protects the key before storage. The browser receives normalized wishlist aggregates and never receives the credential again.</p></div><em>{data?.source === 'steam' ? 'LIVE BOUNDARY' : 'FIXTURE MODE'}</em></div><div className="token-section"><div><p className="panel-title">Demo app token</p><p className="panel-subtitle">Companion-token issuance remains simulated; account authentication is active.</p></div>{token ? <><div className="token-value"><code>{token}</code><button onClick={()=>{navigator.clipboard?.writeText(token);notify('Token copied')}}>Copy</button></div><div className="token-actions"><span>Issued just now · Read-only · {data?.projectName || 'configured project'}</span><button className="danger-button" onClick={revoke}>Revoke token</button></div></> : <div className="empty-token"><span>⌁</span><p><b>No active demo token</b><small>Issue one to simulate mobile companion access.</small></p><button className="primary-button compact" onClick={issue}>Issue token</button></div>}</div></article><aside className="panel audit-panel"><p className="panel-title">Connection facts</p><p className="panel-subtitle">Safe local verification</p><div className="audit-list"><div><span className="audit-dot green-dot"/><p><b>Browser API cache disabled</b><small>Private responses are never stored offline</small></p></div><div><span className="audit-dot purple-dot"/><p><b>Protected credential storage</b><small>No plaintext key in storage or client responses</small></p></div><div><span className="audit-dot"/><p><b>Source: {data?.source || 'checking'}</b><small>App ID {data?.appId || '—'}</small></p></div></div></aside></div><div className="security-principles"><div><span>01</span><b>Passwordless owner identity</b><p>Each authenticated user receives an isolated workspace.</p></div><div><span>02</span><b>Protected connection</b><p>The stored credential is available only to the server runtime.</p></div><div><span>03</span><b>Scoped clients next</b><p>Real revocable companion tokens still require a durable token service.</p></div></div></>;
 }
 
-function Settings({ data, milestone, setMilestone, notify, reset, disconnect, deleteAccount, disconnecting }: { data:WishlistDashboardData|null; milestone:string; setMilestone:(s:string)=>void; notify:(s:string)=>void; reset:()=>void; disconnect:()=>void; deleteAccount:()=>void; disconnecting:boolean }) {
+function Settings({ data, milestone, setMilestone, saveMilestone, notify, reset, disconnect, deleteAccount, disconnecting }: { data:WishlistDashboardData|null; milestone:string; setMilestone:(s:string)=>void; saveMilestone:()=>void; notify:(s:string)=>void; reset:()=>void; disconnect:()=>void; deleteAccount:()=>void; disconnecting:boolean }) {
   const [pushState, setPushState] = useState<PushState>('checking');
   const [pushConfiguration, setPushConfiguration] = useState<PushConfiguration | null>(null);
   const [testReceipt, setTestReceipt] = useState<PushTestReceipt | null>(null);
@@ -877,13 +897,8 @@ function Settings({ data, milestone, setMilestone, notify, reset, disconnect, de
     <div className="settings-layout">
       <article className="panel settings-panel">
         <div className="settings-section">
-          <div><h2>Milestone target</h2><p>Choose the next round-number goal shown on the dashboard.</p></div>
-          <select value={milestone} onChange={(event) => setMilestone(event.target.value)} aria-label="Milestone target">
-            <option value="15000">15,000 wishlists</option>
-            <option value="25000">25,000 wishlists</option>
-            <option value="50000">50,000 wishlists</option>
-            <option value="100000">100,000 wishlists</option>
-          </select>
+          <div><h2>Milestone target</h2><p>Enter any wishlist total to use as this project&apos;s next goal.</p></div>
+          <input className="milestone-input" type="number" inputMode="numeric" min="1" step="1" value={milestone} onChange={(event) => setMilestone(event.target.value)} aria-label="Milestone target" />
         </div>
         <div className="settings-section">
           <div><h2>Data source</h2><p>{data?.source === 'steam' ? 'Live server-side Steamworks adapter with a protected key.' : 'Deterministic anonymous data for contract validation.'}</p></div>
@@ -927,7 +942,7 @@ function Settings({ data, milestone, setMilestone, notify, reset, disconnect, de
             </div>
             : <button className="primary-button compact" disabled={!['disabled', 'error'].includes(pushState) || data?.source !== 'steam'} onClick={enablePush}>{pushState === 'working' ? 'Updating…' : 'Enable notifications'}</button>}
         </div>
-        <div className="settings-actions"><button className="primary-button compact" onClick={() => notify('Settings saved locally')}>Save changes</button></div>
+        <div className="settings-actions"><button className="primary-button compact" disabled={!validMilestone(milestone) || !data} onClick={saveMilestone}>Save changes</button></div>
       </article>
       <aside className="panel about-card">
         <span className="brand-mark">W</span>
@@ -945,6 +960,19 @@ function Settings({ data, milestone, setMilestone, notify, reset, disconnect, de
 
 function utcToday(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+function validMilestone(value: string): boolean {
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0;
+}
+
+function milestoneValue(value: string): number {
+  return validMilestone(value) ? Number(value) : DEFAULT_MILESTONE;
+}
+
+function milestoneStorageKey(appId: number): string {
+  return `wishline:milestone:${appId}`;
 }
 
 function averageOf(values: number[]): number {
@@ -1013,9 +1041,9 @@ function formatDay(value: string | undefined): string {
 }
 
 function formatShortDate(value: string): string {
-  return new Date(`${value}T12:00:00Z`).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });
+  return new Date(`${value}T12:00:00Z`).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
 function formatChartDate(value: string): string {
-  return new Date(`${value}T12:00:00Z`).toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
+  return new Date(`${value}T12:00:00Z`).toLocaleDateString('en-US', { day: '2-digit', month: 'short' });
 }

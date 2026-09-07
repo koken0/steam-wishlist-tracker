@@ -23,6 +23,7 @@ Steamworks report. This does not clear the separate hosted-key compliance gate.
 - D1 schema and initial migration
 - Throttled manual refresh with workspace-scoped cache
 - Overview, date-range history, projects, widget preview, security, and settings
+- Freely configurable wishlist milestone target persisted per project
 - Redacted real-data acceptance script
 - Opt-in Web Push for changed wishlist activity observations with encrypted
   subscriptions, deduplication, and bounded retry
@@ -101,6 +102,8 @@ Acceptance criteria:
 
 ## Next: reliable private beta
 
+- Keep English as the only product language while the beta is being validated.
+  Plan localization only after beta behavior and product copy have been proven.
 - Owner-facing disconnect and full account deletion are implemented with
   complete active-store data deletion; provider backup guarantees remain
   pending.

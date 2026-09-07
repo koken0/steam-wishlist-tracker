@@ -26,6 +26,7 @@ export default defineConfig({
       WISHLIST_DATA_SOURCE: 'fixture',
       STEAM_FINANCIAL_API_KEY: '',
       STEAM_APP_ID: '',
+      WISHLINE_BETA_PASSWORD: '',
     },
   },
   projects: [
