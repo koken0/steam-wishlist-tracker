@@ -249,18 +249,6 @@ async function initializeHistorySchema(db: D1Database): Promise<void> {
     )`),
     db.prepare(`CREATE INDEX IF NOT EXISTS idx_wishlist_alerts_workspace_created
       ON wishlist_alerts(workspace_id, created_at)`),
-    db.prepare(`CREATE TABLE IF NOT EXISTS wishlist_poll_samples (
-      id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, app_id INTEGER NOT NULL CHECK (app_id > 0),
-      requested_date TEXT NOT NULL, date_phase TEXT NOT NULL CHECK (date_phase IN ('current', 'previous')),
-      outcome TEXT NOT NULL CHECK (outcome IN ('record', 'empty', 'error')),
-      classification TEXT NOT NULL CHECK (classification IN ('initial', 'unchanged', 'timestamp_only', 'counters_changed', 'empty', 'error')),
-      reason_code TEXT, adds INTEGER, deletes INTEGER, purchases INTEGER, gifts INTEGER,
-      delta_adds INTEGER, delta_deletes INTEGER, delta_purchases INTEGER, delta_gifts INTEGER,
-      generated_at TEXT, fetched_at TEXT NOT NULL,
-      FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE)`),
-    db.prepare(`CREATE INDEX IF NOT EXISTS idx_wishlist_poll_workspace_app_date
-      ON wishlist_poll_samples(workspace_id, app_id, requested_date, fetched_at)`),
-    db.prepare('CREATE INDEX IF NOT EXISTS idx_wishlist_poll_fetched ON wishlist_poll_samples(fetched_at)'),
   ]);
   await db.prepare('PRAGMA optimize').run();
 }

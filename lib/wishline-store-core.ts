@@ -178,17 +178,6 @@ export function createWishlineStore(db: D1Database) {
         purchases INTEGER NOT NULL CHECK (purchases >= 0), gifts INTEGER NOT NULL CHECK (gifts >= 0),
         generated_at TEXT, fetched_at TEXT NOT NULL, FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE)`),
       db.prepare('CREATE INDEX IF NOT EXISTS idx_wishlist_intraday_workspace_app_date ON wishlist_intraday_snapshots(workspace_id, app_id, report_date, fetched_at)'),
-      db.prepare(`CREATE TABLE IF NOT EXISTS wishlist_poll_samples (
-        id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, app_id INTEGER NOT NULL CHECK (app_id > 0),
-        requested_date TEXT NOT NULL, date_phase TEXT NOT NULL CHECK (date_phase IN ('current', 'previous')),
-        outcome TEXT NOT NULL CHECK (outcome IN ('record', 'empty', 'error')),
-        classification TEXT NOT NULL CHECK (classification IN ('initial', 'unchanged', 'timestamp_only', 'counters_changed', 'empty', 'error')),
-        reason_code TEXT, adds INTEGER, deletes INTEGER, purchases INTEGER, gifts INTEGER,
-        delta_adds INTEGER, delta_deletes INTEGER, delta_purchases INTEGER, delta_gifts INTEGER,
-        generated_at TEXT, fetched_at TEXT NOT NULL,
-        FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE)`),
-      db.prepare('CREATE INDEX IF NOT EXISTS idx_wishlist_poll_workspace_app_date ON wishlist_poll_samples(workspace_id, app_id, requested_date, fetched_at)'),
-      db.prepare('CREATE INDEX IF NOT EXISTS idx_wishlist_poll_fetched ON wishlist_poll_samples(fetched_at)'),
       db.prepare(`CREATE TABLE IF NOT EXISTS wishlist_alerts (
         id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, app_id INTEGER NOT NULL CHECK (app_id > 0), report_date TEXT NOT NULL,
         kind TEXT NOT NULL, title TEXT NOT NULL, message TEXT NOT NULL, created_at TEXT NOT NULL, read_at TEXT,

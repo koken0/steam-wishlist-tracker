@@ -350,17 +350,6 @@ export async function ensureGovernanceSchema(db: D1Database): Promise<void> {
       finalized_counter_changes INTEGER NOT NULL DEFAULT 0 CHECK (finalized_counter_changes >= 0),
       FOREIGN KEY (sync_run_id) REFERENCES sync_runs(id) ON DELETE CASCADE
     )`),
-    db.prepare(`CREATE TABLE IF NOT EXISTS wishlist_poll_samples (
-      id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, app_id INTEGER NOT NULL CHECK (app_id > 0),
-      requested_date TEXT NOT NULL, date_phase TEXT NOT NULL CHECK (date_phase IN ('current', 'previous')),
-      outcome TEXT NOT NULL CHECK (outcome IN ('record', 'empty', 'error')),
-      classification TEXT NOT NULL CHECK (classification IN ('initial', 'unchanged', 'timestamp_only', 'counters_changed', 'empty', 'error')),
-      reason_code TEXT, adds INTEGER, deletes INTEGER, purchases INTEGER, gifts INTEGER,
-      delta_adds INTEGER, delta_deletes INTEGER, delta_purchases INTEGER, delta_gifts INTEGER,
-      generated_at TEXT, fetched_at TEXT NOT NULL,
-      FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE)`),
-    db.prepare('CREATE INDEX IF NOT EXISTS idx_wishlist_poll_workspace_app_date ON wishlist_poll_samples(workspace_id, app_id, requested_date, fetched_at)'),
-    db.prepare('CREATE INDEX IF NOT EXISTS idx_wishlist_poll_fetched ON wishlist_poll_samples(fetched_at)'),
     db.prepare(`CREATE TABLE IF NOT EXISTS push_subscriptions (
       id TEXT PRIMARY KEY,
       workspace_id TEXT NOT NULL,
@@ -372,32 +361,12 @@ export async function ensureGovernanceSchema(db: D1Database): Promise<void> {
       FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
       UNIQUE (workspace_id, endpoint_hash)
     )`),
-  ]).then(() => ensureSyncActivityColumns(db)).catch((error) => {
+  ]).then(() => undefined).catch((error) => {
     schemaReady.delete(db as object);
     throw error;
   });
   schemaReady.set(db as object, initialization);
   return initialization;
-}
-
-async function ensureSyncActivityColumns(db: D1Database): Promise<void> {
-  const result = await db.prepare('PRAGMA table_info(sync_run_activity)').all<{ name: string }>();
-  const existing = new Set((result.results || []).map((row) => row.name));
-  const definitions: Record<string, string> = {
-    poll_initial: 'INTEGER NOT NULL DEFAULT 0 CHECK (poll_initial >= 0)',
-    poll_unchanged: 'INTEGER NOT NULL DEFAULT 0 CHECK (poll_unchanged >= 0)',
-    poll_timestamp_only: 'INTEGER NOT NULL DEFAULT 0 CHECK (poll_timestamp_only >= 0)',
-    poll_counter_changes: 'INTEGER NOT NULL DEFAULT 0 CHECK (poll_counter_changes >= 0)',
-    poll_empty: 'INTEGER NOT NULL DEFAULT 0 CHECK (poll_empty >= 0)',
-    poll_errors: 'INTEGER NOT NULL DEFAULT 0 CHECK (poll_errors >= 0)',
-    finalized_counter_changes: 'INTEGER NOT NULL DEFAULT 0 CHECK (finalized_counter_changes >= 0)',
-  };
-  const missing = Object.entries(definitions).filter(([name]) => !existing.has(name));
-  if (missing.length) {
-    await db.batch(missing.map(([name, definition]) => db.prepare(
-      `ALTER TABLE sync_run_activity ADD COLUMN ${name} ${definition}`,
-    )));
-  }
 }
 
 function auditStatement(db: D1Database, event: AuditEvent): D1PreparedStatement {

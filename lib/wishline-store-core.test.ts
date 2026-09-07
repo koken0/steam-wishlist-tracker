@@ -9,6 +9,13 @@ const mutableEnv = process.env as unknown as Record<string, string | undefined>;
 
 test('two owners cannot read, replace, refresh through, or delete each other workspace', async () => {
   const { db, dispose } = await testDatabase();
+  await db.prepare(`CREATE TABLE wishlist_poll_samples (
+    id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, app_id INTEGER NOT NULL,
+    requested_date TEXT NOT NULL, date_phase TEXT NOT NULL, outcome TEXT NOT NULL,
+    classification TEXT NOT NULL, reason_code TEXT, adds INTEGER, deletes INTEGER,
+    purchases INTEGER, gifts INTEGER, delta_adds INTEGER, delta_deletes INTEGER,
+    delta_purchases INTEGER, delta_gifts INTEGER, generated_at TEXT, fetched_at TEXT NOT NULL
+  )`).run();
   const originalKey = process.env.WISHLIST_ENCRYPTION_KEY;
   const originalKeyId = process.env.WISHLIST_ENCRYPTION_KEY_ID;
   mutableEnv.WISHLIST_ENCRYPTION_KEY = Buffer.alloc(32, 8).toString('base64');
