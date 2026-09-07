@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { buildWishlistHistory, calendarDatesInclusive, summarizeWishlistRange } from './wishlist-history.ts';
 import type { WishlistDay } from './wishlist-contract.ts';
+import { classifyWishlistPollSample } from './wishlist-poll-evidence.ts';
 
 test('selected history includes both endpoints and reports missing calendar dates', () => {
   const history = buildWishlistHistory([
@@ -48,6 +49,18 @@ test('calendar range rejects invalid or reversed dates', () => {
   assert.deepEqual(calendarDatesInclusive('2026-02-28', '2026-03-01'), ['2026-02-28', '2026-03-01']);
   assert.deepEqual(calendarDatesInclusive('2026-02-30', '2026-03-01'), []);
   assert.deepEqual(calendarDatesInclusive('2026-03-02', '2026-03-01'), []);
+});
+
+test('poll evidence separates counter changes from timestamp-only batches and empty responses', () => {
+  const current = day('2026-09-07', 10, 2);
+  current.generatedAt = '2026-09-07T10:00:00.000Z';
+  const prior = { adds: 10, deletes: 2, purchases: 0, gifts: 0, generated_at: '2026-09-07T09:00:00.000Z' };
+  assert.equal(classifyWishlistPollSample(current, prior), 'timestamp_only');
+  assert.equal(classifyWishlistPollSample({ ...current, adds: 11 }, prior), 'counters_changed');
+  assert.equal(classifyWishlistPollSample({ ...current, generatedAt: prior.generated_at }, prior), 'unchanged');
+  assert.equal(classifyWishlistPollSample(current, null), 'initial');
+  assert.equal(classifyWishlistPollSample(null, prior), 'empty');
+  assert.equal(classifyWishlistPollSample(null, prior, true), 'error');
 });
 
 function day(date: string, adds: number, deletes: number): WishlistDay {

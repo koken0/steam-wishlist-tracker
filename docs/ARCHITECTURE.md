@@ -53,8 +53,14 @@ late Steam corrections recalculate the stored history. The committed schema
 reference is in `db/schema.ts`; forward-only D1 migrations are under
 `drizzle/`.
 
+`wishlist_poll_samples` retains one normalized diagnostic result for every
+scheduled date request. It distinguishes current-day polling from next-day
+finalization and classifies initial, unchanged, timestamp-only, numeric-change,
+empty, and error outcomes. Numeric deltas make the 24–48 hour cadence test
+auditable without storing upstream bodies.
+
 `sync_runs` stores one aggregate outcome per scheduler invocation.
-`sync_run_activity` adds only requested-date, valid-record, and detected-change
+`sync_run_activity` adds aggregate availability and change-classification
 counts for that run. It deliberately contains no workspace identifier, App ID,
 wishlist value, upstream payload, or credential.
 

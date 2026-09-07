@@ -96,16 +96,24 @@ Each scheduled run records separate aggregate activity counters:
 
 - `reportDatesRequested`: reporting dates for which a Steam request was started;
 - `recordsReceived`: valid normalized daily records returned by Steam;
-- `changesDetected`: new current-day intraday observations stored because at
-  least one counter or Steam's generation timestamp differed;
+- `changesDetected` / `pollCounterChanges`: samples where at least one wishlist counter actually changed;
+- `pollTimestampOnly`: Steam changed only `time_generated`, with identical counters;
+- `pollUnchanged`, `pollInitial`, `pollEmpty`, and `pollErrors`: unchanged, baseline, empty, and failed date requests;
+- `finalizedCounterChanges`: counter changes found while re-querying yesterday, separated from genuine current-day movement;
 - `pushAttempted`, `pushSent`, `pushExpired`, and `pushFailed`: generic browser
   deliveries attempted, accepted by a push service, removed as expired, or
   left for bounded retry.
 
 A successful run with records received and `changesDetected: 0` means Steam
-responded but the current-day observation was unchanged. It is not a sync
-failure. The counters contain no App ID, wishlist value, credential, request
-header, or response body.
+responded without a numeric change. It is not a sync failure. Aggregate health
+counters contain no App ID, wishlist value, credential, request header, or
+response body.
+
+Inspect `wishlist_poll_samples` in D1 for retained evidence. Current-day rows
+classified `counters_changed` prove intraday movement; previous-day rows with
+that classification identify next-day finalization. Delta columns show which
+counter moved. Empty/error samples establish availability windows without
+retaining raw Steam responses.
 
 `unchanged` with `pushAttempted: 0` means the job and Steam request worked but
 there was nothing new to notify. `changed` with `pushSent > 0` means at least

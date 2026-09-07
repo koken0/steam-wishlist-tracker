@@ -1,6 +1,7 @@
 import fixture from '@/fixtures/steam-wishlist.sample.json';
 import {
   classifyWishlistFreshness,
+  normalizeSteamWishlistResponse,
   storedWishlistTotal,
   type WishlistDashboardData,
   type WishlistDay,
@@ -10,6 +11,7 @@ import {
   readWishlistAlerts,
   readWishlistHistory,
   saveWishlistObservation,
+  saveWishlistPollSample,
   saveWishlistHistory,
 } from '@/lib/wishlist-history-store';
 import { WishlistConnectorError } from '@/lib/wishlist-errors';
@@ -45,6 +47,13 @@ export type WishlistSyncActivity = {
   reportDatesRequested: number;
   recordsReceived: number;
   changesDetected: number;
+  pollInitial: number;
+  pollUnchanged: number;
+  pollTimestampOnly: number;
+  pollCounterChanges: number;
+  pollEmpty: number;
+  pollErrors: number;
+  finalizedCounterChanges: number;
 };
 
 export { WishlistConnectorError } from '@/lib/wishlist-errors';
@@ -122,7 +131,16 @@ async function loadSteamData(connection: SteamConnection): Promise<WishlistDashb
     const dates = existing.daily.length ? currentAndPreviousUtcDates() : utcDatesEndingToday(lookbackDays);
     if (connection.syncActivity) connection.syncActivity.reportDatesRequested += dates.length;
     const [payloads, fetchedProjectName] = await Promise.all([
-      mapWithConcurrency(dates, 4, (date) => fetchSteamWishlistDate(key, appId, date)),
+      mapWithConcurrency(dates, 4, async (date) => {
+        try {
+          const payload = await fetchSteamWishlistDate(key, appId, date);
+          await recordPollEvidence(connection, date, normalizeSteamWishlistResponse(payload), fetchedAt);
+          return payload;
+        } catch (error) {
+          await recordPollEvidence(connection, date, null, fetchedAt, error);
+          throw error;
+        }
+      }),
       connection.projectName?.trim() ? Promise.resolve(null) : fetchSteamProjectName(appId),
     ]);
     storeProjectName = fetchedProjectName;
@@ -134,7 +152,6 @@ async function loadSteamData(connection: SteamConnection): Promise<WishlistDashb
       const currentDay = fetchedDaily.find((day) => day.date === currentDate);
       if (currentDay) {
         const changed = await saveWishlistObservation(connection.cacheScope, appId, currentDay, fetchedAt);
-        if (changed && connection.syncActivity) connection.syncActivity.changesDetected += 1;
         if (changed) {
           const baseline = recentBaselineAdds(existing.daily, currentDate);
           if (baseline != null) {
@@ -162,6 +179,40 @@ async function loadSteamData(connection: SteamConnection): Promise<WishlistDashb
       null,
       { code: connectorError.code, message: `${connectorError.message} Showing the last stored data.` },
     );
+  }
+}
+
+async function recordPollEvidence(
+  connection: SteamConnection,
+  requestedDate: string,
+  day: WishlistDay | null,
+  fetchedAt: string,
+  error?: unknown,
+): Promise<void> {
+  if (!connection.cacheScope || !connection.syncActivity) return;
+  const today = utcDate(0);
+  const reasonCode = error instanceof WishlistConnectorError ? error.code : error ? 'INTERNAL_ERROR' : null;
+  try {
+    const classification = await saveWishlistPollSample({
+      workspaceId: connection.cacheScope,
+      appId: connection.appId,
+      requestedDate,
+      datePhase: requestedDate === today ? 'current' : 'previous',
+      fetchedAt,
+      day,
+      reasonCode,
+    });
+    if (classification === 'initial') connection.syncActivity.pollInitial += 1;
+    else if (classification === 'unchanged') connection.syncActivity.pollUnchanged += 1;
+    else if (classification === 'timestamp_only') connection.syncActivity.pollTimestampOnly += 1;
+    else if (classification === 'counters_changed') {
+      connection.syncActivity.pollCounterChanges += 1;
+      connection.syncActivity.changesDetected += 1;
+      if (requestedDate !== today) connection.syncActivity.finalizedCounterChanges += 1;
+    } else if (classification === 'empty') connection.syncActivity.pollEmpty += 1;
+    else connection.syncActivity.pollErrors += 1;
+  } catch {
+    // Diagnostic persistence must not turn a usable Steam response into a failed sync.
   }
 }
 

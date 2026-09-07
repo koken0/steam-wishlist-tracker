@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Miniflare } from 'miniflare';
 import { decryptSecret, encryptSecret, secretEnvelopeKeyId } from './secret-crypto.ts';
+import { saveWishlistPollSampleInDatabase } from './wishlist-poll-evidence.ts';
 import {
   classifySchedulerRun,
   enforceRetentionInDatabase,
@@ -45,9 +46,12 @@ test('audit fields are allowlisted and retention removes only expired operationa
       (id, workspace_id, app_id, report_date, adds, deletes, purchases, gifts, fetched_at)
       VALUES ('old', ?, 123, '2025-01-01', 1, 0, 0, 0, '2025-01-01T00:00:00.000Z'),
              ('new', ?, 123, '2026-08-31', 0, 0, 0, 0, '2026-08-31T00:00:00.000Z')`).bind(workspaceId, workspaceId).run();
+    await db.prepare(`INSERT INTO wishlist_poll_samples
+      (id, workspace_id, app_id, requested_date, date_phase, outcome, classification, fetched_at)
+      VALUES ('poll-old', ?, 123, '2025-01-01', 'previous', 'empty', 'empty', '2025-01-01T00:00:00.000Z')`).bind(workspaceId).run();
 
     const summary = await enforceRetentionInDatabase(db, new Date('2026-09-05T00:00:00.000Z'));
-    assert.deepEqual(summary, { intradayDeleted: 1, alertsDeleted: 0, auditsDeleted: 1, syncRunsDeleted: 1, auditRecorded: true });
+    assert.deepEqual(summary, { intradayDeleted: 1, pollSamplesDeleted: 1, alertsDeleted: 0, auditsDeleted: 1, syncRunsDeleted: 1, auditRecorded: true });
     assert.deepEqual((await db.prepare('SELECT id FROM wishlist_intraday_snapshots ORDER BY id').all()).results, [{ id: 'new' }]);
     const auditRows = await db.prepare('SELECT event_type, outcome, reason_code FROM audit_events').all();
     assert.deepEqual(auditRows.results, [{ event_type: 'retention.executed', outcome: 'success', reason_code: 'SCHEDULED_POLICY' }]);
@@ -66,7 +70,7 @@ test('scheduler health distinguishes successful fetches, detected changes, and s
       attempted: 1,
       succeeded: 1,
       failed: 0,
-      activity: { reportDatesRequested: 2, recordsReceived: 2, changesDetected: 0 },
+      activity: pollActivity({ changesDetected: 0, pollUnchanged: 2 }),
     });
     await recordSyncRunInDatabase(db, {
       startedAt: '2026-09-05T02:00:00.000Z',
@@ -74,7 +78,7 @@ test('scheduler health distinguishes successful fetches, detected changes, and s
       attempted: 1,
       succeeded: 1,
       failed: 0,
-      activity: { reportDatesRequested: 2, recordsReceived: 2, changesDetected: 1 },
+      activity: pollActivity({ changesDetected: 1, pollCounterChanges: 1 }),
     });
 
     const healthy = await readSchedulerHealthInDatabase(db, new Date('2026-09-05T02:30:00.000Z'));
@@ -89,6 +93,13 @@ test('scheduler health distinguishes successful fetches, detected changes, and s
       reportDatesRequested: 2,
       recordsReceived: 2,
       changesDetected: 1,
+      pollInitial: 0,
+      pollUnchanged: 0,
+      pollTimestampOnly: 0,
+      pollCounterChanges: 1,
+      pollEmpty: 0,
+      pollErrors: 0,
+      finalizedCounterChanges: 0,
       telemetryAvailable: true,
       result: 'changed',
     });
@@ -110,6 +121,13 @@ test('scheduler result labels keep unchanged runs distinct from failures', () =>
     reportDatesRequested: 2,
     recordsReceived: 2,
     changesDetected: 0,
+    pollInitial: 0,
+    pollUnchanged: 2,
+    pollTimestampOnly: 0,
+    pollCounterChanges: 0,
+    pollEmpty: 0,
+    pollErrors: 0,
+    finalizedCounterChanges: 0,
     telemetryAvailable: true,
   };
   assert.equal(classifySchedulerRun(base), 'unchanged');
@@ -117,6 +135,41 @@ test('scheduler result labels keep unchanged runs distinct from failures', () =>
   assert.equal(classifySchedulerRun({ ...base, succeeded: 0, failed: 1, recordsReceived: 0 }), 'failed');
   assert.equal(classifySchedulerRun({ ...base, failed: 1 }), 'partial_failure');
   assert.equal(classifySchedulerRun({ ...base, telemetryAvailable: false }), 'unknown');
+});
+
+test('poll samples retain numeric deltas and separate current-day movement from finalization', async () => {
+  const { db, dispose } = await testDatabase();
+  try {
+    await createProductTables(db);
+    const workspaceId = 'ws_111111111111111111111111';
+    await createWorkspace(db, workspaceId);
+    const sample = (adds: number, generatedAt: string) => ({
+      date: '2026-09-07', adds, deletes: 1, purchases: 0, gifts: 0,
+      addsWindows: adds, addsMac: 0, addsLinux: 0, net: adds - 1, generatedAt,
+    });
+    assert.equal(await saveWishlistPollSampleInDatabase(db, {
+      workspaceId, appId: 123, requestedDate: '2026-09-07', datePhase: 'current',
+      fetchedAt: '2026-09-07T10:00:00.000Z', day: sample(10, '2026-09-07T10:00:00.000Z'),
+    }), 'initial');
+    assert.equal(await saveWishlistPollSampleInDatabase(db, {
+      workspaceId, appId: 123, requestedDate: '2026-09-07', datePhase: 'current',
+      fetchedAt: '2026-09-07T11:00:00.000Z', day: sample(10, '2026-09-07T11:00:00.000Z'),
+    }), 'timestamp_only');
+    assert.equal(await saveWishlistPollSampleInDatabase(db, {
+      workspaceId, appId: 123, requestedDate: '2026-09-07', datePhase: 'previous',
+      fetchedAt: '2026-09-08T10:00:00.000Z', day: sample(14, '2026-09-08T10:00:00.000Z'),
+    }), 'counters_changed');
+    const rows = await db.prepare(
+      `SELECT date_phase, classification, delta_adds FROM wishlist_poll_samples ORDER BY fetched_at`,
+    ).all();
+    assert.deepEqual(rows.results, [
+      { date_phase: 'current', classification: 'initial', delta_adds: null },
+      { date_phase: 'current', classification: 'timestamp_only', delta_adds: 0 },
+      { date_phase: 'previous', classification: 'counters_changed', delta_adds: 4 },
+    ]);
+  } finally {
+    await dispose();
+  }
 });
 
 test('rotation re-wraps every old envelope before retiring the previous key', async () => {
@@ -194,7 +247,17 @@ async function createProductTables(db: D1Database) {
     CREATE TABLE wishlist_intraday_snapshots (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, app_id INTEGER NOT NULL, report_date TEXT NOT NULL, adds INTEGER NOT NULL, deletes INTEGER NOT NULL, purchases INTEGER NOT NULL, gifts INTEGER NOT NULL, generated_at TEXT, fetched_at TEXT NOT NULL, FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE);
     CREATE TABLE wishlist_alerts (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, app_id INTEGER NOT NULL, report_date TEXT NOT NULL, kind TEXT NOT NULL, title TEXT NOT NULL, message TEXT NOT NULL, created_at TEXT NOT NULL, read_at TEXT, FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE);
     CREATE TABLE push_subscriptions (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, endpoint_hash TEXT NOT NULL, encrypted_subscription TEXT NOT NULL, expires_at INTEGER, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE, UNIQUE (workspace_id, endpoint_hash));
+    CREATE TABLE wishlist_poll_samples (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, app_id INTEGER NOT NULL, requested_date TEXT NOT NULL, date_phase TEXT NOT NULL, outcome TEXT NOT NULL, classification TEXT NOT NULL, reason_code TEXT, adds INTEGER, deletes INTEGER, purchases INTEGER, gifts INTEGER, delta_adds INTEGER, delta_deletes INTEGER, delta_purchases INTEGER, delta_gifts INTEGER, generated_at TEXT, fetched_at TEXT NOT NULL, FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE);
   `);
+}
+
+function pollActivity(overrides: Partial<import('./wishline-governance-core.ts').SyncRunActivity> = {}) {
+  return {
+    reportDatesRequested: 2, recordsReceived: 2, changesDetected: 0,
+    pollInitial: 0, pollUnchanged: 0, pollTimestampOnly: 0, pollCounterChanges: 0,
+    pollEmpty: 0, pollErrors: 0, finalizedCounterChanges: 0,
+    ...overrides,
+  };
 }
 
 async function createWorkspace(db: D1Database, workspaceId: string) {

@@ -38,6 +38,13 @@ export type SyncRunActivity = {
   reportDatesRequested: number;
   recordsReceived: number;
   changesDetected: number;
+  pollInitial: number;
+  pollUnchanged: number;
+  pollTimestampOnly: number;
+  pollCounterChanges: number;
+  pollEmpty: number;
+  pollErrors: number;
+  finalizedCounterChanges: number;
 };
 
 export type SchedulerHealthRun = SyncRunActivity & {
@@ -96,10 +103,8 @@ export async function recordSyncRunInDatabase(db: D1Database, run: SyncRunRecord
   validateCount(run.attempted);
   validateCount(run.succeeded);
   validateCount(run.failed);
-  const activity = run.activity || { reportDatesRequested: 0, recordsReceived: 0, changesDetected: 0 };
-  validateCount(activity.reportDatesRequested);
-  validateCount(activity.recordsReceived);
-  validateCount(activity.changesDetected);
+  const activity = run.activity || emptySyncActivity();
+  Object.values(activity).forEach(validateCount);
   const id = crypto.randomUUID();
   await db.batch([
     db.prepare(
@@ -108,9 +113,14 @@ export async function recordSyncRunInDatabase(db: D1Database, run: SyncRunRecord
     ).bind(id, run.startedAt, run.completedAt, run.attempted, run.succeeded, run.failed),
     db.prepare(
       `INSERT INTO sync_run_activity (
-         sync_run_id, report_dates_requested, records_received, changes_detected
-       ) VALUES (?, ?, ?, ?)`,
-    ).bind(id, activity.reportDatesRequested, activity.recordsReceived, activity.changesDetected),
+         sync_run_id, report_dates_requested, records_received, changes_detected,
+         poll_initial, poll_unchanged, poll_timestamp_only, poll_counter_changes,
+         poll_empty, poll_errors, finalized_counter_changes
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(id, activity.reportDatesRequested, activity.recordsReceived, activity.changesDetected,
+      activity.pollInitial, activity.pollUnchanged, activity.pollTimestampOnly,
+      activity.pollCounterChanges, activity.pollEmpty, activity.pollErrors,
+      activity.finalizedCounterChanges),
   ]);
 }
 
@@ -128,7 +138,14 @@ export async function readSchedulerHealthInDatabase(
             a.sync_run_id,
             COALESCE(a.report_dates_requested, 0) AS report_dates_requested,
             COALESCE(a.records_received, 0) AS records_received,
-            COALESCE(a.changes_detected, 0) AS changes_detected
+            COALESCE(a.changes_detected, 0) AS changes_detected,
+            COALESCE(a.poll_initial, 0) AS poll_initial,
+            COALESCE(a.poll_unchanged, 0) AS poll_unchanged,
+            COALESCE(a.poll_timestamp_only, 0) AS poll_timestamp_only,
+            COALESCE(a.poll_counter_changes, 0) AS poll_counter_changes,
+            COALESCE(a.poll_empty, 0) AS poll_empty,
+            COALESCE(a.poll_errors, 0) AS poll_errors,
+            COALESCE(a.finalized_counter_changes, 0) AS finalized_counter_changes
        FROM sync_runs s
        LEFT JOIN sync_run_activity a ON a.sync_run_id = s.id
       ORDER BY s.completed_at DESC
@@ -143,6 +160,13 @@ export async function readSchedulerHealthInDatabase(
     report_dates_requested: number;
     records_received: number;
     changes_detected: number;
+    poll_initial: number;
+    poll_unchanged: number;
+    poll_timestamp_only: number;
+    poll_counter_changes: number;
+    poll_empty: number;
+    poll_errors: number;
+    finalized_counter_changes: number;
   }>();
   const recent = (result.results || []).map((row): SchedulerHealthRun => {
     const run = {
@@ -154,6 +178,13 @@ export async function readSchedulerHealthInDatabase(
       reportDatesRequested: row.report_dates_requested,
       recordsReceived: row.records_received,
       changesDetected: row.changes_detected,
+      pollInitial: row.poll_initial,
+      pollUnchanged: row.poll_unchanged,
+      pollTimestampOnly: row.poll_timestamp_only,
+      pollCounterChanges: row.poll_counter_changes,
+      pollEmpty: row.poll_empty,
+      pollErrors: row.poll_errors,
+      finalizedCounterChanges: row.finalized_counter_changes,
       telemetryAvailable: row.sync_run_id != null,
     };
     return { ...run, result: classifySchedulerRun(run) };
@@ -188,7 +219,7 @@ export async function enforceRetentionInDatabase(
   db: D1Database,
   now = new Date(),
   policy = DEFAULT_RETENTION_POLICY,
-): Promise<{ intradayDeleted: number; alertsDeleted: number; auditsDeleted: number; syncRunsDeleted: number; auditRecorded: boolean }> {
+): Promise<{ intradayDeleted: number; pollSamplesDeleted: number; alertsDeleted: number; auditsDeleted: number; syncRunsDeleted: number; auditRecorded: boolean }> {
   await ensureGovernanceSchema(db);
   validatePolicy(policy);
   const cutoff = (days: number) => new Date(now.valueOf() - days * 86_400_000).toISOString();
@@ -196,8 +227,9 @@ export async function enforceRetentionInDatabase(
   const expiredSyncRuns = await db.prepare(
     'SELECT COUNT(*) AS count FROM sync_runs WHERE completed_at < ?',
   ).bind(syncRunCutoff).first<{ count: number }>();
-  const [intraday, alerts, audits] = await db.batch([
+  const [intraday, pollSamples, alerts, audits] = await db.batch([
     db.prepare('DELETE FROM wishlist_intraday_snapshots WHERE fetched_at < ?').bind(cutoff(policy.intradayDays)),
+    db.prepare('DELETE FROM wishlist_poll_samples WHERE fetched_at < ?').bind(cutoff(policy.intradayDays)),
     db.prepare('DELETE FROM wishlist_alerts WHERE created_at < ?').bind(cutoff(policy.alertDays)),
     db.prepare('DELETE FROM audit_events WHERE occurred_at < ?').bind(cutoff(policy.auditDays)),
     db.prepare('DELETE FROM sync_runs WHERE completed_at < ?').bind(syncRunCutoff),
@@ -217,6 +249,7 @@ export async function enforceRetentionInDatabase(
   }
   return {
     intradayDeleted: changes(intraday),
+    pollSamplesDeleted: changes(pollSamples),
     alertsDeleted: changes(alerts),
     auditsDeleted: changes(audits),
     syncRunsDeleted: Number(expiredSyncRuns?.count || 0),
@@ -308,8 +341,26 @@ export async function ensureGovernanceSchema(db: D1Database): Promise<void> {
       report_dates_requested INTEGER NOT NULL CHECK (report_dates_requested >= 0),
       records_received INTEGER NOT NULL CHECK (records_received >= 0),
       changes_detected INTEGER NOT NULL CHECK (changes_detected >= 0),
+      poll_initial INTEGER NOT NULL DEFAULT 0 CHECK (poll_initial >= 0),
+      poll_unchanged INTEGER NOT NULL DEFAULT 0 CHECK (poll_unchanged >= 0),
+      poll_timestamp_only INTEGER NOT NULL DEFAULT 0 CHECK (poll_timestamp_only >= 0),
+      poll_counter_changes INTEGER NOT NULL DEFAULT 0 CHECK (poll_counter_changes >= 0),
+      poll_empty INTEGER NOT NULL DEFAULT 0 CHECK (poll_empty >= 0),
+      poll_errors INTEGER NOT NULL DEFAULT 0 CHECK (poll_errors >= 0),
+      finalized_counter_changes INTEGER NOT NULL DEFAULT 0 CHECK (finalized_counter_changes >= 0),
       FOREIGN KEY (sync_run_id) REFERENCES sync_runs(id) ON DELETE CASCADE
     )`),
+    db.prepare(`CREATE TABLE IF NOT EXISTS wishlist_poll_samples (
+      id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, app_id INTEGER NOT NULL CHECK (app_id > 0),
+      requested_date TEXT NOT NULL, date_phase TEXT NOT NULL CHECK (date_phase IN ('current', 'previous')),
+      outcome TEXT NOT NULL CHECK (outcome IN ('record', 'empty', 'error')),
+      classification TEXT NOT NULL CHECK (classification IN ('initial', 'unchanged', 'timestamp_only', 'counters_changed', 'empty', 'error')),
+      reason_code TEXT, adds INTEGER, deletes INTEGER, purchases INTEGER, gifts INTEGER,
+      delta_adds INTEGER, delta_deletes INTEGER, delta_purchases INTEGER, delta_gifts INTEGER,
+      generated_at TEXT, fetched_at TEXT NOT NULL,
+      FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE)`),
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_wishlist_poll_workspace_app_date ON wishlist_poll_samples(workspace_id, app_id, requested_date, fetched_at)'),
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_wishlist_poll_fetched ON wishlist_poll_samples(fetched_at)'),
     db.prepare(`CREATE TABLE IF NOT EXISTS push_subscriptions (
       id TEXT PRIMARY KEY,
       workspace_id TEXT NOT NULL,
@@ -321,12 +372,32 @@ export async function ensureGovernanceSchema(db: D1Database): Promise<void> {
       FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
       UNIQUE (workspace_id, endpoint_hash)
     )`),
-  ]).then(() => undefined).catch((error) => {
+  ]).then(() => ensureSyncActivityColumns(db)).catch((error) => {
     schemaReady.delete(db as object);
     throw error;
   });
   schemaReady.set(db as object, initialization);
   return initialization;
+}
+
+async function ensureSyncActivityColumns(db: D1Database): Promise<void> {
+  const result = await db.prepare('PRAGMA table_info(sync_run_activity)').all<{ name: string }>();
+  const existing = new Set((result.results || []).map((row) => row.name));
+  const definitions: Record<string, string> = {
+    poll_initial: 'INTEGER NOT NULL DEFAULT 0 CHECK (poll_initial >= 0)',
+    poll_unchanged: 'INTEGER NOT NULL DEFAULT 0 CHECK (poll_unchanged >= 0)',
+    poll_timestamp_only: 'INTEGER NOT NULL DEFAULT 0 CHECK (poll_timestamp_only >= 0)',
+    poll_counter_changes: 'INTEGER NOT NULL DEFAULT 0 CHECK (poll_counter_changes >= 0)',
+    poll_empty: 'INTEGER NOT NULL DEFAULT 0 CHECK (poll_empty >= 0)',
+    poll_errors: 'INTEGER NOT NULL DEFAULT 0 CHECK (poll_errors >= 0)',
+    finalized_counter_changes: 'INTEGER NOT NULL DEFAULT 0 CHECK (finalized_counter_changes >= 0)',
+  };
+  const missing = Object.entries(definitions).filter(([name]) => !existing.has(name));
+  if (missing.length) {
+    await db.batch(missing.map(([name, definition]) => db.prepare(
+      `ALTER TABLE sync_run_activity ADD COLUMN ${name} ${definition}`,
+    )));
+  }
 }
 
 function auditStatement(db: D1Database, event: AuditEvent): D1PreparedStatement {
@@ -347,6 +418,21 @@ function auditStatement(db: D1Database, event: AuditEvent): D1PreparedStatement 
     crypto.randomUUID(), event.workspaceId, event.appId, event.eventType,
     event.outcome, reasonCode, event.occurredAt || new Date().toISOString(),
   );
+}
+
+function emptySyncActivity(): SyncRunActivity {
+  return {
+    reportDatesRequested: 0,
+    recordsReceived: 0,
+    changesDetected: 0,
+    pollInitial: 0,
+    pollUnchanged: 0,
+    pollTimestampOnly: 0,
+    pollCounterChanges: 0,
+    pollEmpty: 0,
+    pollErrors: 0,
+    finalizedCounterChanges: 0,
+  };
 }
 
 function validatePolicy(policy: RetentionPolicy) {

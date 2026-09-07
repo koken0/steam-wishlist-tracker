@@ -279,9 +279,10 @@ Use the `result` field as the primary diagnosis:
 
 The supporting counters make the diagnosis auditable without exposing business
 data: `reportDatesRequested` proves date requests were started,
-`recordsReceived` proves Steam returned usable normalized records, and
-`changesDetected` proves a distinct current-day observation was stored. Do not
-treat `unchanged` as a failure.
+`recordsReceived` proves Steam returned usable normalized records,
+`pollCounterChanges` proves counters moved, `pollTimestampOnly` isolates batch
+timestamp churn, and `finalizedCounterChanges` identifies next-day corrections.
+Do not treat `unchanged` as a failure.
 
 The same completed event includes `pushAttempted`, `pushSent`, `pushExpired`,
 and `pushFailed`. A changed observation with `pushSent: 1` was delivered to one

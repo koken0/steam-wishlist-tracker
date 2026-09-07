@@ -187,8 +187,10 @@ All items below are required before paid production launch:
 - [ ] Verify tenant isolation with automated integration tests.
 - [x] Replace rolling-window refetching with one-time backfill and hourly
       yesterday/today polling plus last-known-good storage.
-- [ ] Validate the hourly cadence for 24-48 hours with an authorized test game,
-      add bounded retry/backoff, and establish per-workspace quotas.
+- [ ] Complete the 24-48 hour evidence window with an authorized test game and
+      establish per-workspace quotas. Bounded retry/backoff and normalized poll
+      evidence now separate intraday counter changes, timestamp-only batches,
+      empty/error windows, and next-day finalization.
 - [ ] Ensure no logs, traces, analytics, error reports, backups, or support tools
       expose plaintext keys or raw sensitive responses.
 - [ ] Establish a process to review Valve's terms and documentation periodically

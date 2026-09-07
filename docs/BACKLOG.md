@@ -22,7 +22,8 @@ reliable, useful intraday updates without excessive Steam requests.
 3. Confirm routine sync requests only yesterday and today in GMT.
 4. Confirm changed current-day values create observations and repeated
    unchanged values do not create duplicates. Compare `recordsReceived` with
-   `changesDetected`; do not inspect raw upstream bodies.
+   `pollCounterChanges`, `pollTimestampOnly`, and `finalizedCounterChanges`; do
+   not inspect raw upstream bodies.
 5. Confirm yesterday is finalized on the following day and older closed dates
    are not routinely requested again.
 6. If Steam fails or rate-limits a run, confirm the dashboard serves the last

@@ -17,6 +17,7 @@ export type WishlistSyncSummary = {
   push: PushDeliverySummary;
   retention: {
     intradayDeleted: number;
+    pollSamplesDeleted: number;
     alertsDeleted: number;
     auditsDeleted: number;
     syncRunsDeleted: number;
@@ -33,6 +34,8 @@ export async function syncAllWishlistConnections(): Promise<WishlistSyncSummary>
     reportDatesRequested: 0,
     recordsReceived: 0,
     changesDetected: 0,
+    pollInitial: 0, pollUnchanged: 0, pollTimestampOnly: 0, pollCounterChanges: 0,
+    pollEmpty: 0, pollErrors: 0, finalizedCounterChanges: 0,
   };
   const push: PushDeliverySummary = { attempted: 0, sent: 0, expired: 0, failed: 0 };
 
@@ -41,6 +44,8 @@ export async function syncAllWishlistConnections(): Promise<WishlistSyncSummary>
       reportDatesRequested: 0,
       recordsReceived: 0,
       changesDetected: 0,
+      pollInitial: 0, pollUnchanged: 0, pollTimestampOnly: 0, pollCounterChanges: 0,
+      pollEmpty: 0, pollErrors: 0, finalizedCounterChanges: 0,
     };
     try {
       const data = await getWishlistDashboardData(true, {
@@ -70,6 +75,13 @@ export async function syncAllWishlistConnections(): Promise<WishlistSyncSummary>
       activity.reportDatesRequested += connectionActivity.reportDatesRequested;
       activity.recordsReceived += connectionActivity.recordsReceived;
       activity.changesDetected += connectionActivity.changesDetected;
+      activity.pollInitial += connectionActivity.pollInitial;
+      activity.pollUnchanged += connectionActivity.pollUnchanged;
+      activity.pollTimestampOnly += connectionActivity.pollTimestampOnly;
+      activity.pollCounterChanges += connectionActivity.pollCounterChanges;
+      activity.pollEmpty += connectionActivity.pollEmpty;
+      activity.pollErrors += connectionActivity.pollErrors;
+      activity.finalizedCounterChanges += connectionActivity.finalizedCounterChanges;
     }
     try {
       const delivery = await deliverPendingPushNotifications(connection.workspaceId);
@@ -135,6 +147,13 @@ export async function runScheduledWishlistSync(): Promise<WishlistSyncSummary> {
       reportDatesRequested: summary.activity.reportDatesRequested,
       recordsReceived: summary.activity.recordsReceived,
       changesDetected: summary.activity.changesDetected,
+      pollInitial: summary.activity.pollInitial,
+      pollUnchanged: summary.activity.pollUnchanged,
+      pollTimestampOnly: summary.activity.pollTimestampOnly,
+      pollCounterChanges: summary.activity.pollCounterChanges,
+      pollEmpty: summary.activity.pollEmpty,
+      pollErrors: summary.activity.pollErrors,
+      finalizedCounterChanges: summary.activity.finalizedCounterChanges,
       pushAttempted: summary.push.attempted,
       pushSent: summary.push.sent,
       pushExpired: summary.push.expired,
