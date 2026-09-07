@@ -45,16 +45,8 @@ chromium`. Browser acceptance starts a fixture-mode server on port 3100 and
 uses only placeholder connection values. It must not be pointed at real Steam
 credentials or configured to record screenshots, traces, or video.
 
-When authorized real credentials are available and Steam access is expected:
-
-```bash
-npm run test:onboarding
-```
-
-That acceptance script prints only sanitized connection metadata and fails if
-the API key appears in a client response. It must run against an already
-started local development server and uses the Sites sign-in cookie; it does not
-send a user identity header.
+When authorized real credentials are available, use the normal Firebase-authenticated
+browser flow. Never record screenshots, traces, or request bodies containing the key.
 
 ## Environment values
 
@@ -316,7 +308,6 @@ hosting provider.
 | Stored total looks lower than Steamworks | Check the displayed coverage start; Wishline does not infer activity before its first stored date |
 | Local workspace disappeared | Confirm the project-local `.wrangler/` state still exists |
 | Local dev runtime rejects the compatibility date | Upgrade the local Cloudflare runtime or lower `compatibility_date` to the newest date it explicitly supports, then rerun the full validation suite |
-| Local scripted onboarding returns `AUTH_REQUIRED` | Confirm `npm run dev` is current and the test URL is loopback. The Worker accepts Sites' exact simulated identity only in development; staging still requires Firebase. |
 | Settings says push is not configured | Confirm all three VAPID values exist in the Worker, then redeploy. Never inspect or print the private value. |
 | Test notification was not confirmed | Check browser/OS permission and try disabling and enabling again; do not log the subscription endpoint or keys. |
 | `pushExpired` increases | The push service rejected a stale browser capability and Wishline removed it; enable notifications again on that device. |

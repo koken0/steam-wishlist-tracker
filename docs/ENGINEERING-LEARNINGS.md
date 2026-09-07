@@ -77,19 +77,17 @@ treat that as a separate integration defect and not confuse it with Steam
 connectivity, which had independently returned sanitized `200` results. The
 follow-up below records the corrected diagnosis.
 
-### Local Firebase configuration can mask a valid Sites identity
+### Historical: local Firebase configuration masked a Sites identity
 
 Follow-up inspection showed that the Sites identity headers did reach the
 Worker. The actual conflict was that the Cloudflare Vite runtime also loaded
 `FIREBASE_PROJECT_ID` from `wrangler.jsonc` locally, so authentication entered
 Firebase bearer-token mode before considering Sites' simulated identity.
 
-Wishline now recognizes only Sites' exact simulated user when the runtime is in
-development and the request origin is loopback, before applying Firebase
-verification. The Sites middleware removes client-provided identity headers
-before injecting this local identity. Production has no local branch and still
-requires a signed Firebase token. The authorized local onboarding script then
-completed with seven normalized records and no credential in either response.
+At that time Wishline recognized Sites' simulated user on development loopback
+before applying Firebase verification. This compatibility path and its script
+were removed when Sites ceased to be a deployment target; Firebase is now
+authoritative locally and on staging.
 
 The clean local database also exposed that runtime schema initialization had
 not kept pace with migration `0002`: intraday and alert tables were missing.

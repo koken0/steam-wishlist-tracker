@@ -20,9 +20,6 @@ const FIREBASE_JWKS = createRemoteJWKSet(
 
 export async function getWishlineUser(request: Request): Promise<WishlineUser | null> {
   if (!await hasLaunchAccess(request)) return null;
-  const localUser = localSitesUser(request);
-  if (localUser) return localUser;
-
   const firebaseProjectId = process.env.FIREBASE_PROJECT_ID?.trim();
   if (firebaseProjectId) {
     const token = bearerToken(request.headers.get('authorization'));
@@ -47,26 +44,6 @@ export async function getWishlineUser(request: Request): Promise<WishlineUser | 
     id,
     email: cleanClaim(request.headers.get('oai-authenticated-user-email')),
     name: cleanClaim(request.headers.get('oai-authenticated-user-name')),
-  };
-}
-
-function localSitesUser(request: Request): WishlineUser | null {
-  if (process.env.NODE_ENV !== 'development') return null;
-
-  let hostname: string;
-  try {
-    hostname = new URL(request.url).hostname.toLowerCase();
-  } catch {
-    return null;
-  }
-  if (!['localhost', '127.0.0.1', '::1'].includes(hostname)) return null;
-
-  if (request.headers.get('oai-authenticated-user-id')?.trim() !== 'local_seedy') return null;
-
-  return {
-    id: 'local_seedy',
-    email: cleanClaim(request.headers.get('oai-authenticated-user-email')),
-    name: cleanClaim(request.headers.get('oai-authenticated-user-full-name')),
   };
 }
 

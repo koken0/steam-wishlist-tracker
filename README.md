@@ -14,7 +14,7 @@ Wishline is an English-language Phase 1 acceptance build for the Studio Wishlist
 | Application framework | Next.js 16.3.3 | App Router structure, metadata, and React application shell |
 | Server connector | Next.js Route Handler | Normalizes Steamworks responses without exposing the Financial API key |
 | UI runtime | React 19.2.8 | Interactive onboarding, navigation, settings, refresh, and token flows |
-| Identity | Local simulated identity; Firebase Auth on staging | Passwordless Google sign-in and workspace isolation |
+| Identity | Firebase Auth | Passwordless Google sign-in and workspace isolation |
 | Persistence | Cloudflare D1 | Durable owner workspace, encrypted Steam connection, and normalized daily wishlist history |
 | Secret protection | Web Crypto AES-256-GCM | API keys and push capabilities are encrypted before D1 storage and never returned to clients |
 | Language | TypeScript 5.9.3 | Typed application source and build-time checks |
@@ -26,9 +26,9 @@ Wishline is an English-language Phase 1 acceptance build for the Studio Wishlist
 | Package manager | npm | Dependency and script management |
 
 The Cloudflare Vite plugin and Wrangler build and deploy the app directly to a
-Cloudflare Worker. OpenAI Sites metadata remains temporarily available during
-the staging transition. Security-sensitive dependencies are pinned to versions
-that pass the production dependency audit.
+Cloudflare Worker. OpenAI Sites is not a deployment target for this project.
+Security-sensitive dependencies are pinned to versions that pass the
+production dependency audit.
 
 ## Project documentation
 
@@ -139,7 +139,6 @@ public/
   icon-512.png
   og.png            Social preview artwork
 .openai/
-  hosting.json      Optional hosting configuration
 ```
 
 ## Run locally
@@ -169,7 +168,6 @@ npm run lint    # Run static code-quality checks
 npm run start   # Serve a completed production build
 npm run test:fixture  # Validate the anonymous Steam response contract
 npm run test:contract # Validate totals, normalization, and freshness boundaries
-npm run test:onboarding # Authorized, sanitized local identity/onboarding check
 npm run test:browser # Chromium acceptance for auth, dashboard, errors, mobile, and PWA
 ```
 
@@ -197,7 +195,7 @@ Keep `WISHLIST_DATA_SOURCE=fixture`. The dashboard will label every surface as *
 npm run dev
 ```
 
-3. Select **Continue to demo**, then **Open local workspace**. Local development uses the stable simulated identity `local_seedy`; Cloudflare staging uses Google sign-in through Firebase.
+3. Sign in with Google through Firebase, then connect the local workspace.
 4. Enter the Steam App ID and Financial API key in **Connect Steam**. Wishline validates them against Steam before encrypting the key and storing the connection in the owner's D1 workspace.
 
 The older environment-driven connector remains available for diagnostics. To use it instead, set:
@@ -230,11 +228,6 @@ History ranges include both selected endpoints. Wishline enumerates every GMT
 calendar date in the range, marks absent Steam records as missing, and never
 turns them into zero activity. The chart breaks across gaps; a reported day
 whose counts are genuinely zero remains a recorded point.
-
-The authorized local acceptance script follows the same Sites sign-in route as
-the browser. Local identity is recognized only in a development Worker on a
-loopback origin; hosted Cloudflare requests continue to require a verified
-Firebase ID token.
 
 `npm run test:browser` starts an isolated fixture-mode server on port 3100. Its
 browser-owned API doubles use only obvious placeholder keys and never call

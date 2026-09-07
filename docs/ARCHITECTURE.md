@@ -86,9 +86,7 @@ mistaken for a reported zero.
 
 ## Authentication and authorization
 
-- Local development uses the stable Sites test identity `local_seedy`.
-- A hosted private Site uses the platform-authenticated user headers.
-- Direct Cloudflare staging validates Firebase ID tokens before resolving a
+- Local development and Cloudflare staging validate Firebase ID tokens before resolving a
   workspace. The browser sends a short-lived token in the Authorization header;
   the Worker verifies its signature and Firebase project claims before trusting
   the user ID.
@@ -105,11 +103,7 @@ Application code must not implement its own password database or trust a user
 ID supplied by client JavaScript.
 
 The Cloudflare Vite runtime loads the configured Firebase project in local
-development too. Authentication therefore recognizes Sites' exact simulated
-identity first only when `NODE_ENV=development` and the request URL is a
-loopback origin. The Sites middleware strips incoming identity headers before
-injecting that identity. This local branch is unavailable in production;
-Firebase remains authoritative on staging.
+development too, so Firebase remains authoritative in both environments.
 
 ## Steam integration
 

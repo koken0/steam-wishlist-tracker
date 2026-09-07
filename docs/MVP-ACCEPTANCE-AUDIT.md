@@ -67,7 +67,7 @@ Full runtime account isolation and 24-48 hour cadence evidence remain.
 | Browser landing page | Meets - shown only after session restoration confirms there is no owner |
 | Hosted Google sign-in and authenticated setup | Meets |
 | Authorized hosted Steam onboarding | Meets - 24 normalized days, sanitized evidence |
-| Browser onboarding entry | Meets for hosted staging and local scripted identity |
+| Browser onboarding entry | Meets for Firebase-authenticated staging |
 | Authorized real Steam onboarding | Meets - hosted run completed with sanitized evidence |
 
 ## 4.1 Owner entry and onboarding
@@ -76,7 +76,7 @@ Full runtime account isolation and 24-48 hour cadence evidence remain.
 | --- | --- | --- |
 | Saved workspace requires authentication | Meets | `/api/setup` requires a platform identity and saved connections are resolved through that identity. |
 | Returning-owner routing | Meets | A neutral identifying state prevents a landing-page flash; connected owners open the dashboard directly and incomplete owners resume at the connection step. |
-| Stable local owner; no browser-supplied user ID | Meets | The authorized local script completed through the Sites sign-in cookie. The simulated identity branch is limited to development loopback requests; staging requires Firebase. |
+| Stable owner; no browser-supplied user ID | Meets | Firebase ID tokens are verified server-side before workspace resolution. |
 | Exact positive numeric App ID and bounded key | Meets | Setup validates integer App ID, key presence/length/newlines, JSON type, and body size. |
 | Safe errors for invalid, unauthorized, limited, malformed, empty, and mismatched responses | Meets | Connector tests cover access denial, rate limiting, malformed JSON, empty data, network failure, upstream failure, and App-ID mismatch without exposing secrets. |
 | Validate before saving | Meets | Steam is called before persistence and zero usable records reject onboarding. |

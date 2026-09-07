@@ -85,8 +85,7 @@ commercial access.
   requests.
 - Owner-confirmed disconnect with deletion of the protected connection and all
   workspace-scoped wishlist data.
-- Local Sites identity works through the authorized onboarding script without
-  weakening Firebase authentication in production.
+- Firebase authentication is authoritative in local development and staging.
 - Repeatable Chromium acceptance covers authentication, onboarding,
   reconnection, 429/503 errors, desktop/mobile layout, install metadata,
   service-worker privacy, and the offline shell without secret-bearing
