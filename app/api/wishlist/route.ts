@@ -25,7 +25,7 @@ async function wishlistResponse(request: Request, force: boolean) {
     const user = await getWishlineUser(request);
     const savedConnection = user ? await getSteamConnection(user) : null;
     if (!savedConnection) {
-      const access = authorizeWishlistRequest(request);
+      const access = authorizeWishlistRequest(request, user?.id ?? null);
       if (!access.allowed) {
         return NextResponse.json(
           { error: { code: access.code, message: access.message } },

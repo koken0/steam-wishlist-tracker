@@ -335,7 +335,7 @@ hosting provider.
 
 | Symptom | Check |
 | --- | --- |
-| Sign-in loops locally | Visit `/signout-with-chatgpt?return_to=/`, then sign in again |
+| Local workspace does not open | Confirm the URL is `localhost` or `127.0.0.1`, restart `npm run dev`, and verify the runtime is not using `NODE_ENV=production` |
 | `ENCRYPTION_NOT_CONFIGURED` | Restart with `npm run dev`; if preparation was skipped, run `npm run setup:local` explicitly |
 | Steam access denied | Key permissions, App ID, and Steamworks IP allowlist |
 | App ID mismatch | Confirm the key is authorized for the exact configured App ID |

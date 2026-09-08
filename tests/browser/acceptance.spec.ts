@@ -3,8 +3,7 @@ import {
   connectedSetup,
   dashboardFixture,
   disconnectedSetup,
-  hasLocalSession,
-  signInLocally,
+  openLocalWorkspace,
   waitForReact,
 } from './fixtures';
 
@@ -22,10 +21,6 @@ test('authenticates, onboards, reconnects, loads the dashboard, and renders safe
   const submittedKeys: string[] = [];
 
   await page.route('**/api/setup', async (route) => {
-    if (!hasLocalSession(route)) {
-      await route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ error: { code: 'AUTH_REQUIRED', message: 'Sign in to continue.' } }) });
-      return;
-    }
     if (route.request().method() === 'POST') {
       const input = route.request().postDataJSON() as { appId: string; apiKey: string; projectName: string };
       submittedKeys.push(input.apiKey);
@@ -42,10 +37,6 @@ test('authenticates, onboards, reconnects, loads the dashboard, and renders safe
   });
 
   await page.route('**/api/wishlist', async (route) => {
-    if (!hasLocalSession(route)) {
-      await route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ error: { code: 'AUTH_REQUIRED', message: 'Sign in to continue.' } }) });
-      return;
-    }
     if (route.request().method() === 'POST' && refreshFailure) {
       const failure = refreshFailure;
       refreshFailure = null;
@@ -55,13 +46,12 @@ test('authenticates, onboards, reconnects, loads the dashboard, and renders safe
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ...dashboardFixture, projectName: setup.workspace.projectName }) });
   });
 
-  await page.addInitScript(() => window.localStorage.setItem('wishline-theme', 'light'));
   await page.goto('/');
   await waitForReact(page);
-  await page.getByRole('button', { name: /Continue to demo/ }).click();
-  await expect(page.getByText('Account required.')).toBeVisible();
-  await page.getByRole('link', { name: /Open local workspace/ }).click();
-  await waitForReact(page);
+  await page.evaluate(() => {
+    window.localStorage.setItem('wishline-theme', 'light');
+    document.documentElement.dataset.theme = 'light';
+  });
   await expect(page.getByRole('heading', { name: 'Connect your Steam project' })).toBeVisible();
 
   await page.getByLabel('Steam App ID').fill('1234567');
@@ -122,7 +112,6 @@ test('restores a connected owner without flashing the public landing page', asyn
   let releaseSetup!: () => void;
   const setupGate = new Promise<void>((resolve) => { releaseSetup = resolve; });
 
-  await page.context().addCookies([{ name: '__sites_local_auth', value: '1', url: 'http://localhost:3100' }]);
   await page.route('**/api/setup', async (route) => {
     await setupGate;
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(connectedSetup()) });
@@ -142,7 +131,7 @@ test('dashboard remains usable at a phone-sized viewport', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.route('**/api/setup', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(connectedSetup()) }));
   await page.route('**/api/wishlist', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(dashboardFixture) }));
-  await signInLocally(page);
+  await openLocalWorkspace(page);
   await expect(page.getByText('Stored wishlist total').first()).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(1);
@@ -159,7 +148,7 @@ test('account deletion requires browser confirmation and returns to the welcome 
     deleteCalls += 1;
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ deleted: true }) });
   });
-  await signInLocally(page);
+  await openLocalWorkspace(page);
   await page.getByRole('button', { name: 'Settings' }).click();
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: 'Delete Wishline account' }).click();

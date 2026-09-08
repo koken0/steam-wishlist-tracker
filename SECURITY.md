@@ -23,7 +23,8 @@ data. Treat both as sensitive even though the current product is an MVP.
 
 ## Security boundaries
 
-- Identity comes from trusted platform headers, not client-provided user IDs.
+- Hosted identity comes from a server-verified Firebase ID token, never a client-provided user ID.
+- Local development uses one fixed owner only for non-production loopback requests.
 - Every saved Steam connection belongs to one authenticated workspace.
 - The server restores a credential only for the current workspace and only when
   calling the fixed Steam endpoint.
@@ -52,7 +53,7 @@ data. Treat both as sensitive even though the current product is an MVP.
 
 Before using a real key outside local acceptance:
 
-- Require private authenticated Site access.
+- Require private authenticated Firebase access.
 - Configure server secrets through the hosting environment.
 - Restrict access to logs, D1 data, and deployment settings.
 - Protect `/api/internal/scheduler-health` with a dedicated

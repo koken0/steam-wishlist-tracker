@@ -70,24 +70,11 @@ the installed local runtime, so `npm run dev` could not start. Keep
 `compatibility_date` at or below the installed runtime's supported date, or
 upgrade the runtime dependency in the same tested change.
 
-After aligning the date, the server started successfully. The scripted local
-onboarding still received `401`; the initial hypothesis was that the simulated
-Sites identity did not reach the Worker API path. It remained important to
-treat that as a separate integration defect and not confuse it with Steam
-connectivity, which had independently returned sanitized `200` results. The
-follow-up below records the corrected diagnosis.
-
-### Historical: local Firebase configuration masked a Sites identity
-
-Follow-up inspection showed that the Sites identity headers did reach the
-Worker. The actual conflict was that the Cloudflare Vite runtime also loaded
-`FIREBASE_PROJECT_ID` from `wrangler.jsonc` locally, so authentication entered
-Firebase bearer-token mode before considering Sites' simulated identity.
-
-At that time Wishline recognized Sites' simulated user on development loopback
-before applying Firebase verification. This compatibility path and its script
-were removed when Sites ceased to be a deployment target; Firebase is now
-authoritative locally and on staging.
+After aligning the date, the server started successfully. Local development now
+uses one fixed owner only for non-production loopback requests. Hosted requests
+always require a valid Firebase bearer token; arbitrary identity headers are not
+accepted. This keeps local onboarding executable without weakening the deployed
+identity boundary.
 
 The clean local database also exposed that runtime schema initialization had
 not kept pace with migration `0002`: intraday and alert tables were missing.

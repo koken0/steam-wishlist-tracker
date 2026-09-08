@@ -4,26 +4,33 @@ import { generateKeyPair, SignJWT } from 'jose';
 import { getWishlineUser, verifyFirebaseIdToken } from './wishline-auth.ts';
 import { workspaceIdForUser } from './wishline-workspace-id.ts';
 
-test('local identity comes only from trusted platform headers', async () => {
+test('local development uses one loopback-only owner identity', async () => {
   const originalProject = process.env.FIREBASE_PROJECT_ID;
   delete process.env.FIREBASE_PROJECT_ID;
-  const withoutHeader = new Request('https://wishline.test/?userId=attacker', {
+  const remoteRequest = new Request('https://wishline.test/?userId=attacker', {
     method: 'POST',
     body: JSON.stringify({ userId: 'attacker' }),
   });
-  assert.equal(await getWishlineUser(withoutHeader), null);
+  assert.equal(await getWishlineUser(remoteRequest), null);
 
-  const authenticated = new Request('https://wishline.test/?userId=attacker', {
-    headers: {
-      'oai-authenticated-user-id': 'owner-a',
-      'oai-authenticated-user-email': 'owner@example.test',
-    },
+  const localRequest = new Request('http://127.0.0.1:3000/api/setup');
+  assert.deepEqual(await getWishlineUser(localRequest), {
+    id: 'local:owner',
+    email: null,
+    name: 'Local owner',
   });
-  assert.deepEqual(await getWishlineUser(authenticated), {
-    id: 'owner-a',
-    email: 'owner@example.test',
-    name: null,
-  });
+  if (originalProject === undefined) delete process.env.FIREBASE_PROJECT_ID;
+  else process.env.FIREBASE_PROJECT_ID = originalProject;
+});
+
+test('production never accepts the loopback development owner', async () => {
+  const originalNodeEnv = process.env.NODE_ENV;
+  const originalProject = process.env.FIREBASE_PROJECT_ID;
+  Reflect.set(process.env, 'NODE_ENV', 'production');
+  delete process.env.FIREBASE_PROJECT_ID;
+  assert.equal(await getWishlineUser(new Request('http://127.0.0.1:3000/api/setup')), null);
+  if (originalNodeEnv === undefined) Reflect.deleteProperty(process.env, 'NODE_ENV');
+  else Reflect.set(process.env, 'NODE_ENV', originalNodeEnv);
   if (originalProject === undefined) delete process.env.FIREBASE_PROJECT_ID;
   else process.env.FIREBASE_PROJECT_ID = originalProject;
 });
@@ -46,12 +53,10 @@ test('Firebase ID tokens require the expected signature and project claims', asy
   await assert.rejects(() => verifyFirebaseIdToken(token, 'another-project', async () => publicKey));
 });
 
-test('hosted Firebase mode rejects spoofed platform identity headers', async () => {
+test('hosted Firebase mode rejects requests without a valid bearer token', async () => {
   const originalProject = process.env.FIREBASE_PROJECT_ID;
   process.env.FIREBASE_PROJECT_ID = 'wishline-staging';
-  const request = new Request('https://wishline.celkoken.workers.dev/api/setup', {
-    headers: { 'oai-authenticated-user-id': 'forged-owner' },
-  });
+  const request = new Request('https://wishline.celkoken.workers.dev/api/setup');
   assert.equal(await getWishlineUser(request), null);
   if (originalProject === undefined) delete process.env.FIREBASE_PROJECT_ID;
   else process.env.FIREBASE_PROJECT_ID = originalProject;

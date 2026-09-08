@@ -26,7 +26,7 @@ Wishline is an English-language Phase 1 acceptance build for the Studio Wishlist
 | Package manager | npm | Dependency and script management |
 
 The Cloudflare Vite plugin and Wrangler build and deploy the app directly to a
-Cloudflare Worker. OpenAI Sites is not a deployment target for this project.
+Cloudflare Worker.
 Security-sensitive dependencies are pinned to versions that pass the
 production dependency audit.
 
@@ -105,7 +105,7 @@ app/
 lib/
   wishlist-contract.ts  Shared response contract and normalizer
   wishlist-server.ts    Fixture/live adapter, Steam client, and server cache
-  wishline-auth.ts      Platform identity extraction
+  wishline-auth.ts      Firebase verification and loopback-only local owner
   wishline-store.ts     Runtime D1 binding adapter
   wishline-store-core.ts  Testable workspace and connection persistence
   wishline-governance-core.ts  Audit, scheduler health, retention, and key re-wrapping
@@ -139,7 +139,6 @@ public/
   icon-192.png
   icon-512.png
   og.png            Social preview artwork
-.openai/
 ```
 
 ## Run locally
@@ -200,7 +199,7 @@ Keep `WISHLIST_DATA_SOURCE=fixture`. The dashboard will label every surface as *
 npm run dev
 ```
 
-3. Sign in with Google through Firebase, then connect the local workspace.
+3. Open the loopback-only local workspace; hosted environments use Google sign-in through Firebase.
 4. Enter the Steam App ID and Financial API key in **Connect Steam**. Wishline validates them against Steam before encrypting the key and storing the connection in the owner's D1 workspace.
 
 The older environment-driven connector remains available for diagnostics. To use it instead, set:
@@ -358,4 +357,4 @@ managed-key launch gates.
 
 ## Production seams
 
-The UI is organized around the production boundaries described by the PRD: passwordless platform identity, a durable owner workspace and per-date history in D1, versioned AES-256-GCM credential and push-capability storage, a per-App-ID response cache, scoped client tokens, and a reader-only mobile experience. Managed KMS/HSM custody, provider backup guarantees, email/escalation alerting, and a native Android widget remain follow-up work.
+The UI is organized around the production boundaries described by the PRD: verified Firebase identity when hosted, a loopback-only development owner, a durable owner workspace and per-date history in D1, versioned AES-256-GCM credential and push-capability storage, a per-App-ID response cache, scoped client tokens, and a reader-only mobile experience. Managed KMS/HSM custody, provider backup guarantees, email/escalation alerting, and a native Android widget remain follow-up work.

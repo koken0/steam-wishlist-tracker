@@ -1,4 +1,4 @@
-import type { Page, Route } from '@playwright/test';
+import type { Page } from '@playwright/test';
 
 export type BrowserSetup = {
   user: { email: string; name: string };
@@ -37,7 +37,7 @@ export const dashboardFixture = {
 
 export function disconnectedSetup(): BrowserSetup {
   return {
-    user: { email: 'seedy@sites.test', name: 'Seedy' },
+    user: { email: 'owner@wishline.test', name: 'Wishline Owner' },
     workspace: {
       workspaceId: 'ws_acceptance',
       workspaceName: "Seedy's workspace",
@@ -62,15 +62,8 @@ export function connectedSetup(): BrowserSetup {
   };
 }
 
-export function hasLocalSession(route: Route): boolean {
-  return (route.request().headers().cookie || '')
-    .split(';')
-    .some((cookie) => cookie.trim() === '__sites_local_auth=1');
-}
-
-export async function signInLocally(page: Page): Promise<void> {
-  await page.goto('/signin-with-chatgpt?return_to=/');
-  await page.waitForURL('/');
+export async function openLocalWorkspace(page: Page): Promise<void> {
+  await page.goto('/');
   await waitForReact(page);
 }
 

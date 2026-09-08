@@ -74,7 +74,7 @@ Full runtime account isolation and 24-48 hour cadence evidence remain.
 
 | Requirement | Status | Evidence / gap |
 | --- | --- | --- |
-| Saved workspace requires authentication | Meets | `/api/setup` requires a platform identity and saved connections are resolved through that identity. |
+| Saved workspace requires authentication | Meets | `/api/setup` requires a verified Firebase identity when hosted; non-production loopback development uses one fixed local owner. |
 | Returning-owner routing | Meets | A neutral identifying state prevents a landing-page flash; connected owners open the dashboard directly and incomplete owners resume at the connection step. |
 | Stable owner; no browser-supplied user ID | Meets | Firebase ID tokens are verified server-side before workspace resolution. |
 | Exact positive numeric App ID and bounded key | Meets | Setup validates integer App ID, key presence/length/newlines, JSON type, and body size. |

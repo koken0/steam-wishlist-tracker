@@ -2,20 +2,19 @@ type WishlistAccessDecision =
   | { allowed: true }
   | { allowed: false; status: 401 | 403 | 503; code: string; message: string };
 
-export function authorizeWishlistRequest(request: Request): WishlistAccessDecision {
+export function authorizeWishlistRequest(request: Request, userId: string | null): WishlistAccessDecision {
   if (process.env.WISHLIST_DATA_SOURCE !== 'steam') return { allowed: true };
 
   if (process.env.NODE_ENV !== 'production' && isLoopbackRequest(request)) {
     return { allowed: true };
   }
 
-  const userId = request.headers.get('oai-authenticated-user-id')?.trim();
   if (!userId) {
     return {
       allowed: false,
       status: 401,
       code: 'AUTH_REQUIRED',
-      message: 'Sign in through the private Wishline site to access live Steam data.',
+      message: 'Sign in to Wishline to access live Steam data.',
     };
   }
 

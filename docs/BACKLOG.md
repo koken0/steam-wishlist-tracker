@@ -85,7 +85,8 @@ commercial access.
   requests.
 - Owner-confirmed disconnect with deletion of the protected connection and all
   workspace-scoped wishlist data.
-- Firebase authentication is authoritative in local development and staging.
+- Firebase authentication is authoritative when hosted; local development uses
+  one fixed owner restricted to non-production loopback requests.
 - Repeatable Chromium acceptance covers authentication, onboarding,
   reconnection, 429/503 errors, desktop/mobile layout, install metadata,
   service-worker privacy, and the offline shell without secret-bearing

@@ -102,8 +102,9 @@ mistaken for a reported zero.
 Application code must not implement its own password database or trust a user
 ID supplied by client JavaScript.
 
-The Cloudflare Vite runtime loads the configured Firebase project in local
-development too, so Firebase remains authoritative in both environments.
+Hosted requests require a server-verified Firebase token. Local development
+uses one fixed owner only when the runtime is non-production and the request URL
+is loopback, keeping the development path independent from hosted identity.
 
 ## Steam integration
 

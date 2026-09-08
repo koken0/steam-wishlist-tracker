@@ -24,31 +24,25 @@ export async function getWishlineUser(request: Request): Promise<WishlineUser | 
 }
 
 export async function getWishlineAuthenticatedUser(request: Request): Promise<WishlineUser | null> {
-  const firebaseProjectId = process.env.FIREBASE_PROJECT_ID?.trim();
-  if (firebaseProjectId) {
-    const token = bearerToken(request.headers.get('authorization'));
-    if (!token) return null;
-
-    try {
-      const claims = await verifyFirebaseIdToken(token, firebaseProjectId);
-      return {
-        id: `firebase:${claims.sub}`,
-        email: cleanClaim(claims.email),
-        name: cleanClaim(claims.name),
-      };
-    } catch {
-      return null;
-    }
+  if (isLocalDevelopmentRequest(request)) {
+    return { id: 'local:owner', email: null, name: 'Local owner' };
   }
 
-  const id = request.headers.get('oai-authenticated-user-id')?.trim();
-  if (!id) return null;
+  const firebaseProjectId = process.env.FIREBASE_PROJECT_ID?.trim();
+  if (!firebaseProjectId) return null;
+  const token = bearerToken(request.headers.get('authorization'));
+  if (!token) return null;
 
-  return {
-    id,
-    email: cleanClaim(request.headers.get('oai-authenticated-user-email')),
-    name: cleanClaim(request.headers.get('oai-authenticated-user-name')),
-  };
+  try {
+    const claims = await verifyFirebaseIdToken(token, firebaseProjectId);
+    return {
+      id: `firebase:${claims.sub}`,
+      email: cleanClaim(claims.email),
+      name: cleanClaim(claims.name),
+    };
+  } catch {
+    return null;
+  }
 }
 
 export async function verifyFirebaseIdToken(
@@ -82,4 +76,14 @@ function cleanClaim(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const cleaned = value.trim();
   return cleaned ? cleaned.slice(0, 254) : null;
+}
+
+function isLocalDevelopmentRequest(request: Request): boolean {
+  if (process.env.NODE_ENV === 'production') return false;
+  try {
+    const hostname = new URL(request.url).hostname.toLowerCase();
+    return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
+  } catch {
+    return false;
+  }
 }
