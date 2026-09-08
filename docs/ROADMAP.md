@@ -28,6 +28,8 @@ Steamworks report. This does not clear the separate hosted-key compliance gate.
 - Opt-in Web Push for changed wishlist activity observations with encrypted
   subscriptions, deduplication, and bounded retry
 - Verifiable test-notification tutorial with resend, device receipt, and click
+- Persistent light/dark appearance preference
+- Visible application version sourced from package metadata
 
 ## Now: private hosted pilot
 

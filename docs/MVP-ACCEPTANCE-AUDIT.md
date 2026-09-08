@@ -96,6 +96,7 @@ Full runtime account isolation and 24-48 hour cadence evidence remain.
 | Missing dates differ from zero | Meets | Every selected calendar date becomes a recorded or missing entry. The UI draws striped gaps, preserves a zero-activity point, and distinguishes pending bounded recovery from exhausted dates. |
 | Late corrections recalculate dependent metrics | Meets | Daily records are upserted by workspace, App ID, and reporting date; tests show corrected input recalculates range aggregates and every running total. |
 | Phone and desktop usability | Meets for MVP | Chromium acceptance verifies the dashboard at desktop and 390 × 844 without horizontal overflow. A broader accessibility audit remains future hardening. |
+| Persistent appearance preference | Meets | The application applies light or dark mode immediately, stores only that non-sensitive preference locally, and browser acceptance verifies it across reload. |
 | Configurable milestone target | Meets | Settings accepts any positive whole-number wishlist target, stores it per App ID in the browser, and browser acceptance verifies that it survives a reload. |
 
 ## 4.3 Refresh and caching
@@ -116,6 +117,7 @@ Full runtime account isolation and 24-48 hour cadence evidence remain.
 | Requirement | Status | Evidence / gap |
 | --- | --- | --- |
 | Valid manifest, icons, name, theme, and service worker | Meets | Browser acceptance validates the manifest, standalone display, required icon metadata, registration, and active controller. |
+| Visible application version | Meets | Sidebar and Settings render version `0.0.1` from package metadata; the matching Git release tag is `0.0.1`. |
 | Clear offline shell | Meets | A deliberate Chromium offline navigation loads the cached root shell; private API requests reject while offline instead of returning stored data. |
 | Private API data excluded from service-worker cache | Meets | Browser inspection finds no `/api/` entries in any Cache Storage bucket, and offline API fetches fail at the network boundary. |
 | Preview uses normalized data and correct labels | Meets | It uses dashboard data and displays total kind, latest reported movement, coverage, and freshness. |

@@ -128,6 +128,10 @@ Wishline treats today's record as provisional and older records as closed.
   intraday observation only when counters or `time_generated` change.
 - Yesterday is refreshed during the following day to obtain its final value.
   Older closed dates are not routinely requested again.
+- Missing closed dates from the bounded backfill or recent stored coverage enter
+  a scheduler-only repair queue. A run may request at most two repair dates per
+  workspace; each date stops after three attempts separated by increasing
+  quiet periods. Manual refresh never processes this queue.
 - Manual refresh follows the same bounded date rule and the 60-second safety
   interval. It cannot promise that Steam has generated a newer batch.
 - Hourly polling is the MVP test cadence; faster paid polling remains unproven.
@@ -270,6 +274,7 @@ Accepted when:
 - stored totals use the labels in Section 3.3;
 - a selected inclusive date range produces the correct sum and trend;
 - missing dates and unavailable totals are distinguishable from zero;
+- missing dates distinguish pending bounded recovery from exhausted recovery;
 - late corrections recalculate every dependent metric; and
 - the layout remains usable at phone and desktop widths.
 
@@ -297,6 +302,9 @@ Accepted when:
 - the app has a valid manifest, icons, name, theme, and service worker and is
   installable in at least one supported desktop browser and one supported
   mobile browser;
+- the owner can switch between light and dark themes, and the browser preserves
+  that preference across reloads;
+- Settings displays the current application version from package metadata;
 - the installed shell can open offline to a clear offline state;
 - `/api/` responses and private analytics are never stored by the service
   worker;

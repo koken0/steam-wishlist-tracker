@@ -104,9 +104,11 @@ Navigation does not stack the full tables into one long screen.
 ## Steam reporting cadence
 
 The API supports the current GMT date and recent values are published in
-intraday batches. Wishline runs hourly and requests only yesterday and today
-after the initial bounded history import. Yesterday is refreshed only while it
-is the immediately previous date; older closed dates are left untouched.
+intraday batches. Wishline runs hourly and routinely requests yesterday and
+today after the initial bounded history import. Yesterday is refreshed only
+while it is the immediately previous date. Missing closed dates can be claimed
+only by the scheduler, at most two per workspace and run, and stop after three
+attempts with increasing quiet periods. Manual refresh does not process them.
 
 The Cloudflare Worker exports an hourly scheduled handler. Environments that do
 not attach Worker cron triggers can POST to `/api/internal/hourly-sync` with
@@ -118,6 +120,9 @@ Each scheduled run records separate aggregate activity counters:
 - `reportDatesRequested`: reporting dates for which a Steam request was started;
 - `recordsReceived`: valid normalized daily records returned by Steam;
 - `changesDetected` / `pollCounterChanges`: samples where at least one wishlist counter actually changed;
+- `repairDatesRequested`: bounded closed-date repair requests;
+- `repairRecordsRecovered`: gaps filled with a usable Steam record;
+- `repairEmpty`, `repairErrors`, and `repairExhausted`: safe aggregate repair outcomes.
 - `pollTimestampOnly`: Steam changed only `time_generated`, with identical counters;
 - `pollUnchanged`, `pollInitial`, `pollEmpty`, and `pollErrors`: unchanged, baseline, empty, and failed date requests;
 - `finalizedCounterChanges`: counter changes found while re-querying yesterday, separated from genuine current-day movement;

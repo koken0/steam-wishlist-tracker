@@ -5,6 +5,8 @@ This directory contains the durable project documentation. Keep the root
 
 ## Documents
 
+- [Changelog](../CHANGELOG.md): released application versions and their notable
+  product, acquisition, operational, and safety changes.
 - [Product requirements - Version 0.2 Vision Draft](PRD-V0.2.md): current
   requirements baseline for the local PWA prototype, definitive data rules,
   acceptance criteria, and later-phase boundaries.

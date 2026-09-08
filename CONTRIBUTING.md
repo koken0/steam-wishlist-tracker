@@ -58,6 +58,15 @@ Update `db/schema.ts` and add a forward-only migration under `drizzle/`. Do not
 edit a migration that may already have been applied to a shared environment.
 Document rollback or compatibility behavior for destructive changes.
 
+## Versions and release tags
+
+- Keep the root `package.json` and `package-lock.json` versions identical.
+- The application reads this package metadata for its visible version; do not
+  add a second hard-coded version string.
+- Record notable changes in `CHANGELOG.md` before creating a release tag.
+- Use semantic version tags without a `v` prefix, such as `0.0.1`, and place the
+  tag on the validated release commit.
+
 ## Definition of done
 
 A change is done when its behavior, failure mode, security impact, tests, and

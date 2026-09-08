@@ -1,5 +1,7 @@
 # Wishline MVP
 
+**Current application version:** `0.0.1` ([changelog](CHANGELOG.md))
+
 Wishline is an English-language Phase 1 acceptance build for the Studio Wishlist Tracker PRD. It is a mobile-responsive Progressive Web App with two interchangeable data sources: a committed anonymous fixture and an authenticated, server-only connection to Steamworks `GetAppWishlistReporting`.
 
 > **Product status:** active private prototype. Steam's API accepts the current
@@ -33,6 +35,7 @@ production dependency audit.
 ## Project documentation
 
 - [Documentation index](docs/README.md)
+- [Changelog](CHANGELOG.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Operations](docs/OPERATIONS.md)
 - [Steamworks compliance and monetization](docs/STEAM-COMPLIANCE.md)

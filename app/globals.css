@@ -10,6 +10,7 @@ button { color:inherit; }
 .sidebar { position:fixed; inset:0 auto 0 0; width:232px; display:flex; flex-direction:column; padding:28px 18px 20px; background:#181a1d; color:#f8f8f4; z-index:5; }
 .brand { display:flex; align-items:center; gap:11px; padding:0 8px 34px; font-size:19px; font-weight:800; letter-spacing:-.5px; }
 .brand-mark { display:grid; place-items:center; width:32px; height:32px; border-radius:10px; background:var(--lime); color:#17191c; font-size:17px; transform:rotate(-3deg); }
+.app-version { margin-left:auto; color:#777c80; font-size:8px; font-weight:700; letter-spacing:.3px; }
 .sidebar nav { display:flex; flex-direction:column; gap:6px; }
 .nav-item { display:flex; align-items:center; gap:12px; padding:11px 12px; color:#a9adb0; border-radius:10px; text-decoration:none; font-size:14px; font-weight:600; }
 .nav-item span { width:20px; text-align:center; font-size:18px; }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import packageMetadata from '@/package.json';
 import {
   observeWishlineUser,
   signInToWishline,
@@ -508,7 +509,7 @@ export default function Home() {
   return (
     <main className="app-shell">
       <aside className="sidebar">
-        <button className="brand brand-button" onClick={() => setView('overview')}><span className="brand-mark">W</span><span>Wishline</span></button>
+        <button className="brand brand-button" onClick={() => setView('overview')}><span className="brand-mark">W</span><span>Wishline</span><small className="app-version">v{packageMetadata.version}</small></button>
         <nav aria-label="Primary navigation">
           {nav.map((item) => (
             <button key={item.id} className={`nav-item ${view === item.id ? 'active' : ''}`} onClick={() => setView(item.id)}>
@@ -975,7 +976,7 @@ function Settings({ data, milestone, setMilestone, saveMilestone, notify, reset,
       <aside className="panel about-card">
         <span className="brand-mark">W</span>
         <h2>Wishline MVP</h2>
-        <p>Local real-data acceptance build<br/>Version 0.2.0</p>
+        <p>Local real-data acceptance build<br/>Version {packageMetadata.version}</p>
         <hr/>
         <p>{data?.source === 'steam' ? `Connected to App ID ${data.appId}.` : 'Ready to connect a Steamworks project through onboarding.'}</p>
         <button className="danger-text" onClick={reset}>Update Steam connection</button>

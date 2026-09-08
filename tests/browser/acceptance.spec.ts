@@ -83,6 +83,7 @@ test('authenticates, onboards, reconnects, loads the dashboard, and renders safe
   await expect(page.getByRole('alert')).toContainText('temporarily unavailable');
 
   await page.getByRole('button', { name: 'Settings' }).click();
+  await expect(page.locator('.about-card')).toContainText('Version 0.0.1');
   await page.getByLabel('Milestone target').fill('23456');
   await page.getByRole('button', { name: 'Save changes' }).click();
   await expect(page.getByRole('status')).toContainText('Milestone target saved');
