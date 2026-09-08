@@ -8,6 +8,7 @@ import type { AdminOverview } from '@/lib/wishline-admin-store';
 import styles from './admin.module.css';
 
 type SessionState = 'checking' | 'signed-out' | 'loading' | 'ready' | 'forbidden' | 'error';
+const RUNS_PER_PAGE = 10;
 
 export default function AdminPage() {
   const pathname = usePathname();
@@ -146,6 +147,9 @@ function Stat({ label, value, accent = false }: { label: string; value: number; 
 function SchedulerPanel({ overview }: { overview: AdminOverview }) {
   const { scheduler } = overview;
   const latest = scheduler.latest;
+  const [page, setPage] = useState(1);
+  const pageCount = Math.max(1, Math.ceil(scheduler.recent.length / RUNS_PER_PAGE));
+  const visibleRuns = scheduler.recent.slice((page - 1) * RUNS_PER_PAGE, page * RUNS_PER_PAGE);
   const statusLabel = { healthy: 'Saludable', degraded: 'Con fallas', stale: 'Atrasado', unknown: 'Sin datos' }[scheduler.status];
   return <section className={styles.panel} id="scheduler">
     <div className={styles.panelHead}>
@@ -161,7 +165,7 @@ function SchedulerPanel({ overview }: { overview: AdminOverview }) {
     <div className={styles.tableWrap}>
       <table>
         <thead><tr><th>Finalizó</th><th>Estado</th><th>Intentos</th><th>Éxitos</th><th>Fallos</th><th>Registros</th><th>Cambios</th><th>Poll errors</th></tr></thead>
-        <tbody>{scheduler.recent.map((run) => <tr key={`${run.startedAt}-${run.completedAt}`}>
+        <tbody>{visibleRuns.map((run) => <tr key={`${run.startedAt}-${run.completedAt}`}>
           <td>{formatDate(run.completedAt)}</td>
           <td><span className={run.failed > 0 ? styles.bad : styles.good}>{runLabel(run.result)}</span></td>
           <td>{run.attempted}</td><td>{run.succeeded}</td><td>{run.failed}</td><td>{run.recordsReceived}</td><td>{run.changesDetected}</td><td>{run.pollErrors}</td>
@@ -169,6 +173,11 @@ function SchedulerPanel({ overview }: { overview: AdminOverview }) {
       </table>
       {!scheduler.recent.length && <div className={styles.empty}>Todavía no hay ejecuciones registradas.</div>}
     </div>
+    {scheduler.recent.length > RUNS_PER_PAGE && <div className={styles.pagination}>
+      <button disabled={page === 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>← Anterior</button>
+      <span>Página {page} de {pageCount} · {scheduler.recent.length} ejecuciones</span>
+      <button disabled={page === pageCount} onClick={() => setPage((current) => Math.min(pageCount, current + 1))}>Siguiente →</button>
+    </div>}
     {overview.recentSyncFailures.length > 0 && <div className={styles.failures}>
       <h3>Fallos recientes por proyecto</h3>
       {overview.recentSyncFailures.slice(0, 8).map((failure, index) => <div key={`${failure.occurredAt}-${index}`}>

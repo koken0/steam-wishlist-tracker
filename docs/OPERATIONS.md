@@ -91,7 +91,8 @@ everyone by default.
 
 The separate `/admin/worker` page reads the latest 48 durable `sync_runs`,
 classifies the scheduler as healthy, degraded, stale, or unknown, and exposes
-only aggregate counters. Recent workspace-scoped `sync.failure` audit events
+only aggregate counters. The visible run history is paginated at 10 executions
+per page. Recent workspace-scoped `sync.failure` audit events
 identify the affected project and sanitized reason code without returning a
 credential or upstream response. A successful run with no changed counters is
 shown as **Sin cambios**, not as a failure.
