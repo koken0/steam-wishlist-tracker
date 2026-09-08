@@ -21,7 +21,7 @@ The first P0 closure block is now implemented:
 - the stored wishlist total is reconstructed from all retained dates;
 - coverage start/end and Fresh/Delayed/Stale/Unknown are part of the client
   contract and visible in the main surfaces;
-- failed Steam refreshes return durable last-known-good history with a warning;
+- recoverable Steam refresh failures return durable last-known-good history with a warning; explicit access denial withholds metrics until the owner reconnects;
 - onboarding rejects validation with zero usable records; and
 - contract tests cover totals, normalization, and freshness boundaries.
 
@@ -107,7 +107,7 @@ Full runtime account isolation and 24-48 hour cadence evidence remain.
 | 60-second refresh safety interval | Meets | Forced refreshes reuse cache inside `MIN_FORCE_REFRESH_MS`. |
 | Configured server cache | Meets for prototype | Cache lifetime is bounded between 60 seconds and 24 hours. It is process memory only. |
 | Generation, fetch, and cache status distinguished | Meets | Contract and overview expose generation, fetch, cache, freshness, and coverage status. |
-| Failed refresh preserves last-known-good result | Meets | Durable D1 history is served with a safe warning after a failed refresh or process restart. |
+| Failed refresh preserves last-known-good result | Meets | Durable D1 history is served with a safe warning after a recoverable failed refresh or process restart. `STEAM_ACCESS_DENIED` retains history internally but withholds it from the browser until the owner reconnects. |
 | Delayed and stale state displayed | Meets | Fresh/Delayed/Stale/Unknown is calculated at the documented boundaries and rendered. |
 | App ID and date range bounded | Meets | Fixed endpoint, exact App ID validation, and a 1-90 day lookback bound are implemented. |
 | Intraday incremental acquisition | Meets in implementation | The first load backfills a bounded range; later interactive refreshes query only yesterday and today. The scheduler can additionally repair at most two missing closed dates per run and stops after three attempts. Real cadence evidence is pending. |

@@ -128,7 +128,7 @@ test('restores a connected owner without flashing the public landing page', asyn
   await expect(page.getByRole('heading', { name: /Your Steam wishlists/ })).toHaveCount(0);
 });
 
-test('renders revoked Steam credentials as a red connection error', async ({ page }) => {
+test('blocks stored data after Steam revokes access and offers reconnection', async ({ page }) => {
   await page.route('**/api/setup', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(connectedSetup()) }));
   await page.route('**/api/wishlist', (route) => route.fulfill({
     status: 200,
@@ -146,8 +146,12 @@ test('renders revoked Steam credentials as a red connection error', async ({ pag
 
   const error = page.getByRole('alert');
   await expect(error).toHaveClass(/data-error/);
-  await expect(error).toContainText('Steam connection rejected');
-  await expect(error).toContainText('Steamworks rejected the key');
+  await expect(error).toContainText('Steam access revoked');
+  await expect(page.getByText('Stored wishlist total')).toHaveCount(0);
+  await expect(page.getByText('Latest reported net')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Update Steam connection' }).click();
+  await expect(page.getByRole('heading', { name: 'Connect your Steam project' })).toBeVisible();
+  await expect(page.getByLabel('Steam App ID')).toHaveValue(String(dashboardFixture.appId));
 });
 
 test('dashboard remains usable at a phone-sized viewport', async ({ page }) => {

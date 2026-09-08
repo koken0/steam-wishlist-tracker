@@ -204,7 +204,9 @@ App ID and reporting date, even if that date is fetched again.
 A later response for the same App ID and reporting date replaces the stored
 normalized values for that date. Derived totals, trends, baselines, milestones,
 and exports are recalculated. The last-known-good record remains available if a
-subsequent request fails validation or cannot reach Steam.
+subsequent recoverable request fails validation or cannot reach Steam. If Steam
+explicitly denies access, Wishline retains the record internally but withholds
+all metrics from the browser until the owner supplies an accepted key and App ID.
 
 ### 3.8 Freshness and failure state
 
@@ -216,10 +218,11 @@ subsequent request fails validation or cannot reach Steam.
 - `Unknown`: no valid stored record or successful synchronization metadata is
   available.
 
-The dashboard always displays the reporting date, Steam generation time when
-available, fetch time, and freshness state. A failed refresh must not erase or
-replace the last-known-good data. Its error message must not contain secrets or
-raw upstream payloads.
+The dashboard displays the reporting date, Steam generation time when available,
+fetch time, and freshness state while the connection remains authorized. A
+failed refresh must not erase or replace the last-known-good data. Explicit
+access denial hides those metrics and offers the connection setup again. Error
+messages must not contain secrets or raw upstream payloads.
 
 ### 3.9 Retention, deletion, and export
 
@@ -290,7 +293,8 @@ Accepted when:
 - normal reads use the configured server cache;
 - every response distinguishes Steam generation time, fetch time, and cache
   status;
-- a failed or invalid upstream response preserves the last-known-good result;
+- a failed or invalid upstream response preserves the last-known-good result,
+  while explicit access denial withholds it from the browser until reconnection;
 - the UI displays delayed or stale data instead of presenting it as current;
   and
 - requests remain restricted to the configured App ID and bounded date range.

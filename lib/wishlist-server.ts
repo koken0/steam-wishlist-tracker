@@ -203,11 +203,20 @@ async function loadSteamData(connection: SteamConnection): Promise<WishlistDashb
     return buildSteamDashboard(connection, fetchedDaily, fetchedAt, storeProjectName, null);
   } catch (error) {
     if (!connection.cacheScope) throw error;
-    const history = await readWishlistHistory(connection.cacheScope, appId);
-    if (!history.daily.length || !history.fetchedAt) throw error;
     const connectorError = error instanceof WishlistConnectorError
       ? error
       : new WishlistConnectorError('HISTORY_WRITE_FAILED', 'Wishline could not update its stored wishlist history.', 500);
+    if (connectorError.code === 'STEAM_ACCESS_DENIED') {
+      return buildSteamDashboard(
+        connection,
+        [],
+        fetchedAt,
+        null,
+        { code: connectorError.code, message: connectorError.message },
+      );
+    }
+    const history = await readWishlistHistory(connection.cacheScope, appId);
+    if (!history.daily.length || !history.fetchedAt) throw error;
     const dashboard = await buildSteamDashboard(
       connection,
       history.daily,

@@ -506,6 +506,13 @@ export default function Home() {
     );
   }
 
+  const steamAccessDenied = wishlistData?.syncWarning?.code === 'STEAM_ACCESS_DENIED';
+  const updateSteamConnection = () => {
+    setScreen('onboarding');
+    setOnboardingStep(2);
+    setSetupError('');
+  };
+
   return (
     <main className="app-shell">
       <aside className="sidebar">
@@ -517,25 +524,26 @@ export default function Home() {
             </button>
           ))}
         </nav>
-        <div className={`sidebar-note ${wishlistData?.source === 'steam' ? 'live-source' : ''}`}><span className="status-dot" /><div>{wishlistData?.source === 'steam' ? 'Live Steam data' : 'Anonymous fixture'}<small>{wishlistData?.source === 'steam' ? 'Financial key stays server-side' : 'Safe local contract data'}</small></div></div>
+        <div className={`sidebar-note ${wishlistData?.source === 'steam' && !steamAccessDenied ? 'live-source' : ''}`}><span className="status-dot" /><div>{steamAccessDenied ? 'Steam access revoked' : wishlistData?.source === 'steam' ? 'Live Steam data' : 'Anonymous fixture'}<small>{steamAccessDenied ? 'Update credentials to continue' : wishlistData?.source === 'steam' ? 'Financial key stays server-side' : 'Safe local contract data'}</small></div></div>
         <button className="profile" onClick={leaveWorkspace}><span className="avatar">{ownerInitials(setup)}</span><span><b>{setup?.user.name || setup?.user.email || 'Wishline owner'}</b><small>{usesFirebaseAuthentication() ? 'Sign out' : 'Local owner'}</small></span><span>↗</span></button>
       </aside>
 
       <section className="workspace">
         <header className="topbar">
           <button className="project-picker" onClick={() => setView('projects')}><span className="game-tile">{wishlistData?.projectName?.charAt(0) || 'W'}</span><span><small>Current project</small><b>{wishlistData?.projectName || 'Loading project…'}</b></span><span>⌄</span></button>
-          <div className="top-actions"><span className={`freshness freshness-${wishlistData?.freshness || 'unknown'}`}><i />{wishlistData ? `${freshnessLabel(wishlistData.freshness)} · ${formatRelativeTime(wishlistData.generatedAt || wishlistData.fetchedAt)}` : 'Connecting…'}</span><button className="icon-button theme-button" aria-label="Switch color theme" onClick={toggleTheme}><span className="theme-moon">☾</span><span className="theme-sun">☀</span></button><button className="icon-button" aria-label="Notifications" onClick={() => notify(wishlistData?.alerts[0]?.message || 'No detected wishlist spikes')}>♢{Boolean(wishlistData?.alerts.length) && <em>{wishlistData?.alerts.filter((alert) => !alert.readAt).length}</em>}</button><button className={`refresh ${refreshing ? 'spinning' : ''}`} onClick={refreshData}>↻ <span>{refreshing ? 'Syncing…' : 'Refresh'}</span></button></div>
+          <div className="top-actions"><span className={`freshness freshness-${steamAccessDenied ? 'stale' : wishlistData?.freshness || 'unknown'}`}><i />{steamAccessDenied ? 'Access revoked' : wishlistData ? `${freshnessLabel(wishlistData.freshness)} · ${formatRelativeTime(wishlistData.generatedAt || wishlistData.fetchedAt)}` : 'Connecting…'}</span><button className="icon-button theme-button" aria-label="Switch color theme" onClick={toggleTheme}><span className="theme-moon">☾</span><span className="theme-sun">☀</span></button><button className="icon-button" aria-label="Notifications" onClick={() => notify(wishlistData?.alerts[0]?.message || 'No detected wishlist spikes')}>♢{Boolean(wishlistData?.alerts.length) && <em>{wishlistData?.alerts.filter((alert) => !alert.readAt).length}</em>}</button><button className={`refresh ${refreshing ? 'spinning' : ''}`} disabled={steamAccessDenied} onClick={refreshData}>↻ <span>{refreshing ? 'Syncing…' : 'Refresh'}</span></button></div>
         </header>
 
         <div className="content">
           {dataError && <div className="data-error" role="alert"><span>!</span><p><b>Data connection needs attention</b><small>{dataError}</small></p><button onClick={refreshData}>Retry</button></div>}
-          {wishlistData?.syncWarning && <div className={wishlistData.syncWarning.code === 'STEAM_ACCESS_DENIED' ? 'data-error' : 'data-warning'} role={wishlistData.syncWarning.code === 'STEAM_ACCESS_DENIED' ? 'alert' : 'status'}><span>!</span><p><b>{wishlistData.syncWarning.code === 'STEAM_ACCESS_DENIED' ? 'Steam connection rejected' : 'Showing last stored data'}</b><small>{wishlistData.syncWarning.message}</small></p></div>}
+          {steamAccessDenied && <div className="data-error" role="alert"><span>!</span><p><b>Steam access revoked</b><small>Wishline cannot display wishlist data until Steam accepts the connection again.</small></p><button onClick={updateSteamConnection}>Update Steam connection</button></div>}
+          {wishlistData?.syncWarning && !steamAccessDenied && <div className="data-warning" role="status"><span>!</span><p><b>Showing last stored data</b><small>{wishlistData.syncWarning.message}</small></p></div>}
           {!wishlistData && !dataError && <div className="loading-card"><span/><p>Loading the server-side data source…</p></div>}
-          {view === 'overview' && wishlistData && <Overview data={wishlistData} progress={progress} milestone={milestoneValue(milestone)} />}
-          {view === 'projects' && wishlistData && <Projects data={wishlistData} onOpen={() => setView('overview')} notify={notify} />}
-          {view === 'widget' && wishlistData && <WidgetPreview data={wishlistData} refreshing={refreshing} onRefresh={refreshData} />}
-          {view === 'security' && <Security data={wishlistData} token={token} setToken={setToken} notify={notify} />}
-          {view === 'settings' && <Settings data={wishlistData} milestone={milestone} setMilestone={setMilestone} saveMilestone={saveMilestone} notify={notify} reset={() => { setScreen('onboarding'); setOnboardingStep(2); setSetupError(''); }} disconnect={disconnectAndDelete} deleteAccount={deleteAccountAndData} disconnecting={setupLoading} />}
+          {!steamAccessDenied && view === 'overview' && wishlistData && <Overview data={wishlistData} progress={progress} milestone={milestoneValue(milestone)} />}
+          {!steamAccessDenied && view === 'projects' && wishlistData && <Projects data={wishlistData} onOpen={() => setView('overview')} notify={notify} />}
+          {!steamAccessDenied && view === 'widget' && wishlistData && <WidgetPreview data={wishlistData} refreshing={refreshing} onRefresh={refreshData} />}
+          {!steamAccessDenied && view === 'security' && <Security data={wishlistData} token={token} setToken={setToken} notify={notify} />}
+          {!steamAccessDenied && view === 'settings' && <Settings data={wishlistData} milestone={milestone} setMilestone={setMilestone} saveMilestone={saveMilestone} notify={notify} reset={updateSteamConnection} disconnect={disconnectAndDelete} deleteAccount={deleteAccountAndData} disconnecting={setupLoading} />}
         </div>
       </section>
       {toast && <div className="toast" role="status"><span>✓</span>{toast}</div>}
