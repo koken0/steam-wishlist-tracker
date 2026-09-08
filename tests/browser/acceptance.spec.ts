@@ -55,6 +55,7 @@ test('authenticates, onboards, reconnects, loads the dashboard, and renders safe
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ...dashboardFixture, projectName: setup.workspace.projectName }) });
   });
 
+  await page.addInitScript(() => window.localStorage.setItem('wishline-theme', 'light'));
   await page.goto('/');
   await waitForReact(page);
   await page.getByRole('button', { name: /Continue to demo/ }).click();
@@ -71,6 +72,12 @@ test('authenticates, onboards, reconnects, loads the dashboard, and renders safe
   await page.getByRole('button', { name: /Open dashboard/ }).click();
 
   await expect(page.getByText('Stored wishlist total').first()).toBeVisible();
+  const darkModeButton = page.getByRole('button', { name: 'Switch color theme' });
+  await darkModeButton.click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await page.reload();
+  await waitForReact(page);
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await expect(page.getByText('Acceptance Harbor').first()).toBeVisible();
   await expect(page.getByText('Incomplete coverage')).toBeVisible();
   await expect(page.getByText(/missing 2026-09-04/)).toBeVisible();

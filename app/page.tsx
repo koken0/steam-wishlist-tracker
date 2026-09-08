@@ -227,6 +227,11 @@ export default function Home() {
   const [setupLoading, setSetupLoading] = useState(false);
   const [setupError, setSetupError] = useState('');
   const [accessRequired, setAccessRequired] = useState(false);
+  function toggleTheme() {
+    const nextTheme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = nextTheme;
+    window.localStorage.setItem('wishline-theme', nextTheme);
+  }
 
   useEffect(() => {
     let active = true;
@@ -506,7 +511,7 @@ export default function Home() {
       <section className="workspace">
         <header className="topbar">
           <button className="project-picker" onClick={() => setView('projects')}><span className="game-tile">{wishlistData?.projectName?.charAt(0) || 'W'}</span><span><small>Current project</small><b>{wishlistData?.projectName || 'Loading project…'}</b></span><span>⌄</span></button>
-          <div className="top-actions"><span className={`freshness freshness-${wishlistData?.freshness || 'unknown'}`}><i />{wishlistData ? `${freshnessLabel(wishlistData.freshness)} · ${formatRelativeTime(wishlistData.generatedAt || wishlistData.fetchedAt)}` : 'Connecting…'}</span><button className="icon-button" aria-label="Notifications" onClick={() => notify(wishlistData?.alerts[0]?.message || 'No detected wishlist spikes')}>♢{Boolean(wishlistData?.alerts.length) && <em>{wishlistData?.alerts.filter((alert) => !alert.readAt).length}</em>}</button><button className={`refresh ${refreshing ? 'spinning' : ''}`} onClick={refreshData}>↻ <span>{refreshing ? 'Syncing…' : 'Refresh'}</span></button></div>
+          <div className="top-actions"><span className={`freshness freshness-${wishlistData?.freshness || 'unknown'}`}><i />{wishlistData ? `${freshnessLabel(wishlistData.freshness)} · ${formatRelativeTime(wishlistData.generatedAt || wishlistData.fetchedAt)}` : 'Connecting…'}</span><button className="icon-button theme-button" aria-label="Switch color theme" onClick={toggleTheme}><span className="theme-moon">☾</span><span className="theme-sun">☀</span></button><button className="icon-button" aria-label="Notifications" onClick={() => notify(wishlistData?.alerts[0]?.message || 'No detected wishlist spikes')}>♢{Boolean(wishlistData?.alerts.length) && <em>{wishlistData?.alerts.filter((alert) => !alert.readAt).length}</em>}</button><button className={`refresh ${refreshing ? 'spinning' : ''}`} onClick={refreshData}>↻ <span>{refreshing ? 'Syncing…' : 'Refresh'}</span></button></div>
         </header>
 
         <div className="content">
