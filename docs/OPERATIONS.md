@@ -53,6 +53,7 @@ browser flow. Never record screenshots, traces, or request bodies containing the
 | Value | Purpose | Required |
 | --- | --- | --- |
 | `WISHLINE_BETA_PASSWORD` | Temporary shared password for private-beta enrollment and account linking | Private beta only |
+| `WISHLINE_ADMIN_USER_IDS` | Comma-separated immutable authenticated IDs allowed to read the private `/admin` console | Operator console |
 | `WISHLIST_ENCRYPTION_KEY` | Protects saved workspace credentials | Yes for app onboarding |
 | `WISHLIST_ENCRYPTION_KEY_ID` | Non-secret ID written into new credential envelopes | Yes; defaults to `primary` |
 | `WISHLIST_PREVIOUS_ENCRYPTION_KEY` | Temporarily reads old envelopes during a controlled rotation | Rotation window only |
@@ -71,6 +72,22 @@ browser flow. Never record screenshots, traces, or request bodies containing the
 | `WISHLIST_ALLOWED_USER_IDS` | Production allowlist for legacy live mode | Legacy production only |
 
 Keep `.env.example` aligned whenever a runtime value is added or removed.
+
+## Private operator console
+
+`/admin` is a read-only desktop-oriented view of account registrations,
+connected projects, last observed activity, and whether a workspace has an
+active browser-push subscription. Its API first validates the normal Firebase
+ID token and then requires the resulting immutable identity to appear in
+`WISHLINE_ADMIN_USER_IDS`. In hosted Firebase mode each entry uses
+`firebase:<Firebase UID>`; never configure an email address, bearer token, or
+Steam credential as an administrator ID.
+
+The console deliberately does not return Firebase tokens, owner user IDs,
+encrypted secrets, push endpoints, wishlist totals, or raw Steam responses.
+Configure the allowlist as a server-side Worker secret and open `/admin` with
+that same Google/Firebase account. Removing the variable closes the console to
+everyone by default.
 
 ## Steam reporting cadence
 

@@ -100,6 +100,7 @@ app/
   api/setup/        Authenticated connection, disconnect, and deletion endpoint
   api/push/         Authenticated per-device Web Push subscription endpoint
   api/account/      Owner-confirmed full account deletion
+  api/admin/        Read-only operator overview, restricted by authenticated UID
   api/internal/     Scheduled sync, read-only health, and privileged key re-wrapping
 lib/
   wishlist-contract.ts  Shared response contract and normalizer
@@ -155,6 +156,10 @@ remains available as an explicit repair/setup command but is not part of the
 normal onboarding path.
 
 Open `http://localhost:3000`.
+
+The private operator console is available at `http://localhost:3000/admin`.
+It remains closed unless the signed-in immutable user ID appears in the
+server-only `WISHLINE_ADMIN_USER_IDS` allowlist.
 
 The development server binds to `127.0.0.1` so live financial data is not exposed to other devices on the local network.
 
