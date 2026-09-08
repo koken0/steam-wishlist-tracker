@@ -36,6 +36,8 @@ export async function syncAllWishlistConnections(): Promise<WishlistSyncSummary>
     changesDetected: 0,
     pollInitial: 0, pollUnchanged: 0, pollTimestampOnly: 0, pollCounterChanges: 0,
     pollEmpty: 0, pollErrors: 0, finalizedCounterChanges: 0,
+    repairDatesRequested: 0, repairRecordsRecovered: 0, repairEmpty: 0,
+    repairErrors: 0, repairExhausted: 0,
   };
   const push: PushDeliverySummary = { attempted: 0, sent: 0, expired: 0, failed: 0 };
 
@@ -46,6 +48,8 @@ export async function syncAllWishlistConnections(): Promise<WishlistSyncSummary>
       changesDetected: 0,
       pollInitial: 0, pollUnchanged: 0, pollTimestampOnly: 0, pollCounterChanges: 0,
       pollEmpty: 0, pollErrors: 0, finalizedCounterChanges: 0,
+      repairDatesRequested: 0, repairRecordsRecovered: 0, repairEmpty: 0,
+      repairErrors: 0, repairExhausted: 0,
     };
     try {
       const data = await getWishlistDashboardData(true, {
@@ -54,6 +58,7 @@ export async function syncAllWishlistConnections(): Promise<WishlistSyncSummary>
         projectName: connection.projectName,
         cacheScope: connection.workspaceId,
         syncActivity: connectionActivity,
+        repairHistory: true,
       });
       if (data.syncWarning) {
         if (data.syncWarning.code === 'DATA_NOT_YET_AVAILABLE') {
@@ -96,6 +101,11 @@ export async function syncAllWishlistConnections(): Promise<WishlistSyncSummary>
       activity.pollEmpty += connectionActivity.pollEmpty;
       activity.pollErrors += connectionActivity.pollErrors;
       activity.finalizedCounterChanges += connectionActivity.finalizedCounterChanges;
+      activity.repairDatesRequested += connectionActivity.repairDatesRequested;
+      activity.repairRecordsRecovered += connectionActivity.repairRecordsRecovered;
+      activity.repairEmpty += connectionActivity.repairEmpty;
+      activity.repairErrors += connectionActivity.repairErrors;
+      activity.repairExhausted += connectionActivity.repairExhausted;
     }
     try {
       const delivery = await deliverPendingPushNotifications(connection.workspaceId);
@@ -168,6 +178,11 @@ export async function runScheduledWishlistSync(): Promise<WishlistSyncSummary> {
       pollEmpty: summary.activity.pollEmpty,
       pollErrors: summary.activity.pollErrors,
       finalizedCounterChanges: summary.activity.finalizedCounterChanges,
+      repairDatesRequested: summary.activity.repairDatesRequested,
+      repairRecordsRecovered: summary.activity.repairRecordsRecovered,
+      repairEmpty: summary.activity.repairEmpty,
+      repairErrors: summary.activity.repairErrors,
+      repairExhausted: summary.activity.repairExhausted,
       pushAttempted: summary.push.attempted,
       pushSent: summary.push.sent,
       pushExpired: summary.push.expired,

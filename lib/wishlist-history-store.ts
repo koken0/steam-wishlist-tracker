@@ -165,7 +165,7 @@ export async function completeWishlistHistoryRepair(
   now = new Date(),
 ): Promise<void> {
   const db = await historyDatabase();
-  const outcome = nextHistoryRepairOutcome(repair.attempts, recovered, now);
+  const outcome = nextHistoryRepairOutcome(repair.attempts, recovered, now, Boolean(reasonCode));
   await db.prepare(
     `UPDATE wishlist_history_repairs
         SET status = ?, attempts = ?, next_attempt_at = ?, locked_until = NULL,
@@ -175,6 +175,23 @@ export async function completeWishlistHistoryRepair(
     outcome.status, outcome.attempts, outcome.nextAttemptAt, reasonCode, now.toISOString(),
     workspaceId, appId, repair.reportDate,
   ).run();
+}
+
+export async function readWishlistHistoryRepairs(
+  workspaceId: string,
+  appId: number,
+): Promise<Array<{ date: string; status: 'pending' | 'processing' | 'empty' | 'error' | 'exhausted' }>> {
+  const db = await historyDatabase();
+  const result = await db.prepare(
+    `SELECT report_date, status FROM wishlist_history_repairs
+      WHERE workspace_id = ? AND app_id = ?
+        AND status IN ('pending', 'processing', 'empty', 'error', 'exhausted')
+      ORDER BY report_date`,
+  ).bind(workspaceId, appId).all<{
+    report_date: string;
+    status: 'pending' | 'processing' | 'empty' | 'error' | 'exhausted';
+  }>();
+  return (result.results || []).map((row) => ({ date: row.report_date, status: row.status }));
 }
 
 export async function saveWishlistObservation(

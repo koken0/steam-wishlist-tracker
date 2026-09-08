@@ -93,7 +93,7 @@ Full runtime account isolation and 24-48 hour cadence evidence remain.
 | Latest date, movement, freshness, source, and coverage | Meets | Latest activity, source, coverage dates, timestamps, and explicit freshness state render. |
 | Stored total labels | Meets | Stored totals are derived only from retained history and show their coverage. |
 | Inclusive date-range totals and trend | Meets | Pure calculation tests cover both endpoints, UTC month boundaries, invalid ranges, and reported-only sums. Browser acceptance renders the resulting summary. |
-| Missing dates differ from zero | Meets | Every selected calendar date becomes a recorded or missing entry. The UI shows incomplete coverage, lists missing dates, draws striped gaps, and preserves a zero-activity point. |
+| Missing dates differ from zero | Meets | Every selected calendar date becomes a recorded or missing entry. The UI draws striped gaps, preserves a zero-activity point, and distinguishes pending bounded recovery from exhausted dates. |
 | Late corrections recalculate dependent metrics | Meets | Daily records are upserted by workspace, App ID, and reporting date; tests show corrected input recalculates range aggregates and every running total. |
 | Phone and desktop usability | Meets for MVP | Chromium acceptance verifies the dashboard at desktop and 390 × 844 without horizontal overflow. A broader accessibility audit remains future hardening. |
 | Configurable milestone target | Meets | Settings accepts any positive whole-number wishlist target, stores it per App ID in the browser, and browser acceptance verifies that it survives a reload. |
@@ -109,7 +109,7 @@ Full runtime account isolation and 24-48 hour cadence evidence remain.
 | Failed refresh preserves last-known-good result | Meets | Durable D1 history is served with a safe warning after a failed refresh or process restart. |
 | Delayed and stale state displayed | Meets | Fresh/Delayed/Stale/Unknown is calculated at the documented boundaries and rendered. |
 | App ID and date range bounded | Meets | Fixed endpoint, exact App ID validation, and a 1-90 day lookback bound are implemented. |
-| Intraday incremental acquisition | Meets in implementation | The first load backfills a bounded range; later refreshes query only yesterday and today, storing changed intraday observations. Real cadence evidence is pending. |
+| Intraday incremental acquisition | Meets in implementation | The first load backfills a bounded range; later interactive refreshes query only yesterday and today. The scheduler can additionally repair at most two missing closed dates per run and stops after three attempts. Real cadence evidence is pending. |
 
 ## 4.4 Installable PWA and preview
 

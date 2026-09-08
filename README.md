@@ -226,12 +226,15 @@ password grants browser access for 12 hours through an `HttpOnly` cookie and is
 required before Wishline resolves an identity, creates a workspace, or links a
 Steam account. Removing the secret disables this temporary gate.
 
-The key is sent to Steamworks in the `x-webapi-key` request header, never in the URL. Browser responses contain only the configured App ID, project label, timestamps, normalized aggregate metrics, and safe spike events. Manual refreshes use an authenticated POST action, cannot bypass the server more than once per minute, and normal responses use the configured server cache. After onboarding, refresh requests only yesterday and today's GMT records.
+The key is sent to Steamworks in the `x-webapi-key` request header, never in the URL. Browser responses contain only the configured App ID, project label, timestamps, normalized aggregate metrics, repair status, and safe spike events. Manual refreshes use an authenticated POST action, cannot bypass the server more than once per minute, and normal responses use the configured server cache. After onboarding, interactive refreshes request only yesterday and today's GMT records. The hourly scheduler may additionally claim at most two missing closed dates from a durable repair queue; each date is tried no more than three times after 6-hour, 24-hour, and 72-hour quiet periods.
 
 History ranges include both selected endpoints. Wishline enumerates every GMT
 calendar date in the range, marks absent Steam records as missing, and never
 turns them into zero activity. The chart breaks across gaps; a reported day
 whose counts are genuinely zero remains a recorded point.
+Missing closed dates are queued for bounded scheduler-only recovery. The
+dashboard distinguishes recovery still pending from dates unavailable after
+all retries.
 
 `npm run test:browser` starts an isolated fixture-mode server on port 3100. Its
 browser-owned API doubles use only obvious placeholder keys and never call

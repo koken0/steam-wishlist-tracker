@@ -135,10 +135,13 @@ claim. Heavy store activity may delay updates. Completed historical dates should
 not be repeatedly queried because Valve warns that excessive requests may
 trigger rate limiting or key restrictions.
 
-Wishline performs one bounded onboarding backfill, then queries only yesterday
-and today each hour. Changed current-day observations are stored; yesterday is
-re-queried only while it is the immediately preceding date so the finalized
-value replaces its provisional value.
+Wishline performs one bounded onboarding backfill, then routinely queries only
+yesterday and today each hour. Changed current-day observations are stored and
+yesterday is finalized during the following day. Missing closed dates may enter
+a scheduler-only repair queue capped at two requests per workspace per run and
+three attempts per date with increasing quiet periods. Interactive refreshes
+never trigger historical repair requests and exhausted dates are not queried
+again.
 
 Sources:
 

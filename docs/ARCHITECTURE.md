@@ -128,12 +128,17 @@ implements intraday batch monitoring without describing it as strict real time:
 1. Validate the key and App ID with one request for the current GMT date, then
    perform one bounded historical backfill after the connection is saved.
 2. Persist the latest value for each reporting date in D1.
-3. Every hour, query only yesterday and today in GMT.
+3. Every hour, routinely query only yesterday and today in GMT.
 4. Store a new intraday observation only when today's counters or Steam
    generation timestamp changed.
 5. Re-query yesterday during the following day so its final value replaces the
-   provisional value, but do not routinely query older dates.
-6. Preserve last-known-good history after failures or rate limiting.
+   provisional value.
+6. Put missing closed dates into a durable repair queue. Only the scheduler can
+   claim them, at most two per workspace per run and three attempts per date,
+   after 6-hour, 24-hour, and 72-hour quiet periods.
+7. Upsert recovered dates and mark unrecovered dates exhausted rather than
+   turning them into zero activity or querying them indefinitely.
+8. Preserve last-known-good history after failures or rate limiting.
 
 The direct Cloudflare staging Worker has an active `0 * * * *` cron trigger. A
 secret-protected HTTP route supports other hosting environments that attach an
@@ -142,7 +147,8 @@ external scheduler instead.
 The scheduler emits one sanitized `wishline.scheduler.completed` console event
 per completed invocation. Its activity counts distinguish a successful Steam
 response with no new values from a response that produced a new intraday
-observation. A separate read-only bearer-protected health route exposes the
+observation. Aggregate telemetry also reports requested, recovered, empty,
+errored, and exhausted repair attempts. A separate read-only bearer-protected health route exposes the
 latest 24 aggregate runs and cannot invoke the scheduler.
 
 ## Caching and freshness

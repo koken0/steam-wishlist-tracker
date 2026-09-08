@@ -8,12 +8,17 @@ import {
 } from '@/lib/wishlist-contract';
 import {
   createSpikeAlertIfNeeded,
+  claimWishlistHistoryRepairs,
+  completeWishlistHistoryRepair,
+  enqueueWishlistHistoryRepairs,
   readWishlistAlerts,
+  readWishlistHistoryRepairs,
   readWishlistHistory,
   saveWishlistObservation,
   saveWishlistPollSample,
   saveWishlistHistory,
 } from '@/lib/wishlist-history-store';
+import { missingRequestedHistoryDates, recentMissingHistoryDates } from '@/lib/wishlist-history-repair';
 import { WishlistConnectorError } from '@/lib/wishlist-errors';
 import { fetchSteamWishlistDate, requireUsableWishlistDays, validateSteamWishlistAccess } from '@/lib/wishlist-steam-client';
 import {
@@ -41,6 +46,7 @@ export type SteamConnection = {
   cacheScope?: string;
   useEnvironmentMetadata?: boolean;
   syncActivity?: WishlistSyncActivity;
+  repairHistory?: boolean;
 };
 
 export type WishlistSyncActivity = {
@@ -54,6 +60,11 @@ export type WishlistSyncActivity = {
   pollEmpty: number;
   pollErrors: number;
   finalizedCounterChanges: number;
+  repairDatesRequested: number;
+  repairRecordsRecovered: number;
+  repairEmpty: number;
+  repairErrors: number;
+  repairExhausted: number;
 };
 
 export { WishlistConnectorError } from '@/lib/wishlist-errors';
@@ -164,8 +175,29 @@ async function loadSteamData(connection: SteamConnection): Promise<WishlistDashb
         }
       }
       await saveWishlistHistory(connection.cacheScope, appId, fetchedDaily, fetchedAt);
-      const history = await readWishlistHistory(connection.cacheScope, appId);
-      return buildSteamDashboard(connection, history.daily, history.fetchedAt || fetchedAt, storeProjectName, null);
+      if (!existing.daily.length) {
+        await enqueueWishlistHistoryRepairs(
+          connection.cacheScope,
+          appId,
+          missingRequestedHistoryDates(dates, fetchedDaily.map((day) => day.date), new Date(fetchedAt)),
+          new Date(fetchedAt),
+        );
+      } else if (connection.repairHistory) {
+        const storedDates = new Set([...existing.daily, ...fetchedDaily].map((day) => day.date));
+        await enqueueWishlistHistoryRepairs(
+          connection.cacheScope,
+          appId,
+          recentMissingHistoryDates([...storedDates], new Date(fetchedAt)),
+          new Date(fetchedAt),
+        );
+        await repairMissingHistory(connection, fetchedAt);
+      }
+      const [history, historyRepairs] = await Promise.all([
+        readWishlistHistory(connection.cacheScope, appId),
+        readWishlistHistoryRepairs(connection.cacheScope, appId),
+      ]);
+      const dashboard = await buildSteamDashboard(connection, history.daily, history.fetchedAt || fetchedAt, storeProjectName, null);
+      return { ...dashboard, historyRepairs };
     }
 
     return buildSteamDashboard(connection, fetchedDaily, fetchedAt, storeProjectName, null);
@@ -176,13 +208,56 @@ async function loadSteamData(connection: SteamConnection): Promise<WishlistDashb
     const connectorError = error instanceof WishlistConnectorError
       ? error
       : new WishlistConnectorError('HISTORY_WRITE_FAILED', 'Wishline could not update its stored wishlist history.', 500);
-    return buildSteamDashboard(
+    const dashboard = await buildSteamDashboard(
       connection,
       history.daily,
       history.fetchedAt,
       null,
       { code: connectorError.code, message: `${connectorError.message} Showing the last stored data.` },
     );
+    const historyRepairs = await readWishlistHistoryRepairs(connection.cacheScope, appId);
+    return { ...dashboard, historyRepairs };
+  }
+}
+
+async function repairMissingHistory(connection: SteamConnection, fetchedAt: string): Promise<void> {
+  if (!connection.cacheScope) return;
+  const repairs = await claimWishlistHistoryRepairs(
+    connection.cacheScope,
+    connection.appId,
+    new Date(fetchedAt),
+  );
+  for (const repair of repairs) {
+    if (connection.syncActivity) {
+      connection.syncActivity.reportDatesRequested += 1;
+      connection.syncActivity.repairDatesRequested += 1;
+    }
+    try {
+      const payload = await fetchSteamWishlistDate(connection.apiKey, connection.appId, repair.reportDate);
+      const day = normalizeSteamWishlistResponse(payload);
+      if (day) {
+        await saveWishlistHistory(connection.cacheScope, connection.appId, [day], fetchedAt);
+        if (connection.syncActivity) {
+          connection.syncActivity.recordsReceived += 1;
+          connection.syncActivity.repairRecordsRecovered += 1;
+        }
+      } else if (connection.syncActivity) {
+        connection.syncActivity.repairEmpty += 1;
+        if (repair.attempts + 1 >= 3) connection.syncActivity.repairExhausted += 1;
+      }
+      await completeWishlistHistoryRepair(
+        connection.cacheScope, connection.appId, repair, Boolean(day), null, new Date(fetchedAt),
+      );
+    } catch (error) {
+      const reasonCode = error instanceof WishlistConnectorError ? error.code : 'INTERNAL_ERROR';
+      if (connection.syncActivity) {
+        connection.syncActivity.repairErrors += 1;
+        if (repair.attempts + 1 >= 3) connection.syncActivity.repairExhausted += 1;
+      }
+      await completeWishlistHistoryRepair(
+        connection.cacheScope, connection.appId, repair, false, reasonCode, new Date(fetchedAt),
+      );
+    }
   }
 }
 

@@ -19,13 +19,14 @@ reliable, useful intraday updates without excessive Steam requests.
 2. Inspect the result after scheduled hourly runs without manually refreshing
    repeatedly. Use the sanitized scheduler-health endpoint or retained
    `wishline.scheduler` logs.
-3. Confirm routine sync requests only yesterday and today in GMT.
+3. Confirm routine sync requests yesterday and today in GMT; any older request
+   must be a queued repair, limited to two dates per workspace in that run.
 4. Confirm changed current-day values create observations and repeated
    unchanged values do not create duplicates. Compare `recordsReceived` with
    `pollCounterChanges`, `pollTimestampOnly`, and `finalizedCounterChanges`; do
    not inspect raw upstream bodies.
-5. Confirm yesterday is finalized on the following day and older closed dates
-   are not routinely requested again.
+5. Confirm yesterday is finalized on the following day and missing closed dates
+   stop after recovery or three attempts with the documented backoff.
 6. If Steam fails or rate-limits a run, confirm the dashboard serves the last
    known good history with a safe warning.
 7. Enable Web Push on one device and confirm a changed observation produces one
@@ -43,11 +44,11 @@ bodies, or treat a lack of changed Steam data as a synchronization failure.
 
 ## Before a broader private beta
 
-### WL-006 — Add quotas and retry telemetry
+### WL-006 — Add per-workspace request quotas
 
-Sanitized audit events and scheduled-run health are durable. Add per-workspace
-request quotas and aggregate bounded-retry telemetry without credentials, raw
-Steam responses, or free-form error payloads.
+Sanitized audit events, scheduled-run health, and aggregate history-repair
+telemetry are durable. Add per-workspace request quotas without credentials,
+raw Steam responses, or free-form error payloads.
 
 ### WL-007 — Complete account-level retention and deletion
 

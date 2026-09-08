@@ -8,7 +8,7 @@ export const schema = {
   wishlistAlerts: ['id', 'workspace_id', 'app_id', 'report_date', 'kind', 'title', 'message', 'created_at', 'read_at'],
   auditEvents: ['id', 'workspace_id', 'app_id', 'event_type', 'outcome', 'reason_code', 'occurred_at'],
   syncRuns: ['id', 'started_at', 'completed_at', 'attempted', 'succeeded', 'failed'],
-  syncRunActivity: ['sync_run_id', 'report_dates_requested', 'records_received', 'changes_detected', 'poll_initial', 'poll_unchanged', 'poll_timestamp_only', 'poll_counter_changes', 'poll_empty', 'poll_errors', 'finalized_counter_changes'],
+  syncRunActivity: ['sync_run_id', 'report_dates_requested', 'records_received', 'changes_detected', 'poll_initial', 'poll_unchanged', 'poll_timestamp_only', 'poll_counter_changes', 'poll_empty', 'poll_errors', 'finalized_counter_changes', 'repair_dates_requested', 'repair_records_recovered', 'repair_empty', 'repair_errors', 'repair_exhausted'],
   pushSubscriptions: ['id', 'workspace_id', 'endpoint_hash', 'encrypted_subscription', 'expires_at', 'created_at', 'updated_at'],
   pushDeliveries: ['observation_id', 'subscription_id', 'attempts', 'sent_at', 'last_attempt_at', 'last_error_code'],
   pushTestReceipts: ['id', 'workspace_id', 'subscription_id', 'ack_token_hash', 'provider_status', 'received_at', 'clicked_at', 'expires_at', 'created_at'],

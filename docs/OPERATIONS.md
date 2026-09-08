@@ -341,6 +341,8 @@ hosting provider.
 | App ID mismatch | Confirm the key is authorized for the exact configured App ID |
 | Onboarding succeeds with no wishlist rows | Steam accepted the App ID/key check but has not published today or yesterday yet; let the bounded backfill and later sync retry data acquisition |
 | No new wishlist date | Confirm the previous GMT date has been published; keep the last stored date while bounded retries remain pending |
+| Chart shows `pending recovery` | The scheduler queued a missing closed date; inspect only aggregate `repair*` health counters and allow the bounded backoff to run |
+| Chart shows `unavailable after bounded retries` | Steam returned no usable record, or a safe connector error, across three attempts; the scheduler has stopped requesting that date |
 | Refresh returns cached data | Wait for the one-minute refresh safety window |
 | Dashboard says `Showing last stored data` | Steam refresh failed; inspect the safe error and freshness while preserving the stored history |
 | Stored total looks lower than Steamworks | Check the displayed coverage start; Wishline does not infer activity before its first stored date |

@@ -31,6 +31,10 @@ export type WishlistDashboardData = {
   freshness: WishlistFreshness;
   cacheHit: boolean;
   syncWarning: { code: string; message: string } | null;
+  historyRepairs?: Array<{
+    date: string;
+    status: 'pending' | 'processing' | 'empty' | 'error' | 'exhausted';
+  }>;
   alerts: Array<{
     id: string;
     kind: 'spike';

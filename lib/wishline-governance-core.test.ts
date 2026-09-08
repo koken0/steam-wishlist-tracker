@@ -100,6 +100,11 @@ test('scheduler health distinguishes successful fetches, detected changes, and s
       pollEmpty: 0,
       pollErrors: 0,
       finalizedCounterChanges: 0,
+      repairDatesRequested: 0,
+      repairRecordsRecovered: 0,
+      repairEmpty: 0,
+      repairErrors: 0,
+      repairExhausted: 0,
       telemetryAvailable: true,
       result: 'changed',
     });
@@ -128,6 +133,11 @@ test('scheduler result labels keep unchanged runs distinct from failures', () =>
     pollEmpty: 0,
     pollErrors: 0,
     finalizedCounterChanges: 0,
+    repairDatesRequested: 0,
+    repairRecordsRecovered: 0,
+    repairEmpty: 0,
+    repairErrors: 0,
+    repairExhausted: 0,
     telemetryAvailable: true,
   };
   assert.equal(classifySchedulerRun(base), 'unchanged');
@@ -257,6 +267,8 @@ function pollActivity(overrides: Partial<import('./wishline-governance-core.ts')
     reportDatesRequested: 2, recordsReceived: 2, changesDetected: 0,
     pollInitial: 0, pollUnchanged: 0, pollTimestampOnly: 0, pollCounterChanges: 0,
     pollEmpty: 0, pollErrors: 0, finalizedCounterChanges: 0,
+    repairDatesRequested: 0, repairRecordsRecovered: 0, repairEmpty: 0,
+    repairErrors: 0, repairExhausted: 0,
     ...overrides,
   };
 }

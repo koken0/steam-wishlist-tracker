@@ -45,6 +45,11 @@ export type SyncRunActivity = {
   pollEmpty: number;
   pollErrors: number;
   finalizedCounterChanges: number;
+  repairDatesRequested: number;
+  repairRecordsRecovered: number;
+  repairEmpty: number;
+  repairErrors: number;
+  repairExhausted: number;
 };
 
 export type SchedulerHealthRun = SyncRunActivity & {
@@ -115,12 +120,15 @@ export async function recordSyncRunInDatabase(db: D1Database, run: SyncRunRecord
       `INSERT INTO sync_run_activity (
          sync_run_id, report_dates_requested, records_received, changes_detected,
          poll_initial, poll_unchanged, poll_timestamp_only, poll_counter_changes,
-         poll_empty, poll_errors, finalized_counter_changes
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         poll_empty, poll_errors, finalized_counter_changes, repair_dates_requested,
+         repair_records_recovered, repair_empty, repair_errors, repair_exhausted
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(id, activity.reportDatesRequested, activity.recordsReceived, activity.changesDetected,
       activity.pollInitial, activity.pollUnchanged, activity.pollTimestampOnly,
       activity.pollCounterChanges, activity.pollEmpty, activity.pollErrors,
-      activity.finalizedCounterChanges),
+      activity.finalizedCounterChanges, activity.repairDatesRequested,
+      activity.repairRecordsRecovered, activity.repairEmpty, activity.repairErrors,
+      activity.repairExhausted),
   ]);
 }
 
@@ -145,7 +153,12 @@ export async function readSchedulerHealthInDatabase(
             COALESCE(a.poll_counter_changes, 0) AS poll_counter_changes,
             COALESCE(a.poll_empty, 0) AS poll_empty,
             COALESCE(a.poll_errors, 0) AS poll_errors,
-            COALESCE(a.finalized_counter_changes, 0) AS finalized_counter_changes
+            COALESCE(a.finalized_counter_changes, 0) AS finalized_counter_changes,
+            COALESCE(a.repair_dates_requested, 0) AS repair_dates_requested,
+            COALESCE(a.repair_records_recovered, 0) AS repair_records_recovered,
+            COALESCE(a.repair_empty, 0) AS repair_empty,
+            COALESCE(a.repair_errors, 0) AS repair_errors,
+            COALESCE(a.repair_exhausted, 0) AS repair_exhausted
        FROM sync_runs s
        LEFT JOIN sync_run_activity a ON a.sync_run_id = s.id
       ORDER BY s.completed_at DESC
@@ -167,6 +180,11 @@ export async function readSchedulerHealthInDatabase(
     poll_empty: number;
     poll_errors: number;
     finalized_counter_changes: number;
+    repair_dates_requested: number;
+    repair_records_recovered: number;
+    repair_empty: number;
+    repair_errors: number;
+    repair_exhausted: number;
   }>();
   const recent = (result.results || []).map((row): SchedulerHealthRun => {
     const run = {
@@ -185,6 +203,11 @@ export async function readSchedulerHealthInDatabase(
       pollEmpty: row.poll_empty,
       pollErrors: row.poll_errors,
       finalizedCounterChanges: row.finalized_counter_changes,
+      repairDatesRequested: row.repair_dates_requested,
+      repairRecordsRecovered: row.repair_records_recovered,
+      repairEmpty: row.repair_empty,
+      repairErrors: row.repair_errors,
+      repairExhausted: row.repair_exhausted,
       telemetryAvailable: row.sync_run_id != null,
     };
     return { ...run, result: classifySchedulerRun(run) };
@@ -348,6 +371,11 @@ export async function ensureGovernanceSchema(db: D1Database): Promise<void> {
       poll_empty INTEGER NOT NULL DEFAULT 0 CHECK (poll_empty >= 0),
       poll_errors INTEGER NOT NULL DEFAULT 0 CHECK (poll_errors >= 0),
       finalized_counter_changes INTEGER NOT NULL DEFAULT 0 CHECK (finalized_counter_changes >= 0),
+      repair_dates_requested INTEGER NOT NULL DEFAULT 0 CHECK (repair_dates_requested >= 0),
+      repair_records_recovered INTEGER NOT NULL DEFAULT 0 CHECK (repair_records_recovered >= 0),
+      repair_empty INTEGER NOT NULL DEFAULT 0 CHECK (repair_empty >= 0),
+      repair_errors INTEGER NOT NULL DEFAULT 0 CHECK (repair_errors >= 0),
+      repair_exhausted INTEGER NOT NULL DEFAULT 0 CHECK (repair_exhausted >= 0),
       FOREIGN KEY (sync_run_id) REFERENCES sync_runs(id) ON DELETE CASCADE
     )`),
     db.prepare(`CREATE TABLE IF NOT EXISTS push_subscriptions (
@@ -401,6 +429,11 @@ function emptySyncActivity(): SyncRunActivity {
     pollEmpty: 0,
     pollErrors: 0,
     finalizedCounterChanges: 0,
+    repairDatesRequested: 0,
+    repairRecordsRecovered: 0,
+    repairEmpty: 0,
+    repairErrors: 0,
+    repairExhausted: 0,
   };
 }
 

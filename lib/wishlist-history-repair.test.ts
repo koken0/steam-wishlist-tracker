@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   HISTORY_REPAIR_MAX_ATTEMPTS,
   initialHistoryRepairAt,
+  missingRequestedHistoryDates,
   nextHistoryRepairOutcome,
   recentMissingHistoryDates,
 } from './wishlist-history-repair.ts';
@@ -12,6 +13,14 @@ test('history repair starts after a six-hour quiet period', () => {
     initialHistoryRepairAt(new Date('2026-09-08T00:00:00.000Z')),
     '2026-09-08T06:00:00.000Z',
   );
+});
+
+test('initial backfill queues only missing closed dates', () => {
+  assert.deepEqual(missingRequestedHistoryDates(
+    ['2026-09-04', '2026-09-05', '2026-09-06', '2026-09-07', '2026-09-08'],
+    ['2026-09-04', '2026-09-06', '2026-09-08'],
+    new Date('2026-09-08T20:00:00.000Z'),
+  ), ['2026-09-05']);
 });
 
 test('history repair backs off and stops after three unsuccessful attempts', () => {
@@ -30,6 +39,12 @@ test('history repair backs off and stops after three unsuccessful attempts', () 
 test('a recovered date becomes terminal immediately', () => {
   assert.deepEqual(nextHistoryRepairOutcome(1, true, new Date('2026-09-08T00:00:00.000Z')), {
     status: 'recovered', attempts: 2, nextAttemptAt: null,
+  });
+});
+
+test('temporary connector failures remain distinguishable while they back off', () => {
+  assert.deepEqual(nextHistoryRepairOutcome(0, false, new Date('2026-09-08T00:00:00.000Z'), true), {
+    status: 'error', attempts: 1, nextAttemptAt: '2026-09-09T00:00:00.000Z',
   });
 });
 

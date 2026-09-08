@@ -87,6 +87,8 @@ Acceptance criteria:
 - Historical reconstruction clearly labels stored values and their coverage.
 - [x] Inclusive range calculations enumerate missing GMT dates explicitly,
   preserve reported zero-activity days, and recalculate after corrections.
+- [x] Missing closed dates enter a durable, scheduler-only repair queue with
+  bounded concurrency, backoff, terminal exhaustion, and visible status.
 
 ### 4. Expand automated coverage
 

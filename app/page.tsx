@@ -660,6 +660,16 @@ function Overview({ data, progress, milestone }: { data:WishlistDashboardData; p
     () => summarizeWishlistRange(history, fromDate, toDate),
     [fromDate, history, toDate],
   );
+  const selectedRepairStates = new Map(
+    (data.historyRepairs || [])
+      .filter((repair) => selected.missingDates.includes(repair.date))
+      .map((repair) => [repair.date, repair.status]),
+  );
+  const exhaustedRepairs = [...selectedRepairStates.values()].filter((status) => status === 'exhausted').length;
+  const pendingRepairs = selectedRepairStates.size - exhaustedRepairs;
+  const missingDetail = exhaustedRepairs
+    ? `${pendingRepairs ? `${pendingRepairs} pending recovery · ` : ''}${exhaustedRepairs} unavailable after bounded retries`
+    : pendingRepairs ? `${pendingRepairs} pending recovery` : `missing ${selected.missingDates.join(', ')}`;
 
   return <>
     <PageHeading eyebrow={formatHeadingDate(latest?.date)} title="Your wishlists are moving." copy={`${data.projectName}'s latest Steam-generated data is ${Math.abs(pace).toFixed(0)}% ${pace >= 0 ? 'above' : 'below'} the previous weekly pace.`} />
@@ -672,7 +682,7 @@ function Overview({ data, progress, milestone }: { data:WishlistDashboardData; p
     </div>
     <article className="panel range-panel">
       <div className="range-head"><div><p className="panel-title">History by date range</p><p className="panel-subtitle">Daily net movement and estimated total progression</p></div><div className="date-range"><label>From<input type="date" min={firstDate} max={toDate || lastDate} value={fromDate} onChange={(event)=>setFromDate(event.target.value)} /></label><span>→</span><label>To<input type="date" min={fromDate || firstDate} max={lastDate} value={toDate} onChange={(event)=>setToDate(event.target.value)} /></label></div></div>
-      {selected.expectedDays ? <><div className={`range-coverage ${selected.complete ? 'complete' : 'incomplete'}`} role="status"><b>{selected.complete ? 'Complete coverage' : 'Incomplete coverage'}</b><span>{selected.complete ? `${selected.recordedDays} reported days` : `${selected.recordedDays} of ${selected.expectedDays} days have data · missing ${selected.missingDates.join(', ')}`}</span></div><div className="range-summary"><div><small>INCLUSIVE PERIOD</small><b>{selected.expectedDays} {selected.expectedDays === 1 ? 'day' : 'days'}</b></div><div><small>REPORTED ADDS</small><b className="green">+{formatCount(selected.adds)}</b></div><div><small>REPORTED DELETES</small><b>-{formatCount(selected.deletes)}</b></div><div><small>REPORTED NET GROWTH</small><b className={selected.net >= 0 ? 'green' : ''}>{signedCount(selected.net)}</b></div></div>{selected.recordedDays ? <WishlistRangeChart entries={selected.entries} /> : <div className="empty-range">There are no records in this range. Days are shown as missing, not as zero activity.</div>}</> : <div className="empty-range">Choose a valid range within the available history.</div>}
+      {selected.expectedDays ? <><div className={`range-coverage ${selected.complete ? 'complete' : 'incomplete'}`} role="status"><b>{selected.complete ? 'Complete coverage' : 'Incomplete coverage'}</b><span>{selected.complete ? `${selected.recordedDays} reported days` : `${selected.recordedDays} of ${selected.expectedDays} days have data · ${missingDetail}`}</span></div><div className="range-summary"><div><small>INCLUSIVE PERIOD</small><b>{selected.expectedDays} {selected.expectedDays === 1 ? 'day' : 'days'}</b></div><div><small>REPORTED ADDS</small><b className="green">+{formatCount(selected.adds)}</b></div><div><small>REPORTED DELETES</small><b>-{formatCount(selected.deletes)}</b></div><div><small>REPORTED NET GROWTH</small><b className={selected.net >= 0 ? 'green' : ''}>{signedCount(selected.net)}</b></div></div>{selected.recordedDays ? <WishlistRangeChart entries={selected.entries} /> : <div className="empty-range">There are no records in this range. Days are shown as missing, not as zero activity.</div>}</> : <div className="empty-range">Choose a valid range within the available history.</div>}
     </article>
     <div className="dashboard-grid">
       <article className="panel trend-panel"><div className="panel-head"><div><p className="panel-title">Last 7 days</p><p className="panel-subtitle">Adds, deletes, and net movement reported by Steam</p></div><div className="legend"><span><i className="legend-now" />Net</span></div></div><div className="daily-table">{recent.slice().reverse().map(day=><div key={day.date}><time>{formatShortDate(day.date)}</time><span className="daily-adds">+{formatCount(day.adds)}</span><span className="daily-deletes">-{formatCount(day.deletes)}</span><b>{signedCount(day.net)}</b></div>)}</div></article>

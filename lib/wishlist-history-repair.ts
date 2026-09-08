@@ -27,6 +27,7 @@ export function nextHistoryRepairOutcome(
   previousAttempts: number,
   recovered: boolean,
   now: Date,
+  failed = false,
 ): WishlistHistoryRepairOutcome {
   const attempts = previousAttempts + 1;
   if (recovered) return { status: 'recovered', attempts, nextAttemptAt: null };
@@ -35,10 +36,21 @@ export function nextHistoryRepairOutcome(
   }
   const delay = RETRY_DELAYS_MS[Math.max(0, attempts - 1)];
   return {
-    status: 'empty',
+    status: failed ? 'error' : 'empty',
     attempts,
     nextAttemptAt: new Date(now.getTime() + delay).toISOString(),
   };
+}
+
+export function missingRequestedHistoryDates(
+  requestedDates: readonly string[],
+  receivedDates: readonly string[],
+  today: Date,
+): string[] {
+  const received = new Set(receivedDates);
+  const utcToday = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+  const latestRepairable = new Date(utcToday - 2 * 86_400_000).toISOString().slice(0, 10);
+  return requestedDates.filter((date) => date <= latestRepairable && !received.has(date));
 }
 
 export function recentMissingHistoryDates(
