@@ -102,6 +102,6 @@ test('maps network failures and rejects an empty normalized period', async () =>
   );
   assert.throws(
     () => requireUsableWishlistDays([{ response: { appid: 123, date: '2026-09-03' } }]),
-    (error) => errorCode(error) === 'NO_WISHLIST_DATA',
+    (error) => errorCode(error) === 'DATA_NOT_YET_AVAILABLE',
   );
 });

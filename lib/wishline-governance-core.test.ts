@@ -132,6 +132,7 @@ test('scheduler result labels keep unchanged runs distinct from failures', () =>
   };
   assert.equal(classifySchedulerRun(base), 'unchanged');
   assert.equal(classifySchedulerRun({ ...base, changesDetected: 1 }), 'changed');
+  assert.equal(classifySchedulerRun({ ...base, recordsReceived: 0, pollEmpty: 2 }), 'no_usable_records');
   assert.equal(classifySchedulerRun({ ...base, succeeded: 0, failed: 1, recordsReceived: 0 }), 'failed');
   assert.equal(classifySchedulerRun({ ...base, failed: 1 }), 'partial_failure');
   assert.equal(classifySchedulerRun({ ...base, telemetryAvailable: false }), 'unknown');

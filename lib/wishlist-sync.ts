@@ -56,20 +56,34 @@ export async function syncAllWishlistConnections(): Promise<WishlistSyncSummary>
         syncActivity: connectionActivity,
       });
       if (data.syncWarning) {
-        failed += 1;
-        await recordAuditEventSafely({ workspaceId: connection.workspaceId, appId: connection.appId, eventType: 'sync.failure', outcome: 'failure', reasonCode: data.syncWarning.code });
+        if (data.syncWarning.code === 'DATA_NOT_YET_AVAILABLE') {
+          succeeded += 1;
+          await recordAuditEventSafely({
+            workspaceId: connection.workspaceId,
+            appId: connection.appId,
+            eventType: 'sync.success',
+            outcome: 'success',
+            reasonCode: 'DATA_NOT_YET_AVAILABLE',
+          });
+        } else {
+          failed += 1;
+          await recordAuditEventSafely({ workspaceId: connection.workspaceId, appId: connection.appId, eventType: 'sync.failure', outcome: 'failure', reasonCode: data.syncWarning.code });
+        }
       } else {
         succeeded += 1;
         await recordAuditEventSafely({ workspaceId: connection.workspaceId, appId: connection.appId, eventType: 'sync.success', outcome: 'success', reasonCode: data.freshness.toUpperCase() });
       }
     } catch (error) {
-      failed += 1;
+      const reasonCode = error instanceof WishlistConnectorError ? error.code : 'INTERNAL_ERROR';
+      const dataNotYetAvailable = reasonCode === 'DATA_NOT_YET_AVAILABLE';
+      if (dataNotYetAvailable) succeeded += 1;
+      else failed += 1;
       await recordAuditEventSafely({
         workspaceId: connection.workspaceId,
         appId: connection.appId,
-        eventType: 'sync.failure',
-        outcome: 'failure',
-        reasonCode: error instanceof WishlistConnectorError ? error.code : 'INTERNAL_ERROR',
+        eventType: dataNotYetAvailable ? 'sync.success' : 'sync.failure',
+        outcome: dataNotYetAvailable ? 'success' : 'failure',
+        reasonCode,
       });
     } finally {
       activity.reportDatesRequested += connectionActivity.reportDatesRequested;

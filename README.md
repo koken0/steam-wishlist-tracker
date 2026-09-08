@@ -272,7 +272,7 @@ Use the `result` field as the primary diagnosis:
 | `failed` | The run executed, but no configured connection synchronized successfully |
 | `no_connections` | The scheduler worked, but there were no saved connections to process |
 | `no_remote_request` | A connection was processed without starting a new Steam date request; this is expected only when another forced refresh populated the same workspace/App cache less than 60 seconds earlier |
-| `no_usable_records` | Date requests started, but no usable normalized record was retained |
+| `no_usable_records` | Steam accepted the date requests but has not published a usable record yet; this is an expected availability window, not a connector failure |
 | `unknown` | The row predates detailed scheduler telemetry |
 
 The supporting counters make the diagnosis auditable without exposing business

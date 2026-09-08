@@ -296,6 +296,14 @@ identify connector failures; `no_connections`, `no_remote_request`, and
 reserved for rows written before detailed telemetry existed. Preserve this
 distinction whenever scheduler logging changes.
 
+When Steam accepts both date requests but neither response contains a usable
+daily record, the connection records a successful `sync.success` audit with
+reason `DATA_NOT_YET_AVAILABLE` and the run result is `no_usable_records`.
+This expected publication-delay window keeps the last-known-good history and
+does not degrade scheduler health. Network failures, access rejection, rate
+limits, upstream HTTP failures, malformed responses, and unexpected App IDs
+continue to record `sync.failure` and degrade health.
+
 `no_remote_request` is expected only when the same workspace/App cache was
 populated by another forced refresh less than 60 seconds earlier. Consecutive
 hourly occurrences require investigation: verify that the scheduler activity

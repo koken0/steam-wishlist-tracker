@@ -82,8 +82,8 @@ export function requireUsableWishlistDays(payloads: SteamWishlistResponse[]): Wi
     .sort((a, b) => a.date.localeCompare(b.date));
   if (!daily.length) {
     throw new WishlistConnectorError(
-      'NO_WISHLIST_DATA',
-      'Steam accepted the request but returned no usable wishlist records for the configured period.',
+      'DATA_NOT_YET_AVAILABLE',
+      'Steam accepted the request but has not published usable wishlist records for the requested dates yet.',
       502,
     );
   }
