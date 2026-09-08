@@ -89,12 +89,16 @@ Configure the allowlist as a server-side Worker secret and open `/admin` with
 that same Google/Firebase account. Removing the variable closes the console to
 everyone by default.
 
-The **Worker automático** section reads the latest 48 durable `sync_runs`,
+The separate `/admin/worker` page reads the latest 48 durable `sync_runs`,
 classifies the scheduler as healthy, degraded, stale, or unknown, and exposes
 only aggregate counters. Recent workspace-scoped `sync.failure` audit events
 identify the affected project and sanitized reason code without returning a
 credential or upstream response. A successful run with no changed counters is
 shown as **Sin cambios**, not as a failure.
+
+The operator UI uses separate routes: `/admin` for the compact summary,
+`/admin/worker` for scheduler diagnostics, and `/admin/usuarios` for accounts.
+Navigation does not stack the full tables into one long screen.
 
 ## Steam reporting cadence
 

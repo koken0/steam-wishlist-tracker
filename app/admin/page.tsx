@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { observeWishlineUser, signInToWishline, signOutOfWishline, wishlineAuthorizationHeader } from '@/lib/firebase-client';
 import type { AdminOverview } from '@/lib/wishline-admin-store';
 import styles from './admin.module.css';
@@ -9,6 +10,8 @@ import styles from './admin.module.css';
 type SessionState = 'checking' | 'signed-out' | 'loading' | 'ready' | 'forbidden' | 'error';
 
 export default function AdminPage() {
+  const pathname = usePathname();
+  const view = pathname.endsWith('/worker') ? 'worker' : pathname.endsWith('/usuarios') ? 'users' : 'summary';
   const [session, setSession] = useState<SessionState>('checking');
   const [overview, setOverview] = useState<AdminOverview | null>(null);
   const [query, setQuery] = useState('');
@@ -77,7 +80,11 @@ export default function AdminPage() {
       <aside className={styles.sidebar}>
         <Link href="/" className={styles.brand}><span>W</span> Wishline</Link>
         <div className={styles.operator}>Operator console <small>Acceso privado</small></div>
-        <nav><a className={styles.active} href="#summary">Resumen</a><a href="#scheduler">Worker horario</a><a href="#accounts">Usuarios</a></nav>
+        <nav>
+          <Link className={view === 'summary' ? styles.active : ''} href="/admin">Resumen</Link>
+          <Link className={view === 'worker' ? styles.active : ''} href="/admin/worker">Worker horario</Link>
+          <Link className={view === 'users' ? styles.active : ''} href="/admin/usuarios">Usuarios</Link>
+        </nav>
         <button className={styles.signOut} onClick={() => void signOutOfWishline()}>Cerrar sesión</button>
       </aside>
       <section className={styles.workspace}>
@@ -85,18 +92,22 @@ export default function AdminPage() {
           <div><span className={styles.liveDot} /> Sistema operativo</div>
           <button className={styles.secondary} onClick={() => void load()}>Actualizar</button>
         </header>
-        <div className={styles.content} id="summary">
+        <div className={styles.content}>
           <div className={styles.heading}>
-            <div><p>ADMINISTRACIÓN</p><h1>Resumen de Wishline</h1><span>Datos privados del operador · actualizado {formatDate(overview.generatedAt)}</span></div>
+            <div><p>ADMINISTRACIÓN</p><h1>{view === 'worker' ? 'Worker automático' : view === 'users' ? 'Usuarios registrados' : 'Resumen de Wishline'}</h1><span>Datos privados del operador · actualizado {formatDate(overview.generatedAt)}</span></div>
           </div>
-          <div className={styles.stats}>
+          {view === 'summary' && <div className={styles.stats}>
             <Stat label="Usuarios" value={overview.totals.accounts} accent />
             <Stat label="Nuevos · 7 días" value={overview.totals.newLast7Days} />
             <Stat label="Proyectos conectados" value={overview.totals.connected} />
             <Stat label="Con notificaciones" value={overview.totals.notificationsEnabled} />
-          </div>
-          <SchedulerPanel overview={overview} />
-          <section className={styles.panel} id="accounts">
+          </div>}
+          {view === 'summary' && <div className={styles.summaryLinks}>
+            <Link href="/admin/worker"><span>Automatización</span><strong>Revisar Worker horario</strong><small>{overview.scheduler.status === 'healthy' ? 'Funcionando correctamente' : 'Requiere atención'}</small></Link>
+            <Link href="/admin/usuarios"><span>Cuentas</span><strong>Administrar usuarios</strong><small>{overview.totals.accounts} usuarios registrados</small></Link>
+          </div>}
+          {view === 'worker' && <SchedulerPanel overview={overview} />}
+          {view === 'users' && <section className={styles.panel}>
             <div className={styles.panelHead}>
               <div><h2>Usuarios registrados</h2><p>Los más recientes aparecen primero.</p></div>
               <input aria-label="Buscar usuarios" placeholder="Buscar email, proyecto o App ID" value={query} onChange={(event) => setQuery(event.target.value)} />
@@ -117,7 +128,7 @@ export default function AdminPage() {
               </table>
               {!accounts.length && <div className={styles.empty}>No hay usuarios que coincidan con la búsqueda.</div>}
             </div>
-          </section>
+          </section>}
         </div>
       </section>
     </main>
