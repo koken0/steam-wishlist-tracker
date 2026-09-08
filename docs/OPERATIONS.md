@@ -339,6 +339,7 @@ hosting provider.
 | `ENCRYPTION_NOT_CONFIGURED` | Restart with `npm run dev`; if preparation was skipped, run `npm run setup:local` explicitly |
 | Steam access denied | Key permissions, App ID, and Steamworks IP allowlist |
 | App ID mismatch | Confirm the key is authorized for the exact configured App ID |
+| Onboarding succeeds with no wishlist rows | Steam accepted the App ID/key check but has not published today or yesterday yet; let the bounded backfill and later sync retry data acquisition |
 | No new wishlist date | Confirm the previous GMT date has been published; keep the last stored date while bounded retries remain pending |
 | Refresh returns cached data | Wait for the one-minute refresh safety window |
 | Dashboard says `Showing last stored data` | Steam refresh failed; inspect the safe error and freshness while preserving the stored history |

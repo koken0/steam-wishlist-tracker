@@ -248,8 +248,12 @@ Accepted when:
 - local sign-in resolves a stable test owner without accepting a user ID from
   browser JavaScript;
 - the connection form requires an exact numeric App ID and a Financial API key;
-- invalid, unauthorized, rate-limited, empty, malformed, and App-ID-mismatched
-  Steam responses produce safe, understandable errors;
+- invalid, unauthorized, rate-limited, malformed, and App-ID-mismatched Steam
+  responses produce safe, understandable errors;
+- connection validation checks today and then yesterday in GMT, and accepts
+  matched successful responses even when neither day has been published yet;
+- when neither recent day is available, onboarding advances with a clear
+  successful-connection notice and explains that Wishline will keep checking;
 - a valid connection is tested before it is saved;
 - the key is encrypted before persistence, used only by server code, and never
   returned in a browser response, URL, log, screenshot, or offline cache;

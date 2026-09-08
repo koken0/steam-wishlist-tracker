@@ -40,10 +40,10 @@ test('spike baseline uses up to seven completed days before today', () => {
   assert.equal(recentBaselineAdds(days.slice(0, 4), '2026-09-03'), null);
 });
 
-test('connection validation targets exactly the current GMT date', () => {
+test('connection validation targets today and then yesterday in GMT', () => {
   assert.deepEqual(
     connectionValidationDates(new Date('2026-09-05T23:59:59.000Z')),
-    ['2026-09-05'],
+    ['2026-09-05', '2026-09-04'],
   );
 });
 

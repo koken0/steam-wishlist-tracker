@@ -45,6 +45,7 @@ type SetupState = {
     connected: boolean;
     updatedAt: string | null;
   };
+  validation?: { projectName: string; records: number };
 };
 
 const previewPoints = [32, 40, 37, 55, 51, 72];
@@ -226,6 +227,7 @@ export default function Home() {
   const [setup, setSetup] = useState<SetupState | null>(null);
   const [setupLoading, setSetupLoading] = useState(false);
   const [setupError, setSetupError] = useState('');
+  const [setupNotice, setSetupNotice] = useState('');
   const [accessRequired, setAccessRequired] = useState(false);
   function toggleTheme() {
     const nextTheme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
@@ -417,12 +419,21 @@ export default function Home() {
   async function saveConnection(input: { appId: string; apiKey: string; projectName: string }) {
     setSetupLoading(true);
     setSetupError('');
+    setSetupNotice('');
     try {
       const value = await connectSteam(input);
       setSetup(value);
-      const data = await fetchWishlistDashboard(true);
-      setWishlistData(data);
-      setDataError('');
+      if (value.validation?.records === 0) {
+        setSetupNotice('Steam accepted the connection, but wishlist data for today and yesterday is not available yet. Your connection is saved and Wishline will keep checking.');
+      }
+      try {
+        const data = await fetchWishlistDashboard(true);
+        setWishlistData(data);
+        setDataError('');
+      } catch (error) {
+        setWishlistData(null);
+        setDataError(error instanceof Error ? error.message : 'Wishlist data is not available yet.');
+      }
       setOnboardingStep(3);
     } catch (error) {
       setSetupError(error instanceof Error ? error.message : 'Steam connection could not be saved.');
@@ -483,6 +494,7 @@ export default function Home() {
         data={wishlistData}
         setup={setup}
         error={setupError}
+        notice={setupNotice}
         loading={setupLoading}
         authenticate={authenticateAndLoadSetup}
         connect={saveConnection}
@@ -583,7 +595,7 @@ function Welcome({ accessRequired, error, loading, onContinue }: { accessRequire
   );
 }
 
-function Onboarding({ step, data, setup, error, loading, authenticate, connect, next, back, finish }: { step:number; data:WishlistDashboardData|null; setup:SetupState|null; error:string; loading:boolean; authenticate:()=>void; connect:(input:{appId:string;apiKey:string;projectName:string})=>void; next:()=>void; back:()=>void; finish:()=>void }) {
+function Onboarding({ step, data, setup, error, notice, loading, authenticate, connect, next, back, finish }: { step:number; data:WishlistDashboardData|null; setup:SetupState|null; error:string; notice:string; loading:boolean; authenticate:()=>void; connect:(input:{appId:string;apiKey:string;projectName:string})=>void; next:()=>void; back:()=>void; finish:()=>void }) {
   const [appId, setAppId] = useState(setup?.workspace.appId ? String(setup.workspace.appId) : '');
   const [apiKey, setApiKey] = useState('');
   const [projectName, setProjectName] = useState(setup?.workspace.projectName || '');
@@ -615,6 +627,7 @@ function Onboarding({ step, data, setup, error, loading, authenticate, connect, 
           </>}
           {step === 3 && <>
             <span className="setup-icon ready-icon">✓</span><p className="eyebrow">STEP 3 OF 3</p><h1>Ready to track momentum</h1><p className="setup-lead">Your authenticated workspace and live Steam connection are ready. The Financial API key remains protected on the server.</p>
+            {notice && <div className="inline-notice" role="status"><b>Connection successful.</b><span>{notice}</span></div>}
             <div className="review-list"><div><span className="game-tile">{setup?.workspace.projectName?.charAt(0) || 'W'}</span><p><small>TRACKING</small><b>{setup?.workspace.projectName || data?.projectName || 'Configured project'}</b></p><em>Live</em></div><div><span>◎</span><p><small>OWNER</small><b>{setup?.user.email || setup?.user.name || 'Authenticated account'}</b></p></div><div><span>◆</span><p><small>CREDENTIAL PROTECTION</small><b>Server-side only</b></p></div></div>
           </>}
           <div className="setup-actions"><button className="secondary-button" onClick={back}>← Back</button>{step === 1 ? setup ? <button className="primary-button compact" disabled={loading} onClick={next}>Continue →</button> : usesFirebaseAuthentication() ? <button className="primary-button compact" disabled={loading} onClick={authenticate}>{loading ? 'Signing in…' : 'Sign in with Google →'}</button> : <button className="primary-button compact" disabled={loading} onClick={authenticate}>{loading ? 'Opening…' : 'Open local workspace →'}</button> : step === 3 ? <button className="primary-button compact" disabled={!setup?.workspace.connected} onClick={finish}>Open dashboard →</button> : null}</div>

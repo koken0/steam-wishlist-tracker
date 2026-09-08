@@ -30,12 +30,16 @@ Diagnostic rule:
 
 ### Keep validation cheap and backfill separate
 
-Credential validation now makes exactly one reporting request for the current
-GMT date. Only a successful validation permits encrypted persistence and the
-bounded historical backfill. This prevents a seven-request validation burst
-from failing an otherwise valid connection.
+Credential validation first requests the current GMT date and, when that
+successful response has no usable record, requests the previous GMT date.
+Successful, App-ID-matched responses with no record on either date still prove
+access and permit encrypted persistence; data availability is not a credential
+failure. Only a successful validation permits the bounded historical backfill.
+This keeps validation to at most two requests and prevents a large validation
+burst from failing an otherwise valid connection.
 
-Regression rule: `connectionValidationDates()` must return exactly one date.
+Regression rule: `connectionValidationDates()` must return today followed by
+yesterday, and validation must stop after the first usable record.
 Historical acquisition belongs to the backfill path, not credential
 validation. HTTP 429 retries remain bounded and respect `Retry-After` up to the
 configured cap.

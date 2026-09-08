@@ -138,3 +138,5 @@ html[data-theme='dark'] .activity-list>div,
 html[data-theme='dark'] .audit-list>div,
 html[data-theme='dark'] .widget-guide li{border-color:var(--line)}
 @media(max-width:560px){.theme-button{width:35px;height:35px}.top-actions{gap:8px}}
+.inline-notice{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:12px 0;padding:11px 12px;border-radius:10px;background:#f0f8df;color:#496300;font-size:8px}.inline-notice span{flex:1;min-width:180px;color:#68764b}
+html[data-theme='dark'] .inline-notice{background:#26321e;color:#c9ee8c}html[data-theme='dark'] .inline-notice span{color:#b4c99a}

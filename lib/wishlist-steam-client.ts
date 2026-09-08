@@ -63,6 +63,22 @@ export async function fetchSteamWishlistDate(
   return payload;
 }
 
+export async function validateSteamWishlistAccess(
+  key: string,
+  appId: number,
+  dates: readonly string[],
+  fetchImpl: typeof fetch = fetch,
+): Promise<number> {
+  for (const date of dates) {
+    const payload = await fetchSteamWishlistDate(key, appId, date, fetchImpl);
+    if (normalizeSteamWishlistResponse(payload)) return 1;
+  }
+
+  // Successful, App-ID-matched responses prove access even when Steam has not
+  // published either recent reporting day yet.
+  return 0;
+}
+
 function retryDelayMs(response: Response, attempt: number): number {
   const retryAfterSeconds = Number(response.headers.get('retry-after'));
   if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds >= 0) {

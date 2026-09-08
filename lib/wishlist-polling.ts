@@ -5,8 +5,9 @@ export function currentAndPreviousUtcDates(now = new Date()): string[] {
   return [-1, 0].map((offset) => new Date(start + offset * 86_400_000).toISOString().slice(0, 10));
 }
 
-export function connectionValidationDates(now = new Date()): [string] {
-  return [now.toISOString().slice(0, 10)];
+export function connectionValidationDates(now = new Date()): [string, string] {
+  const start = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  return [0, -1].map((offset) => new Date(start + offset * 86_400_000).toISOString().slice(0, 10)) as [string, string];
 }
 
 export function shouldReuseWishlistCache(

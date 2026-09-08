@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { WishlistConnectorError } from './wishlist-errors.ts';
-import { fetchSteamWishlistDate, requireUsableWishlistDays } from './wishlist-steam-client.ts';
+import { fetchSteamWishlistDate, requireUsableWishlistDays, validateSteamWishlistAccess } from './wishlist-steam-client.ts';
 
 function errorCode(error: unknown): string | null {
   return error instanceof WishlistConnectorError ? error.code : null;
@@ -104,4 +104,30 @@ test('maps network failures and rejects an empty normalized period', async () =>
     () => requireUsableWishlistDays([{ response: { appid: 123, date: '2026-09-03' } }]),
     (error) => errorCode(error) === 'DATA_NOT_YET_AVAILABLE',
   );
+});
+
+test('connection validation falls back to yesterday when today is not published', async () => {
+  const requestedDates: string[] = [];
+  const fetchImpl = (async (input: URL | RequestInfo) => {
+    const date = new URL(String(input)).searchParams.get('date') || '';
+    requestedDates.push(date);
+    return Response.json(date === '2026-09-04'
+      ? { response: { appid: 123, date, wishlist_summary: { wishlist_adds: 9, wishlist_deletes: 2 } } }
+      : { response: { appid: 123, date } });
+  }) as typeof fetch;
+
+  assert.equal(await validateSteamWishlistAccess('secret', 123, ['2026-09-05', '2026-09-04'], fetchImpl), 1);
+  assert.deepEqual(requestedDates, ['2026-09-05', '2026-09-04']);
+});
+
+test('connection validation accepts two empty successful Steam responses', async () => {
+  const requestedDates: string[] = [];
+  const fetchImpl = (async (input: URL | RequestInfo) => {
+    const date = new URL(String(input)).searchParams.get('date') || '';
+    requestedDates.push(date);
+    return Response.json({ response: { appid: 123, date } });
+  }) as typeof fetch;
+
+  assert.equal(await validateSteamWishlistAccess('secret', 123, ['2026-09-05', '2026-09-04'], fetchImpl), 0);
+  assert.deepEqual(requestedDates, ['2026-09-05', '2026-09-04']);
 });

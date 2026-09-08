@@ -15,7 +15,7 @@ import {
   saveWishlistHistory,
 } from '@/lib/wishlist-history-store';
 import { WishlistConnectorError } from '@/lib/wishlist-errors';
-import { fetchSteamWishlistDate, requireUsableWishlistDays } from '@/lib/wishlist-steam-client';
+import { fetchSteamWishlistDate, requireUsableWishlistDays, validateSteamWishlistAccess } from '@/lib/wishlist-steam-client';
 import {
   connectionValidationDates,
   currentAndPreviousUtcDates,
@@ -144,7 +144,11 @@ async function loadSteamData(connection: SteamConnection): Promise<WishlistDashb
       connection.projectName?.trim() ? Promise.resolve(null) : fetchSteamProjectName(appId),
     ]);
     storeProjectName = fetchedProjectName;
-    const fetchedDaily = requireUsableWishlistDays(payloads);
+    const fetchedDaily = connection.cacheScope
+      ? payloads.map(normalizeSteamWishlistResponse)
+        .filter((day): day is WishlistDay => Boolean(day))
+        .sort((a, b) => a.date.localeCompare(b.date))
+      : requireUsableWishlistDays(payloads);
     if (connection.syncActivity) connection.syncActivity.recordsReceived += fetchedDaily.length;
 
     if (connection.cacheScope) {
@@ -259,11 +263,10 @@ export async function validateSteamConnection(
   connection: SteamConnection,
   fetchImpl: typeof fetch = fetch,
 ): Promise<{ projectName: string; records: number }> {
-  const [payload, storeProjectName] = await Promise.all([
-    fetchSteamWishlistDate(connection.apiKey, connection.appId, connectionValidationDates()[0], fetchImpl),
+  const [records, storeProjectName] = await Promise.all([
+    validateSteamWishlistAccess(connection.apiKey, connection.appId, connectionValidationDates(), fetchImpl),
     fetchSteamProjectName(connection.appId, fetchImpl),
   ]);
-  const records = requireUsableWishlistDays([payload]).length;
   return {
     projectName: connection.projectName?.trim() || storeProjectName || `Steam App ${connection.appId}`,
     records,
