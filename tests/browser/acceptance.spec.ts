@@ -128,6 +128,28 @@ test('restores a connected owner without flashing the public landing page', asyn
   await expect(page.getByRole('heading', { name: /Your Steam wishlists/ })).toHaveCount(0);
 });
 
+test('renders revoked Steam credentials as a red connection error', async ({ page }) => {
+  await page.route('**/api/setup', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(connectedSetup()) }));
+  await page.route('**/api/wishlist', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({
+      ...dashboardFixture,
+      syncWarning: {
+        code: 'STEAM_ACCESS_DENIED',
+        message: 'Steamworks rejected the key, permission, App ID, or IP allowlist.',
+      },
+    }),
+  }));
+
+  await openLocalWorkspace(page);
+
+  const error = page.getByRole('alert');
+  await expect(error).toHaveClass(/data-error/);
+  await expect(error).toContainText('Steam connection rejected');
+  await expect(error).toContainText('Steamworks rejected the key');
+});
+
 test('dashboard remains usable at a phone-sized viewport', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.route('**/api/setup', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(connectedSetup()) }));

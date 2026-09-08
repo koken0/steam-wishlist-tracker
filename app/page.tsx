@@ -529,7 +529,7 @@ export default function Home() {
 
         <div className="content">
           {dataError && <div className="data-error" role="alert"><span>!</span><p><b>Data connection needs attention</b><small>{dataError}</small></p><button onClick={refreshData}>Retry</button></div>}
-          {wishlistData?.syncWarning && <div className="data-warning" role="status"><span>!</span><p><b>Showing last stored data</b><small>{wishlistData.syncWarning.message}</small></p></div>}
+          {wishlistData?.syncWarning && <div className={wishlistData.syncWarning.code === 'STEAM_ACCESS_DENIED' ? 'data-error' : 'data-warning'} role={wishlistData.syncWarning.code === 'STEAM_ACCESS_DENIED' ? 'alert' : 'status'}><span>!</span><p><b>{wishlistData.syncWarning.code === 'STEAM_ACCESS_DENIED' ? 'Steam connection rejected' : 'Showing last stored data'}</b><small>{wishlistData.syncWarning.message}</small></p></div>}
           {!wishlistData && !dataError && <div className="loading-card"><span/><p>Loading the server-side data source…</p></div>}
           {view === 'overview' && wishlistData && <Overview data={wishlistData} progress={progress} milestone={milestoneValue(milestone)} />}
           {view === 'projects' && wishlistData && <Projects data={wishlistData} onOpen={() => setView('overview')} notify={notify} />}
