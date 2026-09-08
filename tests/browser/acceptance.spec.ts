@@ -65,6 +65,8 @@ test('authenticates, onboards, reconnects, loads the dashboard, and renders safe
   const darkModeButton = page.getByRole('button', { name: 'Switch color theme' });
   await darkModeButton.click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect(page.locator('.date-range input').first()).toHaveCSS('background-color', 'rgb(25, 27, 31)');
+  await expect(page.locator('.date-range input').first()).toHaveCSS('color', 'rgb(242, 243, 239)');
   await page.reload();
   await waitForReact(page);
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
@@ -84,6 +86,8 @@ test('authenticates, onboards, reconnects, loads the dashboard, and renders safe
 
   await page.getByRole('button', { name: 'Settings' }).click();
   await expect(page.locator('.about-card')).toContainText('Version 0.0.1');
+  await expect(page.getByLabel('Milestone target')).toHaveCSS('background-color', 'rgb(39, 42, 47)');
+  await expect(page.getByLabel('Milestone target')).toHaveCSS('color', 'rgb(242, 243, 239)');
   await page.getByLabel('Milestone target').fill('23456');
   await page.getByRole('button', { name: 'Save changes' }).click();
   await expect(page.getByRole('status')).toContainText('Milestone target saved');
