@@ -149,9 +149,17 @@ test('blocks stored data after Steam revokes access and offers reconnection', as
   await expect(error).toContainText('Steam access revoked');
   await expect(page.getByText('Stored wishlist total')).toHaveCount(0);
   await expect(page.getByText('Latest reported net')).toHaveCount(0);
+  await page.evaluate(() => {
+    window.localStorage.setItem('wishline-theme', 'dark');
+    document.documentElement.dataset.theme = 'dark';
+  });
   await page.getByRole('button', { name: 'Update Steam connection' }).click();
   await expect(page.getByRole('heading', { name: 'Connect your Steam project' })).toBeVisible();
   await expect(page.getByLabel('Steam App ID')).toHaveValue(String(dashboardFixture.appId));
+  await expect(page.locator('.onboarding-header')).toHaveCSS('background-color', 'rgb(32, 35, 40)');
+  await expect(page.locator('.setup-card')).toHaveCSS('background-color', 'rgb(32, 35, 40)');
+  await expect(page.getByRole('heading', { name: 'Connect your Steam project' })).toHaveCSS('color', 'rgb(242, 243, 239)');
+  await expect(page.locator('.connection-form input').first()).toHaveCSS('background-color', 'rgb(25, 27, 31)');
 });
 
 test('dashboard remains usable at a phone-sized viewport', async ({ page }) => {
