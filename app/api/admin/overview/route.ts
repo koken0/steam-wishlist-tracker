@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { isWishlineAdmin } from '@/lib/wishline-admin-auth';
 import { readAdminOverview } from '@/lib/wishline-admin-store';
-import { getWishlineUser } from '@/lib/wishline-auth';
+import { getWishlineAuthenticatedUser } from '@/lib/wishline-auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
-  const user = await getWishlineUser(request);
+  const user = await getWishlineAuthenticatedUser(request);
   if (!user) return response({ error: { code: 'AUTH_REQUIRED', message: 'Sign in to open the operator console.' } }, 401);
   if (!isWishlineAdmin(user)) return response({ error: { code: 'ADMIN_FORBIDDEN', message: 'This account does not have operator access.' } }, 403);
   try {

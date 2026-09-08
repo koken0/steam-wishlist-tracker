@@ -20,6 +20,10 @@ const FIREBASE_JWKS = createRemoteJWKSet(
 
 export async function getWishlineUser(request: Request): Promise<WishlineUser | null> {
   if (!await hasLaunchAccess(request)) return null;
+  return getWishlineAuthenticatedUser(request);
+}
+
+export async function getWishlineAuthenticatedUser(request: Request): Promise<WishlineUser | null> {
   const firebaseProjectId = process.env.FIREBASE_PROJECT_ID?.trim();
   if (firebaseProjectId) {
     const token = bearerToken(request.headers.get('authorization'));

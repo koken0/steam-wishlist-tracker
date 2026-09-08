@@ -55,7 +55,10 @@ export default function AdminPage() {
   if (session === 'checking' || session === 'loading') return <Gate title="Abriendo consola…" detail="Verificando tu identidad y cargando la actividad." />;
   if (session === 'signed-out') return (
     <Gate title="Consola privada" detail="Inicia sesión con la cuenta administradora de Wishline.">
-      <button className={styles.primary} onClick={() => void signInToWishline()}>Continuar con Google</button>
+      <button className={styles.primary} onClick={() => void signInToWishline().then(load).catch(() => {
+        setMessage('No se pudo iniciar sesión con Google.');
+        setSession('error');
+      })}>Continuar con Google</button>
     </Gate>
   );
   if (session === 'forbidden') return (
