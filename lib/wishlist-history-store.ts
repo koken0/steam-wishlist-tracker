@@ -1,6 +1,12 @@
 import { env } from 'cloudflare:workers';
 import type { WishlistDay } from '@/lib/wishlist-contract';
 import { saveWishlistPollSampleInDatabase, type WishlistPollClassification, type WishlistPollSampleInput } from '@/lib/wishlist-poll-evidence';
+import {
+  HISTORY_REPAIR_LIMIT,
+  initialHistoryRepairAt,
+  nextHistoryRepairOutcome,
+  type WishlistHistoryRepair,
+} from '@/lib/wishlist-history-repair';
 
 type WishlistHistoryRow = {
   report_date: string;
@@ -101,6 +107,74 @@ export async function readWishlistHistory(
     })),
     fetchedAt: rows.map((row) => row.fetched_at).sort().at(-1) || null,
   };
+}
+
+export async function enqueueWishlistHistoryRepairs(
+  workspaceId: string,
+  appId: number,
+  dates: readonly string[],
+  now = new Date(),
+): Promise<void> {
+  if (!dates.length) return;
+  const db = await historyDatabase();
+  const createdAt = now.toISOString();
+  const nextAttemptAt = initialHistoryRepairAt(now);
+  await db.batch(dates.map((date) => db.prepare(
+    `INSERT INTO wishlist_history_repairs (
+       workspace_id, app_id, report_date, status, attempts, next_attempt_at,
+       locked_until, last_reason_code, created_at, updated_at
+     ) VALUES (?, ?, ?, 'pending', 0, ?, NULL, NULL, ?, ?)
+     ON CONFLICT(workspace_id, app_id, report_date) DO NOTHING`,
+  ).bind(workspaceId, appId, date, nextAttemptAt, createdAt, createdAt)));
+}
+
+export async function claimWishlistHistoryRepairs(
+  workspaceId: string,
+  appId: number,
+  now = new Date(),
+  limit = HISTORY_REPAIR_LIMIT,
+): Promise<WishlistHistoryRepair[]> {
+  const db = await historyDatabase();
+  const nowIso = now.toISOString();
+  const lockedUntil = new Date(now.getTime() + 10 * 60 * 1_000).toISOString();
+  const result = await db.prepare(
+    `UPDATE wishlist_history_repairs
+        SET status = 'processing', locked_until = ?, updated_at = ?
+      WHERE rowid IN (
+        SELECT rowid FROM wishlist_history_repairs
+         WHERE workspace_id = ? AND app_id = ?
+           AND ((status IN ('pending', 'empty', 'error') AND next_attempt_at <= ?)
+             OR (status = 'processing' AND locked_until <= ?))
+         ORDER BY next_attempt_at ASC, report_date ASC
+         LIMIT ?
+      )
+      RETURNING report_date, attempts`,
+  ).bind(lockedUntil, nowIso, workspaceId, appId, nowIso, nowIso, limit).all<{
+    report_date: string;
+    attempts: number;
+  }>();
+  return (result.results || []).map((row) => ({ reportDate: row.report_date, attempts: row.attempts }));
+}
+
+export async function completeWishlistHistoryRepair(
+  workspaceId: string,
+  appId: number,
+  repair: WishlistHistoryRepair,
+  recovered: boolean,
+  reasonCode: string | null,
+  now = new Date(),
+): Promise<void> {
+  const db = await historyDatabase();
+  const outcome = nextHistoryRepairOutcome(repair.attempts, recovered, now);
+  await db.prepare(
+    `UPDATE wishlist_history_repairs
+        SET status = ?, attempts = ?, next_attempt_at = ?, locked_until = NULL,
+            last_reason_code = ?, updated_at = ?
+      WHERE workspace_id = ? AND app_id = ? AND report_date = ? AND status = 'processing'`,
+  ).bind(
+    outcome.status, outcome.attempts, outcome.nextAttemptAt, reasonCode, now.toISOString(),
+    workspaceId, appId, repair.reportDate,
+  ).run();
 }
 
 export async function saveWishlistObservation(
@@ -219,6 +293,22 @@ async function initializeHistorySchema(db: D1Database): Promise<void> {
       FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
     )`),
     db.prepare('CREATE INDEX IF NOT EXISTS idx_wishlist_snapshots_app_date ON wishlist_daily_snapshots(app_id, report_date)'),
+    db.prepare(`CREATE TABLE IF NOT EXISTS wishlist_history_repairs (
+      workspace_id TEXT NOT NULL,
+      app_id INTEGER NOT NULL CHECK (app_id > 0),
+      report_date TEXT NOT NULL,
+      status TEXT NOT NULL CHECK (status IN ('pending', 'processing', 'empty', 'error', 'recovered', 'exhausted')),
+      attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+      next_attempt_at TEXT,
+      locked_until TEXT,
+      last_reason_code TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (workspace_id, app_id, report_date),
+      FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+    )`),
+    db.prepare(`CREATE INDEX IF NOT EXISTS idx_wishlist_repairs_due
+      ON wishlist_history_repairs(workspace_id, app_id, status, next_attempt_at)`),
     db.prepare(`CREATE TABLE IF NOT EXISTS wishlist_intraday_snapshots (
       id TEXT PRIMARY KEY,
       workspace_id TEXT NOT NULL,
