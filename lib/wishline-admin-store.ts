@@ -1,5 +1,6 @@
 import { env } from 'cloudflare:workers';
 import { WishlistConnectorError } from './wishlist-errors.ts';
+import { readSchedulerHealthInDatabase, type SchedulerHealth } from './wishline-governance-core.ts';
 
 export type AdminAccount = {
   workspaceId: string;
@@ -19,6 +20,16 @@ export type AdminOverview = {
   generatedAt: string;
   totals: { accounts: number; connected: number; notificationsEnabled: number; newLast7Days: number };
   accounts: AdminAccount[];
+  scheduler: SchedulerHealth;
+  recentSyncFailures: AdminSyncFailure[];
+};
+
+export type AdminSyncFailure = {
+  projectName: string | null;
+  appId: number | null;
+  ownerEmail: string | null;
+  reasonCode: string | null;
+  occurredAt: string;
 };
 
 type AdminAccountRow = {
@@ -41,7 +52,7 @@ export async function readAdminOverview(now = new Date()): Promise<AdminOverview
 }
 
 export async function readAdminOverviewInDatabase(db: D1Database, now = new Date()): Promise<AdminOverview> {
-  const result = await db.prepare(
+  const [result, scheduler, failureResult] = await Promise.all([db.prepare(
     `SELECT w.id AS workspace_id, w.owner_email, w.name AS workspace_name,
             w.created_at, w.updated_at, c.app_id, c.project_name,
             c.updated_at AS connection_updated_at,
@@ -51,7 +62,15 @@ export async function readAdminOverviewInDatabase(db: D1Database, now = new Date
        LEFT JOIN steam_connections c ON c.workspace_id = w.id
       ORDER BY w.created_at DESC
       LIMIT 250`,
-  ).all<AdminAccountRow>();
+  ).all<AdminAccountRow>(), readSchedulerHealthInDatabase(db, now, 48), db.prepare(
+    `SELECT c.project_name, a.app_id, w.owner_email, a.reason_code, a.occurred_at
+       FROM audit_events a
+       LEFT JOIN workspaces w ON w.id = a.workspace_id
+       LEFT JOIN steam_connections c ON c.workspace_id = a.workspace_id
+      WHERE a.event_type = 'sync.failure'
+      ORDER BY a.occurred_at DESC
+      LIMIT 50`,
+  ).all<{ project_name: string | null; app_id: number | null; owner_email: string | null; reason_code: string | null; occurred_at: string }>()]);
   const accounts = (result.results || []).map((row): AdminAccount => ({
     workspaceId: row.workspace_id,
     ownerEmail: row.owner_email,
@@ -75,5 +94,13 @@ export async function readAdminOverviewInDatabase(db: D1Database, now = new Date
       newLast7Days: accounts.filter((account) => new Date(account.createdAt).valueOf() >= sevenDaysAgo).length,
     },
     accounts,
+    scheduler,
+    recentSyncFailures: (failureResult.results || []).map((row) => ({
+      projectName: row.project_name,
+      appId: row.app_id,
+      ownerEmail: row.owner_email,
+      reasonCode: row.reason_code,
+      occurredAt: row.occurred_at,
+    })),
   };
 }

@@ -89,6 +89,13 @@ Configure the allowlist as a server-side Worker secret and open `/admin` with
 that same Google/Firebase account. Removing the variable closes the console to
 everyone by default.
 
+The **Worker automático** section reads the latest 48 durable `sync_runs`,
+classifies the scheduler as healthy, degraded, stale, or unknown, and exposes
+only aggregate counters. Recent workspace-scoped `sync.failure` audit events
+identify the affected project and sanitized reason code without returning a
+credential or upstream response. A successful run with no changed counters is
+shown as **Sin cambios**, not as a failure.
+
 ## Steam reporting cadence
 
 The API supports the current GMT date and recent values are published in
