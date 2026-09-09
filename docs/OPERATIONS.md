@@ -130,6 +130,15 @@ Each scheduled run records separate aggregate activity counters:
   deliveries attempted, accepted by a push service, removed as expired, or
   left for bounded retry.
 
+These counters are diagnostic telemetry, not a complete daily Steam API quota
+ledger. In particular, they do not account for every validation/manual request
+or each HTTP 429 retry attempt. Valve's public Web API terms state a general
+maximum of 100,000 API calls per day; do not infer remaining quota from
+`reportDatesRequested`. A durable, atomic GMT-day counter and fail-closed safety
+cutoff are tracked as WL-006 and are required before broader private-beta use.
+The scope of the published maximum for Financial publisher keys remains a
+question for Valve. Source: [Steam Web API Terms of Use](https://steamcommunity.com/dev/apiterms).
+
 A successful run with records received and `changesDetected: 0` means Steam
 responded without a numeric change. It is not a sync failure. Aggregate health
 counters contain no App ID, wishlist value, credential, request header, or

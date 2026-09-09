@@ -47,8 +47,20 @@ bodies, or treat a lack of changed Steam data as a synchronization failure.
 ### WL-006 — Add per-workspace request quotas
 
 Sanitized audit events, scheduled-run health, and aggregate history-repair
-telemetry are durable. Add per-workspace request quotas without credentials,
-raw Steam responses, or free-form error payloads.
+telemetry are durable, but they are not a complete Steam API-call counter:
+validation/manual traffic and individual HTTP 429 retry attempts are not all
+represented. Add a durable counter keyed by GMT day that reserves capacity
+before every outbound Steam HTTP attempt, including retries, without storing
+credentials, raw Steam responses, or free-form error payloads. Enforce Valve's
+published general maximum of 100,000 calls per day as a hard upper bound and
+use a lower operational cutoff so concurrent requests cannot cross it. Until
+Valve confirms whether the limit applies per Financial key, partner, source IP,
+or application, enforce the most conservative applicable aggregate.
+
+Acceptance: operators can read today's attempted-call count and remaining
+budget; concurrent reservations are atomic; calls fail closed when the safety
+cutoff is exhausted; the GMT rollover and failed upstream attempts are tested.
+Source: [Steam Web API Terms of Use](https://steamcommunity.com/dev/apiterms).
 
 ### WL-007 — Complete account-level retention and deletion
 

@@ -68,6 +68,16 @@ not real-time data. Perform a bounded historical backfill once; afterward query
 only yesterday and today. The hourly poll may update today's cumulative record
 and capture changed observations. Stop routinely querying older closed dates.
 
+Treat Valve's published general ceiling of 100,000 Web API calls per day as a
+hard safety limit. The exact scope for Financial publisher keys (per key,
+partner, source IP, or application) remains unconfirmed, so use the most
+conservative applicable aggregate until Valve clarifies it. Do not describe
+`sync_run_activity.report_dates_requested` as the daily API-call counter: it
+omits validation/manual traffic and HTTP 429 retry attempts. Before broader
+private-beta use, implement a durable GMT-day reservation counter covering
+every outbound Steam HTTP attempt and fail closed below the published ceiling.
+See `docs/STEAM-COMPLIANCE.md` and backlog item WL-006.
+
 ## Incremental commits
 
 Create a commit whenever a coherent, reviewable milestone is complete and its
