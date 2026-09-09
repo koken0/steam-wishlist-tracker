@@ -150,7 +150,9 @@ function SchedulerPanel({ overview }: { overview: AdminOverview }) {
   const [page, setPage] = useState(1);
   const pageCount = Math.max(1, Math.ceil(scheduler.recent.length / RUNS_PER_PAGE));
   const visibleRuns = scheduler.recent.slice((page - 1) * RUNS_PER_PAGE, page * RUNS_PER_PAGE);
-  const statusLabel = { healthy: 'Saludable', degraded: 'Con fallas', stale: 'Atrasado', unknown: 'Sin datos' }[scheduler.status];
+  const statusLabel = scheduler.status === 'degraded'
+    ? latest && latest.succeeded > 0 ? 'Operativo con fallos parciales' : 'Ejecución fallida'
+    : { healthy: 'Saludable', stale: 'Atrasado', unknown: 'Sin datos' }[scheduler.status];
   return <section className={styles.panel} id="scheduler">
     <div className={styles.panelHead}>
       <div><h2>Worker automático · cada hora</h2><p>Últimas 48 ejecuciones conservadas en D1.</p></div>
