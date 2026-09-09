@@ -10,6 +10,7 @@ import {
   wishlineAuthorizationHeader,
 } from '@/lib/firebase-client';
 import type { WishlistDashboardData } from '@/lib/wishlist-contract';
+import type { WishlistAnnotation } from '@/lib/wishlist-annotations-core';
 import {
   buildWishlistHistory,
   summarizeWishlistRange,
@@ -89,6 +90,23 @@ async function fetchWishlistDashboard(force = false): Promise<WishlistDashboardD
     throw new Error('error' in payload ? payload.error?.message || 'Wishlist data could not be loaded.' : 'Wishlist data could not be loaded.');
   }
   return payload as WishlistDashboardData;
+}
+
+async function fetchAnnotations(): Promise<WishlistAnnotation[]> {
+  const response = await fetch('/api/annotations', { cache: 'no-store', headers: await wishlineAuthorizationHeader() });
+  const payload = await response.json() as { annotations?: WishlistAnnotation[]; error?: { message?: string } };
+  if (!response.ok || !payload.annotations) throw new Error(payload.error?.message || 'Timeline notes could not be loaded.');
+  return payload.annotations;
+}
+
+async function mutateAnnotation(method: 'POST' | 'PUT' | 'DELETE', input: { id?: string; date?: string; note?: string }): Promise<WishlistAnnotation | null> {
+  const response = await fetch('/api/annotations', {
+    method, cache: 'no-store', headers: { ...await wishlineAuthorizationHeader(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  const payload = await response.json() as { annotation?: WishlistAnnotation; deleted?: boolean; error?: { message?: string } };
+  if (!response.ok) throw new Error(payload.error?.message || 'Timeline note could not be updated.');
+  return payload.annotation || null;
 }
 
 async function fetchSetup(): Promise<SetupState> {
@@ -655,6 +673,12 @@ function Overview({ data, progress, milestone }: { data:WishlistDashboardData; p
   const lastDate = data.daily.at(-1)?.date || '';
   const [fromDate, setFromDate] = useState(firstDate);
   const [toDate, setToDate] = useState(lastDate);
+  const [annotations, setAnnotations] = useState<WishlistAnnotation[]>([]);
+  const [annotationDate, setAnnotationDate] = useState(lastDate);
+  const [annotationNote, setAnnotationNote] = useState('');
+  const [editingAnnotationId, setEditingAnnotationId] = useState<string | null>(null);
+  const [annotationError, setAnnotationError] = useState('');
+  const [savingAnnotation, setSavingAnnotation] = useState(false);
   const recent = data.daily.slice(-7);
   const previous = data.daily.slice(-14, -7);
   const latest = recent.at(-1);
@@ -680,6 +704,54 @@ function Overview({ data, progress, milestone }: { data:WishlistDashboardData; p
     ? `${pendingRepairs ? `${pendingRepairs} pending recovery · ` : ''}${exhaustedRepairs} unavailable after bounded retries`
     : pendingRepairs ? `${pendingRepairs} pending recovery` : `missing ${selected.missingDates.join(', ')}`;
 
+  useEffect(() => {
+    let active = true;
+    void fetchAnnotations().then((values) => { if (active) setAnnotations(values); }).catch((error) => {
+      if (active) setAnnotationError(error instanceof Error ? error.message : 'Timeline notes could not be loaded.');
+    });
+    return () => { active = false; };
+  }, [data.appId]);
+
+  function selectAnnotationDate(date: string) {
+    const existing = annotations.find((annotation) => annotation.date === date);
+    setAnnotationDate(date);
+    setAnnotationNote(existing?.note || '');
+    setEditingAnnotationId(existing?.id || null);
+    setAnnotationError('');
+    document.getElementById('timeline-note-editor')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  async function saveAnnotation(event: React.FormEvent) {
+    event.preventDefault();
+    setSavingAnnotation(true);
+    setAnnotationError('');
+    try {
+      const saved = await mutateAnnotation(editingAnnotationId ? 'PUT' : 'POST', {
+        id: editingAnnotationId || undefined, date: annotationDate, note: annotationNote,
+      });
+      if (saved) setAnnotations((values) => [saved, ...values.filter((value) => value.id !== saved.id)].sort((a, b) => b.date.localeCompare(a.date)));
+      setEditingAnnotationId(saved?.id || null);
+    } catch (error) {
+      setAnnotationError(error instanceof Error ? error.message : 'Timeline note could not be saved.');
+    } finally { setSavingAnnotation(false); }
+  }
+
+  async function deleteAnnotation(annotation: WishlistAnnotation) {
+    if (!window.confirm(`Delete the note for ${formatShortDate(annotation.date)}?`)) return;
+    setSavingAnnotation(true);
+    setAnnotationError('');
+    try {
+      await mutateAnnotation('DELETE', { id: annotation.id });
+      setAnnotations((values) => values.filter((value) => value.id !== annotation.id));
+      if (editingAnnotationId === annotation.id) {
+        setEditingAnnotationId(null);
+        setAnnotationNote('');
+      }
+    } catch (error) {
+      setAnnotationError(error instanceof Error ? error.message : 'Timeline note could not be deleted.');
+    } finally { setSavingAnnotation(false); }
+  }
+
   return <>
     <PageHeading eyebrow={formatHeadingDate(latest?.date)} title="Your wishlists are moving." copy={`${data.projectName}'s latest Steam-generated data is ${Math.abs(pace).toFixed(0)}% ${pace >= 0 ? 'above' : 'below'} the previous weekly pace.`} />
     <div className="source-strip"><span className={data.source === 'steam' ? 'live' : ''}>{data.source === 'steam' ? '● LIVE STEAMWORKS' : '◇ ANONYMOUS FIXTURE'}</span><p>{freshnessLabel(data.freshness)} · Steam generated {formatTimestamp(data.generatedAt)} · Server fetched {formatTimestamp(data.fetchedAt)}{data.cacheHit ? ' · cached response' : ''}</p></div>
@@ -691,7 +763,17 @@ function Overview({ data, progress, milestone }: { data:WishlistDashboardData; p
     </div>
     <article className="panel range-panel">
       <div className="range-head"><div><p className="panel-title">History by date range</p><p className="panel-subtitle">Daily net movement and estimated total progression</p></div><div className="date-range"><label>From<input type="date" min={firstDate} max={toDate || lastDate} value={fromDate} onChange={(event)=>setFromDate(event.target.value)} /></label><span>→</span><label>To<input type="date" min={fromDate || firstDate} max={lastDate} value={toDate} onChange={(event)=>setToDate(event.target.value)} /></label></div></div>
-      {selected.expectedDays ? <><div className={`range-coverage ${selected.complete ? 'complete' : 'incomplete'}`} role="status"><b>{selected.complete ? 'Complete coverage' : 'Incomplete coverage'}</b><span>{selected.complete ? `${selected.recordedDays} reported days` : `${selected.recordedDays} of ${selected.expectedDays} days have data · ${missingDetail}`}</span></div><div className="range-summary"><div><small>INCLUSIVE PERIOD</small><b>{selected.expectedDays} {selected.expectedDays === 1 ? 'day' : 'days'}</b></div><div><small>REPORTED ADDS</small><b className="green">+{formatCount(selected.adds)}</b></div><div><small>REPORTED DELETES</small><b>-{formatCount(selected.deletes)}</b></div><div><small>REPORTED NET GROWTH</small><b className={selected.net >= 0 ? 'green' : ''}>{signedCount(selected.net)}</b></div></div>{selected.recordedDays ? <WishlistRangeChart entries={selected.entries} /> : <div className="empty-range">There are no records in this range. Days are shown as missing, not as zero activity.</div>}</> : <div className="empty-range">Choose a valid range within the available history.</div>}
+      {selected.expectedDays ? <><div className={`range-coverage ${selected.complete ? 'complete' : 'incomplete'}`} role="status"><b>{selected.complete ? 'Complete coverage' : 'Incomplete coverage'}</b><span>{selected.complete ? `${selected.recordedDays} reported days` : `${selected.recordedDays} of ${selected.expectedDays} days have data · ${missingDetail}`}</span></div><div className="range-summary"><div><small>INCLUSIVE PERIOD</small><b>{selected.expectedDays} {selected.expectedDays === 1 ? 'day' : 'days'}</b></div><div><small>REPORTED ADDS</small><b className="green">+{formatCount(selected.adds)}</b></div><div><small>REPORTED DELETES</small><b>-{formatCount(selected.deletes)}</b></div><div><small>REPORTED NET GROWTH</small><b className={selected.net >= 0 ? 'green' : ''}>{signedCount(selected.net)}</b></div></div>{selected.recordedDays ? <WishlistRangeChart entries={selected.entries} annotations={annotations} onSelectDate={selectAnnotationDate} /> : <div className="empty-range">There are no records in this range. Days are shown as missing, not as zero activity.</div>}</> : <div className="empty-range">Choose a valid range within the available history.</div>}
+      <section className="annotation-manager" aria-labelledby="timeline-notes-title">
+        <div className="annotation-heading"><div><p className="panel-title" id="timeline-notes-title">Timeline notes</p><p className="panel-subtitle">Explain campaigns, demos, launches, or other actions. Select any day in the chart or use the date field.</p></div><span>{annotations.length} {annotations.length === 1 ? 'NOTE' : 'NOTES'}</span></div>
+        <form id="timeline-note-editor" className="annotation-form" onSubmit={saveAnnotation}>
+          <label>Date<input type="date" min={firstDate} max={lastDate} required value={annotationDate} onChange={(event) => selectAnnotationDate(event.target.value)} /></label>
+          <label>What happened?<textarea maxLength={200} required rows={2} value={annotationNote} onChange={(event) => setAnnotationNote(event.target.value)} placeholder="Example: Launched the demo and shared it on Reddit"/><small>{annotationNote.length}/200</small></label>
+          <div className="annotation-form-actions"><button className="primary-button compact" disabled={savingAnnotation || !annotationDate || !annotationNote.trim()}>{savingAnnotation ? 'Saving…' : editingAnnotationId ? 'Save note' : 'Add note'}</button>{editingAnnotationId && <button type="button" className="secondary-button" onClick={() => { setEditingAnnotationId(null); setAnnotationNote(''); }}>Cancel edit</button>}</div>
+        </form>
+        {annotationError && <div className="inline-error" role="alert"><b>Timeline note error.</b><span>{annotationError}</span></div>}
+        <div className="annotation-list" aria-label="Saved timeline notes">{annotations.length ? annotations.map((annotation) => <article key={annotation.id}><span className="annotation-pin">◆</span><div><time dateTime={annotation.date}>{formatShortDate(annotation.date)}</time><p>{annotation.note}</p></div><div><button type="button" onClick={() => selectAnnotationDate(annotation.date)}>Edit</button><button type="button" className="danger-text" disabled={savingAnnotation} onClick={() => deleteAnnotation(annotation)}>Delete</button></div></article>) : <p className="annotation-empty">No notes yet. Select a chart day to record what may have influenced wishlists.</p>}</div>
+      </section>
     </article>
     <div className="dashboard-grid">
       <article className="panel trend-panel"><div className="panel-head"><div><p className="panel-title">Last 7 days</p><p className="panel-subtitle">Adds, deletes, and net movement reported by Steam</p></div><div className="legend"><span><i className="legend-now" />Net</span></div></div><div className="daily-table">{recent.slice().reverse().map(day=><div key={day.date}><time>{formatShortDate(day.date)}</time><span className="daily-adds">+{formatCount(day.adds)}</span><span className="daily-deletes">-{formatCount(day.deletes)}</span><b>{signedCount(day.net)}</b></div>)}</div></article>
@@ -701,7 +783,7 @@ function Overview({ data, progress, milestone }: { data:WishlistDashboardData; p
   </>;
 }
 
-function WishlistRangeChart({ entries }: { entries: WishlistRangeEntry[] }) {
+function WishlistRangeChart({ entries, annotations, onSelectDate }: { entries: WishlistRangeEntry[]; annotations: WishlistAnnotation[]; onSelectDate: (date:string)=>void }) {
   const width = 900;
   const height = 250;
   const padding = 28;
@@ -725,6 +807,7 @@ function WishlistRangeChart({ entries }: { entries: WishlistRangeEntry[] }) {
     return result;
   }, []);
   const labelEvery = Math.max(1, Math.ceil(entries.length / 6));
+  const annotationsByDate = new Map(annotations.map((annotation) => [annotation.date, annotation]));
 
   return (
     <div className="history-chart">
@@ -742,6 +825,7 @@ function WishlistRangeChart({ entries }: { entries: WishlistRangeEntry[] }) {
         <line x1={padding} y1={padding} x2={width-padding} y2={padding}/>
         <line x1={padding} y1={height/2} x2={width-padding} y2={height/2}/>
         <line x1={padding} y1={height-padding} x2={width-padding} y2={height-padding}/>
+        {entries.map((entry, index) => <rect key={`hit-${entry.date}`} className="chart-day-hit" x={xForIndex(index)-Math.max(7, (width-padding*2)/entries.length/2)} y={padding} width={Math.max(14, (width-padding*2)/entries.length)} height={height-padding*2} onClick={() => onSelectDate(entry.date)}><title>Select {formatShortDate(entry.date)} to add a note</title></rect>)}
         {entries.map((entry, index) => entry.status === 'missing' ? (
           <rect className="history-missing" key={entry.date} x={xForIndex(index)-8} y={padding} width="16" height={height-padding*2}>
             <title>{formatShortDate(entry.date)} · no reported data</title>
@@ -753,6 +837,12 @@ function WishlistRangeChart({ entries }: { entries: WishlistRangeEntry[] }) {
           return <g key={index}><path className="history-area" d={area}/><path className="history-line" d={path}/></g>;
         })}
         {points.map((point) => <circle key={point.date} cx={point.x} cy={point.y} r="4"><title>{formatShortDate(point.date)} · {formatCount(point.total)} stored total · {signedCount(point.net)} net</title></circle>)}
+        {entries.map((entry, index) => {
+          const annotation = annotationsByDate.get(entry.date);
+          if (!annotation) return null;
+          const x = xForIndex(index);
+          return <g className="annotation-marker" key={`annotation-${annotation.id}`} role="button" tabIndex={0} aria-label={`${formatShortDate(annotation.date)}: ${annotation.note}`} onClick={() => onSelectDate(annotation.date)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') onSelectDate(annotation.date); }}><line x1={x} y1={padding} x2={x} y2={height-padding}/><path d={`M ${x-9} ${padding-3} L ${x+9} ${padding-3} L ${x} ${padding+13} Z`}/><title>{formatShortDate(annotation.date)} · {annotation.note}</title></g>;
+        })}
       </svg>
       <div className="history-dates">
         {entries.map((entry, index) => <span className={entry.status === 'missing' ? 'missing' : ''} key={entry.date} style={{left:`${(xForIndex(index)/width)*100}%`}}>{index % labelEvery === 0 || index === entries.length-1 || entry.status === 'missing' ? formatChartDate(entry.date) : ''}</span>)}

@@ -93,6 +93,7 @@ Full runtime account isolation and 24-48 hour cadence evidence remain.
 | Latest date, movement, freshness, source, and coverage | Meets | Latest activity, source, coverage dates, timestamps, and explicit freshness state render. |
 | Stored total labels | Meets | Stored totals are derived only from retained history and show their coverage. |
 | Inclusive date-range totals and trend | Meets | Pure calculation tests cover both endpoints, UTC month boundaries, invalid ranges, and reported-only sums. Browser acceptance renders the resulting summary. |
+| Owner timeline annotations | Meets | Authenticated CRUD stores one 200-character note per date, scoped by workspace and App ID. D1 tests prove cross-workspace/App isolation; browser acceptance covers create, marker display, edit, and deletion through the accessible manager. |
 | Missing dates differ from zero | Meets | Every selected calendar date becomes a recorded or missing entry. The UI draws striped gaps, preserves a zero-activity point, and distinguishes pending bounded recovery from exhausted dates. |
 | Late corrections recalculate dependent metrics | Meets | Daily records are upserted by workspace, App ID, and reporting date; tests show corrected input recalculates range aggregates and every running total. |
 | Phone and desktop usability | Meets for MVP | Chromium acceptance verifies the dashboard at desktop and 390 × 844 without horizontal overflow. A broader accessibility audit remains future hardening. |

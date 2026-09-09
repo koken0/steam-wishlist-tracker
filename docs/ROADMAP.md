@@ -23,6 +23,8 @@ Steamworks report. This does not clear the separate hosted-key compliance gate.
 - D1 schema and initial migration
 - Throttled manual refresh with workspace-scoped cache
 - Overview, date-range history, projects, widget preview, security, and settings
+- Dated owner annotations with interactive chart markers and an accessible
+  create/edit/delete manager
 - Freely configurable wishlist milestone target persisted per project
 - Redacted real-data acceptance script
 - Opt-in Web Push for changed wishlist activity observations with encrypted

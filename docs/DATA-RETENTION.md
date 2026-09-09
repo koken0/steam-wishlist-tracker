@@ -10,6 +10,7 @@ privacy notice. Paid production remains blocked by `STEAM-COMPLIANCE.md`.
 | --- | --- | --- |
 | Workspace and encrypted Steam connection | Until owner disconnects or deletes the account | Owner action |
 | Normalized daily history | Until owner disconnects or deletes the account | Owner action; no rolling purge because it would silently change the stored total |
+| Owner timeline annotations | Until individually deleted, owner disconnects, or account deletion | Owner action |
 | Intraday observations | 90 days | Hourly scheduled retention |
 | Normalized hourly poll evidence | 90 days | Hourly scheduled retention |
 | Spike alerts | 365 days | Hourly scheduled retention |
@@ -28,7 +29,7 @@ Steam responses, user emails, request bodies, or arbitrary error text.
 
 **Disconnect and delete all data** removes the encrypted Steam connection,
 encrypted push subscriptions, delivery ledger, daily history, intraday
-observations, hourly poll evidence, and alerts in one workspace-scoped D1 batch. It retains the
+observations, hourly poll evidence, timeline annotations, and alerts in one workspace-scoped D1 batch. It retains the
 empty account workspace so the owner may reconnect.
 
 **Delete Wishline account** requires a separate explicit browser confirmation

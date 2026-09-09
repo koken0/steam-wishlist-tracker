@@ -276,6 +276,10 @@ Accepted when:
   freshness, source, and stored-history coverage;
 - stored totals use the labels in Section 3.3;
 - a selected inclusive date range produces the correct sum and trend;
+- the owner can select a chart date and create, inspect, edit, or delete one
+  brief explanatory note for that workspace and App ID;
+- dated notes use compact interactive markers plus an accessible manager so
+  long text does not overlap the chart;
 - missing dates and unavailable totals are distinguishable from zero;
 - missing dates distinguish pending bounded recovery from exhausted recovery;
 - late corrections recalculate every dependent metric; and

@@ -34,6 +34,8 @@ data. Treat both as sensitive even though the current product is an MVP.
 - The hourly Worker reads all saved connections only inside the server runtime;
   its HTTP fallback rejects requests without the scheduler bearer secret.
 - Intraday snapshots and alerts remain scoped by workspace and App ID.
+- Owner-authored timeline notes remain scoped by workspace and App ID and are
+  returned only through the authenticated, non-cacheable annotations API.
 - Web Push endpoints and browser key material are bearer capabilities. Wishline
   validates known HTTPS push-service hosts, encrypts the complete subscription
   at rest, and stores only a one-way endpoint hash separately.
@@ -46,7 +48,7 @@ data. Treat both as sensitive even though the current product is an MVP.
   code, timestamp, and optional workspace/App ID scope. They have no free-form
   payload column and never contain request bodies or upstream responses.
 - Owner-confirmed disconnect deletes the encrypted Steam connection and all
-  daily, intraday, alert, push-subscription, and delivery data scoped to that
+  daily, intraday, annotation, alert, push-subscription, and delivery data scoped to that
   workspace. It does not revoke the source key in Steamworks.
 
 ## Production controls

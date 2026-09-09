@@ -21,6 +21,8 @@ Browser / installed PWA
                                   |-- response validation/normalization
                                   |-- durable per-date D1 snapshots
                                   `-- workspace-scoped in-memory response cache
+  |
+  `-- /api/annotations ------> authenticated workspace/App-scoped note CRUD
 ```
 
 The browser receives aggregate wishlist activity, project metadata, and
@@ -33,6 +35,7 @@ timestamps. It never receives the saved Financial API key.
 | `app/page.tsx` | Onboarding, dashboard views, refresh interactions, and client rendering |
 | `app/api/setup/route.ts` | Authenticated connection validation, persistence, disconnect, and deletion |
 | `app/api/wishlist/route.ts` | Private normalized dashboard endpoint and refresh action |
+| `app/api/annotations/route.ts` | Authenticated, non-cacheable dated-note CRUD |
 | `app/api/internal/scheduler-health/route.ts` | Secret-protected read-only aggregate scheduler health |
 | `lib/wishline-auth.ts` | Reads the platform-provided authenticated identity |
 | `lib/wishline-store.ts` | Creates owner workspaces and reads/writes Steam connections in D1 |
@@ -52,6 +55,11 @@ workspace, App ID, and Steam reporting date. A repeated date is updated, so
 late Steam corrections recalculate the stored history. The committed schema
 reference is in `db/schema.ts`; forward-only D1 migrations are under
 `drizzle/`.
+
+`wishlist_annotations` stores at most one brief owner-authored note for each
+workspace, App ID, and reporting date. Its free-form content is private product
+context, never audit telemetry. The chart renders a compact marker and exposes
+the full text through an interactive title and the accessible note manager.
 
 `wishlist_poll_samples` retains one normalized diagnostic result for every
 scheduled date request. It distinguishes current-day polling from next-day
@@ -202,7 +210,7 @@ per-event capability whose hash is stored in D1; authenticated Settings reads
 the resulting status and polls briefly while awaiting receipt.
 
 Owner disconnect uses an authenticated `DELETE /api/setup` request with an
-explicit action header. One D1 batch removes alerts, intraday observations,
+explicit action header. One D1 batch removes alerts, annotations, intraday observations,
 daily snapshots, encrypted push subscriptions, and the encrypted Steam
 connection before returning the empty workspace status. The owner workspace
 record remains available for a later

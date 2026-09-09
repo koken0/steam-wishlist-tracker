@@ -13,6 +13,50 @@ test.beforeEach(async ({ page }) => {
     contentType: 'application/json',
     body: JSON.stringify({ required: false, unlocked: true }),
   }));
+  await page.route('**/api/annotations', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ annotations: [] }),
+  }));
+});
+
+test('creates, edits, displays, and deletes a dated timeline note', async ({ page }) => {
+  let annotation: { id: string; date: string; note: string; createdAt: string; updatedAt: string } | null = null;
+  await page.route('**/api/setup', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(connectedSetup()) }));
+  await page.route('**/api/wishlist', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(dashboardFixture) }));
+  await page.route('**/api/annotations', async (route) => {
+    const method = route.request().method();
+    if (method === 'GET') {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ annotations: annotation ? [annotation] : [] }) });
+      return;
+    }
+    const body = route.request().postDataJSON() as { id?: string; date?: string; note?: string };
+    if (method === 'DELETE') annotation = null;
+    else annotation = {
+      id: annotation?.id || 'annotation_1234567890abcdef1234567890abcdef',
+      date: body.date || '', note: body.note || '',
+      createdAt: annotation?.createdAt || '2026-09-09T00:00:00.000Z', updatedAt: '2026-09-09T00:01:00.000Z',
+    };
+    await route.fulfill({ status: method === 'POST' ? 201 : 200, contentType: 'application/json', body: JSON.stringify(method === 'DELETE' ? { deleted: true } : { annotation }) });
+  });
+
+  await openLocalWorkspace(page);
+  await page.getByRole('textbox', { name: 'Date' }).fill('2026-09-03');
+  await page.getByLabel('What happened?').fill('Launched the demo on Steam');
+  await page.getByRole('button', { name: 'Add note' }).click();
+  await expect(page.locator('.annotation-list')).toContainText('Launched the demo on Steam');
+  await expect(page.locator('.annotation-marker')).toHaveCount(1);
+  await expect(page.locator('.annotation-marker')).toHaveAttribute('aria-label', /Launched the demo/);
+
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.getByLabel('What happened?').fill('Launched the demo and posted on Reddit');
+  await page.getByRole('button', { name: 'Save note' }).click();
+  await expect(page.locator('.annotation-list')).toContainText('posted on Reddit');
+
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: 'Delete' }).click();
+  await expect(page.locator('.annotation-list')).toContainText('No notes yet');
+  await expect(page.locator('.annotation-marker')).toHaveCount(0);
 });
 
 test('authenticates, onboards, reconnects, loads the dashboard, and renders safe 429/503 errors', async ({ page }) => {

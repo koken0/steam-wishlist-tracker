@@ -4,6 +4,12 @@ All notable product changes are recorded here. Wishline uses semantic version
 tags without a `v` prefix; the interface renders the same value with a `v`
 prefix for readability.
 
+## Unreleased
+
+- Added private dated timeline notes with interactive chart markers and an
+  accessible responsive manager for creating, editing, and deleting context.
+- Persisted notes in D1 with workspace/App ID isolation and owner-action deletion.
+
 ## 0.0.1 - 2026-09-08
 
 Initial versioned private prototype.
