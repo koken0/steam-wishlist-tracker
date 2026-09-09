@@ -272,23 +272,25 @@ npm run monitor:scheduler
 
 Use the `result` field as the primary diagnosis:
 
-| Result | Meaning |
-| --- | --- |
-| `changed` | Steam returned usable records and a current-day counter or `time_generated` changed |
-| `unchanged` | Steam returned usable records, but the current-day observation did not change |
-| `partial_failure` | At least one connection succeeded and at least one failed |
-| `failed` | The run executed, but no configured connection synchronized successfully |
-| `no_connections` | The scheduler worked, but there were no saved connections to process |
-| `no_remote_request` | A connection was processed without starting a new Steam date request; this is expected only when another forced refresh populated the same workspace/App cache less than 60 seconds earlier |
-| `no_usable_records` | Steam accepted the date requests but has not published a usable record yet; this is an expected availability window, not a connector failure |
-| `unknown` | The row predates detailed scheduler telemetry |
+| Result | Meaning | Operator color |
+| --- | --- | --- |
+| `changed` | Steam returned usable records and a current-day counter or `time_generated` changed | Green |
+| `unchanged` | Steam returned usable records, but the current-day observation did not change | Green |
+| `partial_failure` | At least one connection succeeded and at least one failed | Yellow: some work completed successfully |
+| `failed` | The run executed, but no configured connection synchronized successfully | Red: total failure |
+| `no_connections` | The scheduler worked, but there were no saved connections to process | Green/neutral |
+| `no_remote_request` | A connection was processed without starting a new Steam date request; this is expected only when another forced refresh populated the same workspace/App cache less than 60 seconds earlier | Green/neutral |
+| `no_usable_records` | Steam accepted the date requests but has not published a usable record yet; this is an expected availability window, not a connector failure | Green/neutral |
+| `unknown` | The row predates detailed scheduler telemetry | Gray |
 
 The supporting counters make the diagnosis auditable without exposing business
 data: `reportDatesRequested` proves date requests were started,
 `recordsReceived` proves Steam returned usable normalized records,
 `pollCounterChanges` proves counters moved, `pollTimestampOnly` isolates batch
 timestamp churn, and `finalizedCounterChanges` identifies next-day corrections.
-Do not treat `unchanged` as a failure.
+Do not treat `unchanged` as a failure. Do not show `partial_failure` in red:
+red is reserved for a run where no connection succeeded. The console always
+shows a text label as well as color.
 
 The same completed event includes `pushAttempted`, `pushSent`, `pushExpired`,
 and `pushFailed`. A changed observation with `pushSent: 1` was delivered to one

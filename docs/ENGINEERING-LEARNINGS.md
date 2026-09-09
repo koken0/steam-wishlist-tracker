@@ -4,6 +4,20 @@ This document records sanitized operational findings that should influence
 future implementation and incident diagnosis. Never add credentials, real user
 IDs, raw Steam responses, or sensitive project data here.
 
+## 2026-09-09 partial scheduler status presentation
+
+The scheduler model already distinguished `partial_failure` from `failed`, but
+the first operator-console presentation colored every row with `failed > 0`
+red. That collapsed two materially different outcomes: a partially successful
+run and a run where nothing worked.
+
+Presentation rule: derive row severity from the classified `result`, not from
+the failure counter alone. A partial failure is yellow because at least one
+connection succeeded; a total failure is red because none succeeded. The
+top-level `degraded` state requires the same secondary check against the latest
+run's `succeeded` count. Keep explicit labels (`Falla parcial` and `Falló`) so
+the distinction does not depend on color perception.
+
 ## 2026-09-05 hosted onboarding investigation
 
 ### Compare identical requests before blaming infrastructure

@@ -316,6 +316,25 @@ identify connector failures; `no_connections`, `no_remote_request`, and
 reserved for rows written before detailed telemetry existed. Preserve this
 distinction whenever scheduler logging changes.
 
+### Operator-console status colors
+
+Color communicates severity, not merely the presence of a failed connection:
+
+| Console state | Exact condition | Color | Operator interpretation |
+| --- | --- | --- | --- |
+| Successful | `failed = 0` | Green | Every processed connection completed successfully. |
+| Partial failure | `succeeded > 0` and `failed > 0`; result `partial_failure` | Yellow | At least one connection worked, while one or more require attention. |
+| Total failure | `succeeded = 0` and `failed > 0`; result `failed` | Red | No processed connection synchronized successfully. |
+| Stale | No completed run within the 90-minute health window | Yellow | Recency requires attention; it does not prove a connector failure. |
+| Unknown/no data | No usable health evidence | Gray | There is not enough evidence to classify the scheduler. |
+
+Do not render `partial_failure` in red. A nonzero `failed` counter alone is not
+enough to select the failure color; the UI must also inspect `succeeded` or the
+already classified run `result`. The top-level `degraded` health state covers
+both partial and total failures, so its badge color must use the latest run's
+success count to distinguish yellow from red. Text labels remain mandatory;
+color is only a secondary cue for accessibility.
+
 When Steam accepts both date requests but neither response contains a usable
 daily record, the connection records a successful `sync.success` audit with
 reason `DATA_NOT_YET_AVAILABLE` and the run result is `no_usable_records`.
