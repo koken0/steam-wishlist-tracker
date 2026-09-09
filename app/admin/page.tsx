@@ -121,7 +121,11 @@ export default function AdminPage() {
                     <td><strong>{account.ownerEmail || 'Sin email'}</strong><small>{account.workspaceName}</small></td>
                     <td>{formatDate(account.createdAt)}</td>
                     <td><strong>{account.projectName || 'Sin conectar'}</strong><small>{account.appId ? `App ${account.appId}` : '—'}</small></td>
-                    <td><span className={account.connected ? styles.good : styles.neutral}>{account.connected ? 'Conectado' : 'Pendiente'}</span></td>
+                    <td>{account.syncState === 'suspended'
+                      ? <span className={styles.marked}>Marcada</span>
+                      : <span className={account.connected ? styles.good : styles.neutral}>{account.connected ? 'Conectado' : 'Pendiente'}</span>}
+                      {account.syncState === 'suspended' && <small>{failureReasonLabel(account.suspensionReason)} · {formatDate(account.suspendedAt || '')}</small>}
+                    </td>
                     <td>{formatDate(account.lastActivityAt || account.updatedAt)}</td>
                     <td>{account.notificationsEnabled ? 'Activas' : '—'}</td>
                   </tr>

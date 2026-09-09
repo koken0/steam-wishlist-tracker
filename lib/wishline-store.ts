@@ -21,6 +21,10 @@ export async function listSteamConnectionsForSync(): Promise<StoredSteamConnecti
   return store().listSteamConnectionsForSync();
 }
 
+export async function suspendSteamConnection(workspaceId: string, appId: number, reason: string): Promise<boolean> {
+  return store().suspendSteamConnection(workspaceId, appId, reason);
+}
+
 export async function saveSteamConnection(
   user: WishlineUser,
   input: { appId: number; projectName: string; apiKey: string },

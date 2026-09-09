@@ -24,6 +24,13 @@ async function wishlistResponse(request: Request, force: boolean) {
   try {
     const user = await getWishlineUser(request);
     const savedConnection = user ? await getSteamConnection(user) : null;
+    if (savedConnection?.syncState === 'suspended') {
+      throw new WishlistConnectorError(
+        'STEAM_CONNECTION_SUSPENDED',
+        'Steam access was rejected. Reconnect the project with a valid Financial API key to resume synchronization.',
+        409,
+      );
+    }
     if (!savedConnection) {
       const access = authorizeWishlistRequest(request, user?.id ?? null);
       if (!access.allowed) {

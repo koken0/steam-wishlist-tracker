@@ -9,6 +9,9 @@ export type AdminAccount = {
   appId: number | null;
   projectName: string | null;
   connected: boolean;
+  syncState: 'active' | 'suspended' | null;
+  suspendedAt: string | null;
+  suspensionReason: string | null;
   connectionUpdatedAt: string | null;
   lastActivityAt: string | null;
   notificationsEnabled: boolean;
@@ -41,6 +44,9 @@ type AdminAccountRow = {
   connection_updated_at: string | null;
   last_activity_at: string | null;
   push_count: number;
+  sync_state: 'active' | 'suspended' | null;
+  suspended_at: string | null;
+  suspension_reason: string | null;
 };
 
 export async function readAdminOverviewInDatabase(db: D1Database, now = new Date()): Promise<AdminOverview> {
@@ -50,7 +56,7 @@ export async function readAdminOverviewInDatabase(db: D1Database, now = new Date
   const [result, scheduler, failureResult] = await Promise.all([db.prepare(
     `SELECT w.id AS workspace_id, w.owner_email, w.name AS workspace_name,
             w.created_at, w.updated_at, c.app_id, c.project_name,
-            c.updated_at AS connection_updated_at,
+            c.updated_at AS connection_updated_at, c.sync_state, c.suspended_at, c.suspension_reason,
             (SELECT MAX(p.fetched_at) FROM wishlist_poll_samples p WHERE p.workspace_id = w.id) AS last_activity_at,
             (SELECT COUNT(*) FROM push_subscriptions s WHERE s.workspace_id = w.id) AS push_count
        FROM workspaces w
@@ -75,6 +81,9 @@ export async function readAdminOverviewInDatabase(db: D1Database, now = new Date
     appId: row.app_id,
     projectName: row.project_name,
     connected: row.app_id != null,
+    syncState: row.app_id == null ? null : row.sync_state || 'active',
+    suspendedAt: row.suspended_at,
+    suspensionReason: row.suspension_reason,
     connectionUpdatedAt: row.connection_updated_at,
     lastActivityAt: row.last_activity_at,
     notificationsEnabled: Number(row.push_count) > 0,

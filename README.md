@@ -162,6 +162,9 @@ Open `http://localhost:3000`.
 The private operator console is available at `http://localhost:3000/admin`.
 It remains closed unless the signed-in immutable user ID appears in the
 server-only `WISHLINE_ADMIN_USER_IDS` allowlist.
+Connections rejected by Steam are persistently marked in the operator console
+and excluded from later hourly polling. A newly validated key clears the mark
+and resumes synchronization.
 
 The development server binds to `127.0.0.1` so live financial data is not exposed to other devices on the local network.
 

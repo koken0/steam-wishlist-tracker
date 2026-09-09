@@ -47,6 +47,11 @@ test('two owners cannot read, replace, refresh through, or delete each other wor
     }));
     assert.equal((await store.getSteamConnection(ownerA))?.apiKey, 'owner-a-key');
 
+    assert.equal(await store.suspendSteamConnection(connectionA!.workspaceId, 101, 'STEAM_ACCESS_DENIED'), true);
+    assert.equal((await store.getSteamConnection(ownerA))?.syncState, 'suspended');
+    assert.equal((await store.getSteamConnection(ownerA))?.suspensionReason, 'STEAM_ACCESS_DENIED');
+    assert.deepEqual(await store.listSteamConnectionsForSync(), []);
+
     const replacement = await validateAndSaveConnection(ownerA, {
       appId: 202,
       projectName: 'Requested Name',
@@ -56,6 +61,9 @@ test('two owners cannot read, replace, refresh through, or delete each other wor
       save: store.saveSteamConnection,
     });
     assert.equal((await store.getSteamConnection(ownerA))?.apiKey, 'owner-a-new-key');
+    assert.equal((await store.getSteamConnection(ownerA))?.syncState, 'active');
+    assert.equal((await store.getSteamConnection(ownerA))?.suspendedAt, null);
+    assert.equal((await store.listSteamConnectionsForSync()).length, 1);
     assert.equal(JSON.stringify(replacement).includes('owner-a-key'), false);
     assert.equal(JSON.stringify(replacement).includes('owner-a-new-key'), false);
 

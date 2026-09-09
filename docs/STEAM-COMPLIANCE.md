@@ -41,6 +41,8 @@ The app currently:
 - encrypts the key with AES-256-GCM before storing it in D1;
 - decrypts it only in the server runtime;
 - sends it to Steam in the `x-webapi-key` header over HTTPS;
+- suspends further polling after Steam rejects access, retaining only a
+  sanitized state, reason code, and timestamp until the owner reconnects;
 - requests only the configured App ID and rejects an unexpected App ID;
 - returns normalized aggregate wishlist metrics rather than the credential or
   raw upstream response.

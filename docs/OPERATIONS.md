@@ -97,6 +97,12 @@ identify the affected project and sanitized reason code without returning a
 credential or upstream response. A successful run with no changed counters is
 shown as **Sin cambios**, not as a failure.
 
+When Steam returns `STEAM_ACCESS_DENIED`, the connection is persistently marked
+as suspended with its sanitized reason and timestamp. Suspended connections are
+excluded from subsequent hourly polling and appear as **Marcada** in
+`/admin/usuarios`. Saving a newly validated key reactivates the connection and
+clears the mark; disconnecting still deletes the credential and retained data.
+
 The operator UI uses separate routes: `/admin` for the compact summary,
 `/admin/worker` for scheduler diagnostics, and `/admin/usuarios` for accounts.
 Navigation does not stack the full tables into one long screen.

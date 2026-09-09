@@ -1,4 +1,4 @@
-import { listSteamConnectionsForSync } from '@/lib/wishline-store';
+import { listSteamConnectionsForSync, suspendSteamConnection } from '@/lib/wishline-store';
 import { getWishlistDashboardData } from '@/lib/wishlist-server';
 import { WishlistConnectorError } from '@/lib/wishlist-errors';
 import { enforceRetention, persistSyncRun, recordAuditEventSafely } from '@/lib/wishline-governance';
@@ -72,6 +72,7 @@ export async function syncAllWishlistConnections(): Promise<WishlistSyncSummary>
           });
         } else {
           failed += 1;
+          await suspendIfAccessDenied(connection.workspaceId, connection.appId, data.syncWarning.code);
           await recordAuditEventSafely({ workspaceId: connection.workspaceId, appId: connection.appId, eventType: 'sync.failure', outcome: 'failure', reasonCode: data.syncWarning.code });
         }
       } else {
@@ -83,6 +84,7 @@ export async function syncAllWishlistConnections(): Promise<WishlistSyncSummary>
       const dataNotYetAvailable = reasonCode === 'DATA_NOT_YET_AVAILABLE';
       if (dataNotYetAvailable) succeeded += 1;
       else failed += 1;
+      await suspendIfAccessDenied(connection.workspaceId, connection.appId, reasonCode);
       await recordAuditEventSafely({
         workspaceId: connection.workspaceId,
         appId: connection.appId,
@@ -147,6 +149,20 @@ export async function syncAllWishlistConnections(): Promise<WishlistSyncSummary>
   await persistSyncRun(run);
   const retention = await enforceRetention(new Date(completedAt));
   return { ...run, push, retention };
+}
+
+async function suspendIfAccessDenied(workspaceId: string, appId: number, reasonCode: string) {
+  if (reasonCode !== 'STEAM_ACCESS_DENIED') return;
+  const suspended = await suspendSteamConnection(workspaceId, appId, reasonCode);
+  if (suspended) {
+    await recordAuditEventSafely({
+      workspaceId,
+      appId,
+      eventType: 'connection.suspended',
+      outcome: 'failure',
+      reasonCode,
+    });
+  }
 }
 
 export async function runScheduledWishlistSync(): Promise<WishlistSyncSummary> {

@@ -6,6 +6,7 @@ export type AuditEventType =
   | 'connection.created'
   | 'connection.replaced'
   | 'connection.validation_failed'
+  | 'connection.suspended'
   | 'connection.disconnected'
   | 'encryption.rewrapped'
   | 'push.subscribed'

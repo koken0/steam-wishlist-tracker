@@ -10,6 +10,9 @@ export type StoredSteamConnection = {
   projectName: string;
   apiKey: string;
   updatedAt: string;
+  syncState: 'active' | 'suspended';
+  suspendedAt: string | null;
+  suspensionReason: string | null;
 };
 
 export type WishlineWorkspaceStatus = {
@@ -19,6 +22,9 @@ export type WishlineWorkspaceStatus = {
   projectName: string | null;
   connected: boolean;
   updatedAt: string | null;
+  syncState: 'active' | 'suspended' | null;
+  suspendedAt: string | null;
+  suspensionReason: string | null;
 };
 
 type StoredSteamConnectionRow = {
@@ -27,6 +33,9 @@ type StoredSteamConnectionRow = {
   project_name: string;
   encrypted_api_key: string;
   updated_at: string;
+  sync_state: 'active' | 'suspended';
+  suspended_at: string | null;
+  suspension_reason: string | null;
 };
 
 type WorkspaceRow = {
@@ -36,6 +45,9 @@ type WorkspaceRow = {
   project_name: string | null;
   encrypted_api_key: string | null;
   connection_updated_at: string | null;
+  sync_state: 'active' | 'suspended' | null;
+  suspended_at: string | null;
+  suspension_reason: string | null;
 };
 
 const schemaReady = new WeakMap<object, Promise<void>>();
@@ -54,14 +66,18 @@ export function createWishlineStore(db: D1Database) {
       projectName: row.project_name,
       apiKey: await decryptSecret(row.encrypted_api_key),
       updatedAt: row.connection_updated_at,
+      syncState: row.sync_state || 'active',
+      suspendedAt: row.suspended_at,
+      suspensionReason: row.suspension_reason,
     };
   }
 
   async function listSteamConnectionsForSync(): Promise<StoredSteamConnection[]> {
     await initializeSchema();
     const result = await db.prepare(
-      `SELECT workspace_id, app_id, project_name, encrypted_api_key, updated_at
-         FROM steam_connections ORDER BY workspace_id`,
+      `SELECT workspace_id, app_id, project_name, encrypted_api_key, updated_at,
+              sync_state, suspended_at, suspension_reason
+         FROM steam_connections WHERE sync_state = 'active' ORDER BY workspace_id`,
     ).all<StoredSteamConnectionRow>();
     return Promise.all((result.results || []).map(async (row) => ({
       workspaceId: row.workspace_id,
@@ -69,6 +85,9 @@ export function createWishlineStore(db: D1Database) {
       projectName: row.project_name,
       apiKey: await decryptSecret(row.encrypted_api_key),
       updatedAt: row.updated_at,
+      syncState: row.sync_state,
+      suspendedAt: row.suspended_at,
+      suspensionReason: row.suspension_reason,
     })));
   }
 
@@ -80,10 +99,11 @@ export function createWishlineStore(db: D1Database) {
     const now = new Date().toISOString();
     const encryptedApiKey = await encryptSecret(input.apiKey);
     await db.prepare(
-      `INSERT INTO steam_connections (workspace_id, app_id, project_name, encrypted_api_key, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?)
+      `INSERT INTO steam_connections (workspace_id, app_id, project_name, encrypted_api_key, sync_state, suspended_at, suspension_reason, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 'active', NULL, NULL, ?, ?)
        ON CONFLICT(workspace_id) DO UPDATE SET app_id = excluded.app_id,
          project_name = excluded.project_name, encrypted_api_key = excluded.encrypted_api_key,
+         sync_state = 'active', suspended_at = NULL, suspension_reason = NULL,
          updated_at = excluded.updated_at`,
     ).bind(workspace.id, input.appId, input.projectName, encryptedApiKey, now, now).run();
     await auditSafely({
@@ -99,7 +119,20 @@ export function createWishlineStore(db: D1Database) {
       project_name: input.projectName,
       encrypted_api_key: encryptedApiKey,
       connection_updated_at: now,
+      sync_state: 'active',
+      suspended_at: null,
+      suspension_reason: null,
     });
+  }
+
+  async function suspendSteamConnection(workspaceId: string, appId: number, reason: string, now = new Date()): Promise<boolean> {
+    await initializeSchema();
+    const result = await db.prepare(
+      `UPDATE steam_connections
+          SET sync_state = 'suspended', suspended_at = ?, suspension_reason = ?
+        WHERE workspace_id = ? AND app_id = ? AND sync_state = 'active'`,
+    ).bind(now.toISOString(), reason, workspaceId, appId).run();
+    return Number(result.meta.changes || 0) > 0;
   }
 
   async function disconnectSteamConnection(user: WishlineUser): Promise<WishlineWorkspaceStatus> {
@@ -144,7 +177,7 @@ export function createWishlineStore(db: D1Database) {
     ).bind(workspaceId, user.id, user.email, `${ownerLabel}'s workspace`, now, now).run();
     const row = await db.prepare(
       `SELECT w.id, w.name, c.app_id, c.project_name, c.encrypted_api_key,
-              c.updated_at AS connection_updated_at
+              c.updated_at AS connection_updated_at, c.sync_state, c.suspended_at, c.suspension_reason
          FROM workspaces w LEFT JOIN steam_connections c ON c.workspace_id = w.id
         WHERE w.owner_user_id = ? LIMIT 1`,
     ).bind(user.id).first<WorkspaceRow>();
@@ -161,9 +194,11 @@ export function createWishlineStore(db: D1Database) {
         name TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`),
       db.prepare(`CREATE TABLE IF NOT EXISTS steam_connections (
         workspace_id TEXT PRIMARY KEY, app_id INTEGER NOT NULL CHECK (app_id > 0), project_name TEXT NOT NULL,
-        encrypted_api_key TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+        encrypted_api_key TEXT NOT NULL, sync_state TEXT NOT NULL DEFAULT 'active' CHECK (sync_state IN ('active', 'suspended')),
+        suspended_at TEXT, suspension_reason TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
         FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE)`),
       db.prepare('CREATE INDEX IF NOT EXISTS idx_steam_connections_app_id ON steam_connections(app_id)'),
+      db.prepare('CREATE INDEX IF NOT EXISTS idx_steam_connections_sync_state ON steam_connections(sync_state, workspace_id)'),
       db.prepare(`CREATE TABLE IF NOT EXISTS wishlist_daily_snapshots (
         workspace_id TEXT NOT NULL, app_id INTEGER NOT NULL CHECK (app_id > 0), report_date TEXT NOT NULL,
         adds INTEGER NOT NULL CHECK (adds >= 0), deletes INTEGER NOT NULL CHECK (deletes >= 0),
@@ -231,7 +266,7 @@ export function createWishlineStore(db: D1Database) {
     }
   }
 
-  return { getWorkspaceStatus, getSteamConnection, listSteamConnectionsForSync, saveSteamConnection, disconnectSteamConnection, deleteWishlineAccount };
+  return { getWorkspaceStatus, getSteamConnection, listSteamConnectionsForSync, saveSteamConnection, suspendSteamConnection, disconnectSteamConnection, deleteWishlineAccount };
 }
 
 function publicWorkspace(row: WorkspaceRow): WishlineWorkspaceStatus {
@@ -242,5 +277,8 @@ function publicWorkspace(row: WorkspaceRow): WishlineWorkspaceStatus {
     projectName: row.project_name,
     connected: Boolean(row.encrypted_api_key && row.app_id),
     updatedAt: row.connection_updated_at,
+    syncState: row.encrypted_api_key ? row.sync_state || 'active' : null,
+    suspendedAt: row.suspended_at,
+    suspensionReason: row.suspension_reason,
   };
 }
