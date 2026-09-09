@@ -29,6 +29,41 @@ test('admin overview prepares governance tables before querying them', async () 
   }
 });
 
+test('admin account detail returns safe operational aggregates without internal identifiers or secrets', async () => {
+  const { db, dispose } = await testDatabase();
+  try {
+    await createProductTables(db);
+    const workspaceId = 'ws_private_internal_identifier';
+    await createConnection(db, workspaceId, 123, 'encrypted-secret-envelope');
+    await db.prepare(`UPDATE workspaces SET owner_email = 'owner@example.com' WHERE id = ?`).bind(workspaceId).run();
+    await db.prepare(`INSERT INTO wishlist_daily_snapshots
+      (workspace_id, app_id, report_date, adds, deletes, purchases, gifts, adds_windows, adds_mac, adds_linux, fetched_at)
+      VALUES (?, 123, '2026-09-01', 10, 1, 0, 0, 8, 1, 1, '2026-09-02T00:00:00.000Z'),
+             (?, 123, '2026-09-02', 12, 2, 0, 0, 10, 1, 1, '2026-09-03T00:00:00.000Z')`).bind(workspaceId, workspaceId).run();
+    await db.prepare(`INSERT INTO wishlist_poll_samples
+      (id, workspace_id, app_id, requested_date, date_phase, outcome, classification, fetched_at)
+      VALUES ('poll-safe', ?, 123, '2026-09-02', 'previous', 'record', 'unchanged', '2026-09-03T01:00:00.000Z')`).bind(workspaceId).run();
+    await db.prepare(`INSERT INTO wishlist_history_repairs
+      (workspace_id, app_id, report_date, status, attempts, created_at, updated_at)
+      VALUES (?, 123, '2026-08-30', 'pending', 0, '2026-09-03T00:00:00.000Z', '2026-09-03T00:00:00.000Z')`).bind(workspaceId).run();
+
+    const overview = await readAdminOverviewInDatabase(db, new Date('2026-09-05T02:30:00.000Z'));
+    assert.deepEqual(overview.accounts[0], {
+      ownerEmail: 'owner@example.com', workspaceName: 'Test', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z',
+      appId: 123, projectName: 'Test', connected: true, syncState: 'active', suspendedAt: null, suspensionReason: null,
+      connectionUpdatedAt: '2026-01-01T00:00:00.000Z', lastActivityAt: '2026-09-03T01:00:00.000Z',
+      historyStart: '2026-09-01', historyEnd: '2026-09-02', historyDays: 2,
+      lastPollClassification: 'unchanged', lastPollReason: null, pendingRepairs: 1, exhaustedRepairs: 0,
+      pushSubscriptions: 0, lastFailureAt: null, lastFailureReason: null, notificationsEnabled: false,
+    });
+    const payload = JSON.stringify(overview);
+    assert.equal(payload.includes(workspaceId), false);
+    assert.equal(payload.includes('encrypted-secret-envelope'), false);
+  } finally {
+    await dispose();
+  }
+});
+
 test('audit fields are allowlisted and retention removes only expired operational rows', async () => {
   const { db, dispose } = await testDatabase();
   try {
@@ -271,9 +306,11 @@ async function createProductTables(db: D1Database) {
     CREATE TABLE workspaces (id TEXT PRIMARY KEY, owner_user_id TEXT NOT NULL UNIQUE, owner_email TEXT, name TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
     CREATE TABLE steam_connections (workspace_id TEXT PRIMARY KEY, app_id INTEGER NOT NULL, project_name TEXT NOT NULL, encrypted_api_key TEXT NOT NULL, sync_state TEXT NOT NULL DEFAULT 'active', suspended_at TEXT, suspension_reason TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE);
     CREATE TABLE wishlist_intraday_snapshots (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, app_id INTEGER NOT NULL, report_date TEXT NOT NULL, adds INTEGER NOT NULL, deletes INTEGER NOT NULL, purchases INTEGER NOT NULL, gifts INTEGER NOT NULL, generated_at TEXT, fetched_at TEXT NOT NULL, FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE);
+    CREATE TABLE wishlist_daily_snapshots (workspace_id TEXT NOT NULL, app_id INTEGER NOT NULL, report_date TEXT NOT NULL, adds INTEGER NOT NULL, deletes INTEGER NOT NULL, purchases INTEGER NOT NULL, gifts INTEGER NOT NULL, adds_windows INTEGER NOT NULL, adds_mac INTEGER NOT NULL, adds_linux INTEGER NOT NULL, generated_at TEXT, fetched_at TEXT NOT NULL, PRIMARY KEY (workspace_id, app_id, report_date), FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE);
     CREATE TABLE wishlist_alerts (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, app_id INTEGER NOT NULL, report_date TEXT NOT NULL, kind TEXT NOT NULL, title TEXT NOT NULL, message TEXT NOT NULL, created_at TEXT NOT NULL, read_at TEXT, FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE);
     CREATE TABLE push_subscriptions (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, endpoint_hash TEXT NOT NULL, encrypted_subscription TEXT NOT NULL, expires_at INTEGER, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE, UNIQUE (workspace_id, endpoint_hash));
     CREATE TABLE wishlist_poll_samples (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, app_id INTEGER NOT NULL, requested_date TEXT NOT NULL, date_phase TEXT NOT NULL, outcome TEXT NOT NULL, classification TEXT NOT NULL, reason_code TEXT, adds INTEGER, deletes INTEGER, purchases INTEGER, gifts INTEGER, delta_adds INTEGER, delta_deletes INTEGER, delta_purchases INTEGER, delta_gifts INTEGER, generated_at TEXT, fetched_at TEXT NOT NULL, FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE);
+    CREATE TABLE wishlist_history_repairs (workspace_id TEXT NOT NULL, app_id INTEGER NOT NULL, report_date TEXT NOT NULL, status TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, next_attempt_at TEXT, locked_until TEXT, last_reason_code TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (workspace_id, app_id, report_date), FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE);
   `);
 }
 

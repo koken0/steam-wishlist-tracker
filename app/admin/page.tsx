@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { observeWishlineUser, signInToWishline, signOutOfWishline, wishlineAuthorizationHeader } from '@/lib/firebase-client';
 import type { AdminOverview } from '@/lib/wishline-admin-store';
+import type { AdminAccount } from '@/lib/wishline-admin-store';
 import styles from './admin.module.css';
 
 type SessionState = 'checking' | 'signed-out' | 'loading' | 'ready' | 'forbidden' | 'error';
@@ -16,6 +17,7 @@ export default function AdminPage() {
   const [session, setSession] = useState<SessionState>('checking');
   const [overview, setOverview] = useState<AdminOverview | null>(null);
   const [query, setQuery] = useState('');
+  const [selectedAccount, setSelectedAccount] = useState<AdminAccount | null>(null);
   const [message, setMessage] = useState('');
 
   async function load() {
@@ -117,7 +119,9 @@ export default function AdminPage() {
               <table>
                 <thead><tr><th>Usuario</th><th>Registro</th><th>Proyecto</th><th>Estado</th><th>Última actividad</th><th>Push</th></tr></thead>
                 <tbody>{accounts.map((account) => (
-                  <tr key={account.workspaceId}>
+                  <tr className={styles.accountRow} key={`${account.ownerEmail || 'anonymous'}-${account.createdAt}`} onClick={() => setSelectedAccount(account)} tabIndex={0} onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedAccount(account); }
+                  }} aria-label={`Ver detalles de ${account.ownerEmail || account.workspaceName}`}>
                     <td><strong>{account.ownerEmail || 'Sin email'}</strong><small>{account.workspaceName}</small></td>
                     <td>{formatDate(account.createdAt)}</td>
                     <td><strong>{account.projectName || 'Sin conectar'}</strong><small>{account.appId ? `App ${account.appId}` : '—'}</small></td>
@@ -136,8 +140,75 @@ export default function AdminPage() {
           </section>}
         </div>
       </section>
+      {selectedAccount && <AccountDrawer account={selectedAccount} onClose={() => setSelectedAccount(null)} />}
     </main>
   );
+}
+
+function AccountDrawer({ account, onClose }: { account: AdminAccount; onClose: () => void }) {
+  useEffect(() => {
+    function closeOnEscape(event: KeyboardEvent) { if (event.key === 'Escape') onClose(); }
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [onClose]);
+
+  return <div className={styles.drawerLayer} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <aside className={styles.drawer} role="dialog" aria-modal="true" aria-labelledby="account-detail-title">
+      <div className={styles.drawerHead}>
+        <div><p>DETALLE DEL USUARIO</p><h2 id="account-detail-title">{account.ownerEmail || 'Usuario sin email'}</h2><span>{account.workspaceName}</span></div>
+        <button onClick={onClose} aria-label="Cerrar detalles">×</button>
+      </div>
+      <DetailSection title="Cuenta">
+        <Detail label="Registro" value={formatDate(account.createdAt)} />
+        <Detail label="Última actualización" value={formatDate(account.updatedAt)} />
+      </DetailSection>
+      <DetailSection title="Conexión Steam">
+        <Detail label="Proyecto" value={account.projectName || 'Sin conectar'} />
+        <Detail label="App ID" value={account.appId ? String(account.appId) : '—'} />
+        <Detail label="Estado" value={connectionLabel(account)} />
+        <Detail label="Conexión actualizada" value={account.connectionUpdatedAt ? formatDate(account.connectionUpdatedAt) : '—'} />
+        {account.syncState === 'suspended' && <Detail label="Motivo" value={failureReasonLabel(account.suspensionReason)} />}
+      </DetailSection>
+      <DetailSection title="Sincronización">
+        <Detail label="Última actividad" value={account.lastActivityAt ? formatDate(account.lastActivityAt) : 'Sin actividad'} />
+        <Detail label="Última consulta" value={pollClassificationLabel(account.lastPollClassification, account.lastPollReason)} />
+        <Detail label="Cobertura guardada" value={coverageLabel(account)} />
+        <Detail label="Días guardados" value={String(account.historyDays)} />
+        <Detail label="Reparaciones pendientes" value={String(account.pendingRepairs)} />
+        <Detail label="Reparaciones agotadas" value={String(account.exhaustedRepairs)} />
+        <Detail label="Último fallo" value={account.lastFailureAt ? `${failureReasonLabel(account.lastFailureReason)} · ${formatDate(account.lastFailureAt)}` : 'Ninguno registrado'} />
+      </DetailSection>
+      <DetailSection title="Notificaciones">
+        <Detail label="Suscripciones push" value={String(account.pushSubscriptions)} />
+        <Detail label="Estado" value={account.notificationsEnabled ? 'Activas' : 'Sin suscripciones'} />
+      </DetailSection>
+      <p className={styles.privacyNote}>Esta ficha contiene sólo metadatos operativos sanitizados. No incluye credenciales, tokens, endpoints ni identificadores internos.</p>
+    </aside>
+  </div>;
+}
+
+function DetailSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return <section className={styles.detailSection}><h3>{title}</h3><dl>{children}</dl></section>;
+}
+
+function Detail({ label, value }: { label: string; value: string }) {
+  return <div><dt>{label}</dt><dd>{value}</dd></div>;
+}
+
+function connectionLabel(account: AdminAccount) {
+  if (!account.connected) return 'Pendiente';
+  return account.syncState === 'suspended' ? 'Suspendida' : 'Activa';
+}
+
+function coverageLabel(account: AdminAccount) {
+  if (!account.historyStart || !account.historyEnd) return 'Sin historial';
+  return `${account.historyStart} → ${account.historyEnd}`;
+}
+
+function pollClassificationLabel(classification: string | null, reason: string | null) {
+  const label = ({ initial: 'Registro inicial', unchanged: 'Sin cambios', timestamp_only: 'Marca de tiempo actualizada', counters_changed: 'Cambios detectados', empty: 'Sin registros', error: 'Error' } as Record<string, string>)[classification || ''];
+  if (!label) return 'Sin consultas';
+  return reason ? `${label} · ${failureReasonLabel(reason)}` : label;
 }
 
 function Gate({ title, detail, children }: { title: string; detail: string; children?: React.ReactNode }) {

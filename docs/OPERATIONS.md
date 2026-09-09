@@ -77,7 +77,10 @@ Keep `.env.example` aligned whenever a runtime value is added or removed.
 
 `/admin` is a read-only desktop-oriented view of account registrations,
 connected projects, last observed activity, and whether a workspace has an
-active browser-push subscription. Its API validates the Firebase ID token
+active browser-push subscription. Selecting a user opens a detail drawer with
+sanitized connection state, saved-history date coverage, poll classification,
+repair counts, push-subscription count, and the latest sanitized sync failure.
+Its API validates the Firebase ID token
 independently of the temporary shared beta gate, then requires the resulting immutable identity to appear in
 `WISHLINE_ADMIN_USER_IDS`. In hosted Firebase mode each entry uses
 `firebase:<Firebase UID>`; never configure an email address, bearer token, or

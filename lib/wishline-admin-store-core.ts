@@ -1,7 +1,6 @@
 import { ensureGovernanceSchema, readSchedulerHealthInDatabase, type SchedulerHealth } from './wishline-governance-core.ts';
 
 export type AdminAccount = {
-  workspaceId: string;
   ownerEmail: string | null;
   workspaceName: string;
   createdAt: string;
@@ -14,6 +13,16 @@ export type AdminAccount = {
   suspensionReason: string | null;
   connectionUpdatedAt: string | null;
   lastActivityAt: string | null;
+  historyStart: string | null;
+  historyEnd: string | null;
+  historyDays: number;
+  lastPollClassification: string | null;
+  lastPollReason: string | null;
+  pendingRepairs: number;
+  exhaustedRepairs: number;
+  pushSubscriptions: number;
+  lastFailureAt: string | null;
+  lastFailureReason: string | null;
   notificationsEnabled: boolean;
 };
 
@@ -47,6 +56,15 @@ type AdminAccountRow = {
   sync_state: 'active' | 'suspended' | null;
   suspended_at: string | null;
   suspension_reason: string | null;
+  history_start: string | null;
+  history_end: string | null;
+  history_days: number;
+  last_poll_classification: string | null;
+  last_poll_reason: string | null;
+  pending_repairs: number;
+  exhausted_repairs: number;
+  last_failure_at: string | null;
+  last_failure_reason: string | null;
 };
 
 export async function readAdminOverviewInDatabase(db: D1Database, now = new Date()): Promise<AdminOverview> {
@@ -58,6 +76,15 @@ export async function readAdminOverviewInDatabase(db: D1Database, now = new Date
             w.created_at, w.updated_at, c.app_id, c.project_name,
             c.updated_at AS connection_updated_at, c.sync_state, c.suspended_at, c.suspension_reason,
             (SELECT MAX(p.fetched_at) FROM wishlist_poll_samples p WHERE p.workspace_id = w.id) AS last_activity_at,
+            (SELECT MIN(d.report_date) FROM wishlist_daily_snapshots d WHERE d.workspace_id = w.id) AS history_start,
+            (SELECT MAX(d.report_date) FROM wishlist_daily_snapshots d WHERE d.workspace_id = w.id) AS history_end,
+            (SELECT COUNT(*) FROM wishlist_daily_snapshots d WHERE d.workspace_id = w.id) AS history_days,
+            (SELECT p.classification FROM wishlist_poll_samples p WHERE p.workspace_id = w.id ORDER BY p.fetched_at DESC LIMIT 1) AS last_poll_classification,
+            (SELECT p.reason_code FROM wishlist_poll_samples p WHERE p.workspace_id = w.id ORDER BY p.fetched_at DESC LIMIT 1) AS last_poll_reason,
+            (SELECT COUNT(*) FROM wishlist_history_repairs r WHERE r.workspace_id = w.id AND r.status IN ('pending', 'processing', 'empty', 'error')) AS pending_repairs,
+            (SELECT COUNT(*) FROM wishlist_history_repairs r WHERE r.workspace_id = w.id AND r.status = 'exhausted') AS exhausted_repairs,
+            (SELECT a.occurred_at FROM audit_events a WHERE a.workspace_id = w.id AND a.event_type = 'sync.failure' ORDER BY a.occurred_at DESC LIMIT 1) AS last_failure_at,
+            (SELECT a.reason_code FROM audit_events a WHERE a.workspace_id = w.id AND a.event_type = 'sync.failure' ORDER BY a.occurred_at DESC LIMIT 1) AS last_failure_reason,
             (SELECT COUNT(*) FROM push_subscriptions s WHERE s.workspace_id = w.id) AS push_count
        FROM workspaces w
        LEFT JOIN steam_connections c ON c.workspace_id = w.id
@@ -73,7 +100,6 @@ export async function readAdminOverviewInDatabase(db: D1Database, now = new Date
       LIMIT 50`,
   ).all<{ project_name: string | null; app_id: number | null; owner_email: string | null; reason_code: string | null; occurred_at: string }>()]);
   const accounts = (result.results || []).map((row): AdminAccount => ({
-    workspaceId: row.workspace_id,
     ownerEmail: row.owner_email,
     workspaceName: row.workspace_name,
     createdAt: row.created_at,
@@ -86,6 +112,16 @@ export async function readAdminOverviewInDatabase(db: D1Database, now = new Date
     suspensionReason: row.suspension_reason,
     connectionUpdatedAt: row.connection_updated_at,
     lastActivityAt: row.last_activity_at,
+    historyStart: row.history_start,
+    historyEnd: row.history_end,
+    historyDays: Number(row.history_days),
+    lastPollClassification: row.last_poll_classification,
+    lastPollReason: row.last_poll_reason,
+    pendingRepairs: Number(row.pending_repairs),
+    exhaustedRepairs: Number(row.exhausted_repairs),
+    pushSubscriptions: Number(row.push_count),
+    lastFailureAt: row.last_failure_at,
+    lastFailureReason: row.last_failure_reason,
     notificationsEnabled: Number(row.push_count) > 0,
   }));
   const sevenDaysAgo = now.valueOf() - 7 * 86_400_000;
