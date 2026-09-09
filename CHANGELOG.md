@@ -6,6 +6,8 @@ prefix for readability.
 
 ## Unreleased
 
+- Changed partial scheduler failures to yellow warning badges while keeping
+  total failures red.
 - Added private dated timeline notes with interactive chart markers and an
   accessible responsive manager for creating, editing, and deleting context.
 - Persisted notes in D1 with workspace/App ID isolation and owner-action deletion.

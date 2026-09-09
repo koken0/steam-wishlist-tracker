@@ -157,10 +157,13 @@ function SchedulerPanel({ overview }: { overview: AdminOverview }) {
   const statusLabel = scheduler.status === 'degraded'
     ? latest && latest.succeeded > 0 ? 'Operativo con fallos parciales' : 'Ejecución fallida'
     : { healthy: 'Saludable', stale: 'Atrasado', unknown: 'Sin datos' }[scheduler.status];
+  const healthClass = scheduler.status === 'degraded' && latest && latest.succeeded > 0
+    ? styles.warning
+    : styles[scheduler.status];
   return <section className={styles.panel} id="scheduler">
     <div className={styles.panelHead}>
       <div><h2>Worker automático · cada hora</h2><p>Últimas 48 ejecuciones conservadas en D1.</p></div>
-      <span className={`${styles.health} ${styles[scheduler.status]}`}>{statusLabel}</span>
+      <span className={`${styles.health} ${healthClass}`}>{statusLabel}</span>
     </div>
     <div className={styles.schedulerSummary}>
       <div><span>Última ejecución</span><strong>{latest ? formatDate(latest.completedAt) : '—'}</strong></div>
@@ -175,7 +178,7 @@ function SchedulerPanel({ overview }: { overview: AdminOverview }) {
           const failures = failuresForRun(overview.recentSyncFailures, run);
           return <tr key={`${run.startedAt}-${run.completedAt}`}>
             <td>{formatDate(run.completedAt)}</td>
-            <td><span className={run.failed > 0 ? styles.bad : styles.good}>{runLabel(run.result)}</span></td>
+            <td><span className={run.result === 'partial_failure' ? styles.warning : run.result === 'failed' ? styles.bad : styles.good}>{runLabel(run.result)}</span></td>
             <td>{failures.length ? failures.map((failure) => <span className={styles.runReason} key={`${failure.occurredAt}-${failure.appId}`}>
               <strong>{failureReasonLabel(failure.reasonCode)}</strong><small>{failure.projectName || failure.ownerEmail || (failure.appId ? `App ${failure.appId}` : 'Proyecto desconocido')}</small>
             </span>) : '—'}</td>
