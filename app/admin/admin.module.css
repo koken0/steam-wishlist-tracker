@@ -32,5 +32,6 @@
 :global(html[data-theme='dark']) .degraded{background:#442923;color:#ffad98}
 :global(html[data-theme='dark']) .stale{background:#40351e;color:#e6ca7d}
 :global(html[data-theme='dark']) .unknown{background:#363a40;color:#b8bdc1}
+.runReason{display:block}.runReason+.runReason{margin-top:7px}.runReason strong{color:#a43118}.runReason small{margin-top:2px}
 @media(max-width:900px){.sidebar{position:static;width:auto;height:auto;display:flex;flex-direction:row;align-items:center;padding:16px 20px}.operator,.sidebar nav{display:none}.signOut{margin:0 0 0 auto}.workspace{margin-left:0}.content{padding:28px 20px}.stats,.schedulerSummary{grid-template-columns:1fr 1fr}}
 @media(max-width:560px){.topbar{padding:0 18px}.content{padding:24px 14px}.heading h1{font-size:28px}.stats,.schedulerSummary,.summaryLinks{grid-template-columns:1fr}.panelHead{align-items:stretch;flex-direction:column}.panelHead input{width:100%}.failures>div{grid-template-columns:1fr}.pagination{flex-wrap:wrap}.pagination span{order:-1;width:100%;text-align:center}.gateCard{padding:30px}}

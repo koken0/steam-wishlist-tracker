@@ -164,12 +164,18 @@ function SchedulerPanel({ overview }: { overview: AdminOverview }) {
     </div>
     <div className={styles.tableWrap}>
       <table>
-        <thead><tr><th>Finalizó</th><th>Estado</th><th>Intentos</th><th>Éxitos</th><th>Fallos</th><th>Registros</th><th>Cambios</th><th>Poll errors</th></tr></thead>
-        <tbody>{visibleRuns.map((run) => <tr key={`${run.startedAt}-${run.completedAt}`}>
-          <td>{formatDate(run.completedAt)}</td>
-          <td><span className={run.failed > 0 ? styles.bad : styles.good}>{runLabel(run.result)}</span></td>
-          <td>{run.attempted}</td><td>{run.succeeded}</td><td>{run.failed}</td><td>{run.recordsReceived}</td><td>{run.changesDetected}</td><td>{run.pollErrors}</td>
-        </tr>)}</tbody>
+        <thead><tr><th>Finalizó</th><th>Estado</th><th>Motivo</th><th>Intentos</th><th>Éxitos</th><th>Fallos</th><th>Registros</th><th>Cambios</th><th>Poll errors</th></tr></thead>
+        <tbody>{visibleRuns.map((run) => {
+          const failures = failuresForRun(overview.recentSyncFailures, run);
+          return <tr key={`${run.startedAt}-${run.completedAt}`}>
+            <td>{formatDate(run.completedAt)}</td>
+            <td><span className={run.failed > 0 ? styles.bad : styles.good}>{runLabel(run.result)}</span></td>
+            <td>{failures.length ? failures.map((failure) => <span className={styles.runReason} key={`${failure.occurredAt}-${failure.appId}`}>
+              <strong>{failureReasonLabel(failure.reasonCode)}</strong><small>{failure.projectName || failure.ownerEmail || (failure.appId ? `App ${failure.appId}` : 'Proyecto desconocido')}</small>
+            </span>) : '—'}</td>
+            <td>{run.attempted}</td><td>{run.succeeded}</td><td>{run.failed}</td><td>{run.recordsReceived}</td><td>{run.changesDetected}</td><td>{run.pollErrors}</td>
+          </tr>;
+        })}</tbody>
       </table>
       {!scheduler.recent.length && <div className={styles.empty}>Todavía no hay ejecuciones registradas.</div>}
     </div>
@@ -190,6 +196,25 @@ function SchedulerPanel({ overview }: { overview: AdminOverview }) {
 
 function runLabel(result: AdminOverview['scheduler']['recent'][number]['result']) {
   return ({ changed: 'Cambios detectados', unchanged: 'Sin cambios', partial_failure: 'Falla parcial', failed: 'Falló', no_connections: 'Sin conexiones', no_remote_request: 'Sin consulta remota', no_usable_records: 'Sin registros útiles', unknown: 'Desconocido' })[result];
+}
+
+function failuresForRun(failures: AdminOverview['recentSyncFailures'], run: AdminOverview['scheduler']['recent'][number]) {
+  const startedAt = new Date(run.startedAt).valueOf();
+  const completedAt = new Date(run.completedAt).valueOf();
+  return failures.filter((failure) => {
+    const occurredAt = new Date(failure.occurredAt).valueOf();
+    return occurredAt >= startedAt && occurredAt <= completedAt;
+  });
+}
+
+function failureReasonLabel(reasonCode: string | null) {
+  return ({
+    STEAM_ACCESS_DENIED: 'Steam rechazó el acceso',
+    STEAM_RATE_LIMITED: 'Límite de Steam alcanzado',
+    NETWORK_ERROR: 'Error de red',
+    STEAM_UNAVAILABLE: 'Steam no disponible',
+    INVALID_RESPONSE: 'Respuesta inválida de Steam',
+  } as Record<string, string>)[reasonCode || ''] || reasonCode || 'Error desconocido';
 }
 
 function formatDate(value: string) {
