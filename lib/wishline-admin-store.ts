@@ -1,106 +1,11 @@
 import { env } from 'cloudflare:workers';
 import { WishlistConnectorError } from './wishlist-errors.ts';
-import { readSchedulerHealthInDatabase, type SchedulerHealth } from './wishline-governance-core.ts';
+import { readAdminOverviewInDatabase, type AdminOverview } from './wishline-admin-store-core.ts';
 
-export type AdminAccount = {
-  workspaceId: string;
-  ownerEmail: string | null;
-  workspaceName: string;
-  createdAt: string;
-  updatedAt: string;
-  appId: number | null;
-  projectName: string | null;
-  connected: boolean;
-  connectionUpdatedAt: string | null;
-  lastActivityAt: string | null;
-  notificationsEnabled: boolean;
-};
-
-export type AdminOverview = {
-  generatedAt: string;
-  totals: { accounts: number; connected: number; notificationsEnabled: number; newLast7Days: number };
-  accounts: AdminAccount[];
-  scheduler: SchedulerHealth;
-  recentSyncFailures: AdminSyncFailure[];
-};
-
-export type AdminSyncFailure = {
-  projectName: string | null;
-  appId: number | null;
-  ownerEmail: string | null;
-  reasonCode: string | null;
-  occurredAt: string;
-};
-
-type AdminAccountRow = {
-  workspace_id: string;
-  owner_email: string | null;
-  workspace_name: string;
-  created_at: string;
-  updated_at: string;
-  app_id: number | null;
-  project_name: string | null;
-  connection_updated_at: string | null;
-  last_activity_at: string | null;
-  push_count: number;
-};
+export type { AdminAccount, AdminOverview, AdminSyncFailure } from './wishline-admin-store-core.ts';
 
 export async function readAdminOverview(now = new Date()): Promise<AdminOverview> {
   const db = (env as unknown as { DB?: D1Database }).DB;
   if (!db) throw new WishlistConnectorError('DATABASE_NOT_CONFIGURED', 'The Wishline workspace database is not configured.', 503);
   return readAdminOverviewInDatabase(db, now);
-}
-
-export async function readAdminOverviewInDatabase(db: D1Database, now = new Date()): Promise<AdminOverview> {
-  const [result, scheduler, failureResult] = await Promise.all([db.prepare(
-    `SELECT w.id AS workspace_id, w.owner_email, w.name AS workspace_name,
-            w.created_at, w.updated_at, c.app_id, c.project_name,
-            c.updated_at AS connection_updated_at,
-            (SELECT MAX(p.fetched_at) FROM wishlist_poll_samples p WHERE p.workspace_id = w.id) AS last_activity_at,
-            (SELECT COUNT(*) FROM push_subscriptions s WHERE s.workspace_id = w.id) AS push_count
-       FROM workspaces w
-       LEFT JOIN steam_connections c ON c.workspace_id = w.id
-      ORDER BY w.created_at DESC
-      LIMIT 250`,
-  ).all<AdminAccountRow>(), readSchedulerHealthInDatabase(db, now, 48), db.prepare(
-    `SELECT c.project_name, a.app_id, w.owner_email, a.reason_code, a.occurred_at
-       FROM audit_events a
-       LEFT JOIN workspaces w ON w.id = a.workspace_id
-       LEFT JOIN steam_connections c ON c.workspace_id = a.workspace_id
-      WHERE a.event_type = 'sync.failure'
-      ORDER BY a.occurred_at DESC
-      LIMIT 50`,
-  ).all<{ project_name: string | null; app_id: number | null; owner_email: string | null; reason_code: string | null; occurred_at: string }>()]);
-  const accounts = (result.results || []).map((row): AdminAccount => ({
-    workspaceId: row.workspace_id,
-    ownerEmail: row.owner_email,
-    workspaceName: row.workspace_name,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    appId: row.app_id,
-    projectName: row.project_name,
-    connected: row.app_id != null,
-    connectionUpdatedAt: row.connection_updated_at,
-    lastActivityAt: row.last_activity_at,
-    notificationsEnabled: Number(row.push_count) > 0,
-  }));
-  const sevenDaysAgo = now.valueOf() - 7 * 86_400_000;
-  return {
-    generatedAt: now.toISOString(),
-    totals: {
-      accounts: accounts.length,
-      connected: accounts.filter((account) => account.connected).length,
-      notificationsEnabled: accounts.filter((account) => account.notificationsEnabled).length,
-      newLast7Days: accounts.filter((account) => new Date(account.createdAt).valueOf() >= sevenDaysAgo).length,
-    },
-    accounts,
-    scheduler,
-    recentSyncFailures: (failureResult.results || []).map((row) => ({
-      projectName: row.project_name,
-      appId: row.app_id,
-      ownerEmail: row.owner_email,
-      reasonCode: row.reason_code,
-      occurredAt: row.occurred_at,
-    })),
-  };
 }

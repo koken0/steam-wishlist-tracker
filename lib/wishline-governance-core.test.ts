@@ -3,6 +3,7 @@ import test from 'node:test';
 import { Miniflare } from 'miniflare';
 import { decryptSecret, encryptSecret, secretEnvelopeKeyId } from './secret-crypto.ts';
 import { saveWishlistPollSampleInDatabase } from './wishlist-poll-evidence.ts';
+import { readAdminOverviewInDatabase } from './wishline-admin-store-core.ts';
 import {
   classifySchedulerRun,
   enforceRetentionInDatabase,
@@ -13,6 +14,20 @@ import {
 } from './wishline-governance-core.ts';
 
 const mutableEnv = process.env as unknown as Record<string, string | undefined>;
+
+test('admin overview prepares governance tables before querying them', async () => {
+  const { db, dispose } = await testDatabase();
+  try {
+    await createProductTables(db);
+    const overview = await readAdminOverviewInDatabase(db, new Date('2026-09-05T02:30:00.000Z'));
+
+    assert.equal(overview.totals.accounts, 0);
+    assert.equal(overview.scheduler.status, 'unknown');
+    assert.deepEqual(overview.recentSyncFailures, []);
+  } finally {
+    await dispose();
+  }
+});
 
 test('audit fields are allowlisted and retention removes only expired operational rows', async () => {
   const { db, dispose } = await testDatabase();

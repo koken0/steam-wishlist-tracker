@@ -11,7 +11,8 @@ export async function GET(request: Request) {
   if (!isWishlineAdmin(user)) return response({ error: { code: 'ADMIN_FORBIDDEN', message: 'This account does not have operator access.' } }, 403);
   try {
     return response(await readAdminOverview(), 200);
-  } catch {
+  } catch (error) {
+    console.error('wishline.admin.overview.failed', error);
     return response({ error: { code: 'ADMIN_UNAVAILABLE', message: 'The operator overview is temporarily unavailable.' } }, 503);
   }
 }
