@@ -5,6 +5,7 @@ export const schema = {
   wishlistIntradaySnapshots: ['id', 'workspace_id', 'app_id', 'report_date', 'adds', 'deletes', 'purchases', 'gifts', 'generated_at', 'fetched_at'],
   wishlistPollSamples: ['id', 'workspace_id', 'app_id', 'requested_date', 'date_phase', 'outcome', 'classification', 'reason_code', 'adds', 'deletes', 'purchases', 'gifts', 'delta_adds', 'delta_deletes', 'delta_purchases', 'delta_gifts', 'generated_at', 'fetched_at'],
   wishlistHistoryRepairs: ['workspace_id', 'app_id', 'report_date', 'status', 'attempts', 'next_attempt_at', 'locked_until', 'last_reason_code', 'created_at', 'updated_at'],
+  wishlistAnnotations: ['id', 'workspace_id', 'app_id', 'report_date', 'note', 'created_at', 'updated_at'],
   wishlistAlerts: ['id', 'workspace_id', 'app_id', 'report_date', 'kind', 'title', 'message', 'created_at', 'read_at'],
   auditEvents: ['id', 'workspace_id', 'app_id', 'event_type', 'outcome', 'reason_code', 'occurred_at'],
   syncRuns: ['id', 'started_at', 'completed_at', 'attempted', 'succeeded', 'failed'],

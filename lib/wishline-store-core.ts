@@ -139,6 +139,7 @@ export function createWishlineStore(db: D1Database) {
     const workspace = await getOrCreateWorkspace(user);
     const now = new Date().toISOString();
     await db.batch([
+      db.prepare('DELETE FROM wishlist_annotations WHERE workspace_id = ?').bind(workspace.id),
       db.prepare('DELETE FROM push_subscriptions WHERE workspace_id = ?').bind(workspace.id),
       db.prepare('DELETE FROM wishlist_alerts WHERE workspace_id = ?').bind(workspace.id),
       db.prepare('DELETE FROM wishlist_intraday_snapshots WHERE workspace_id = ?').bind(workspace.id),
@@ -154,6 +155,7 @@ export function createWishlineStore(db: D1Database) {
   async function deleteWishlineAccount(user: WishlineUser): Promise<void> {
     const workspace = await getOrCreateWorkspace(user);
     await db.batch([
+      db.prepare('DELETE FROM wishlist_annotations WHERE workspace_id = ?').bind(workspace.id),
       db.prepare('DELETE FROM push_subscriptions WHERE workspace_id = ?').bind(workspace.id),
       db.prepare('DELETE FROM wishlist_alerts WHERE workspace_id = ?').bind(workspace.id),
       db.prepare('DELETE FROM wishlist_intraday_snapshots WHERE workspace_id = ?').bind(workspace.id),
@@ -215,6 +217,13 @@ export function createWishlineStore(db: D1Database) {
         PRIMARY KEY (workspace_id, app_id, report_date),
         FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE)`),
       db.prepare('CREATE INDEX IF NOT EXISTS idx_wishlist_repairs_due ON wishlist_history_repairs(workspace_id, app_id, status, next_attempt_at)'),
+      db.prepare(`CREATE TABLE IF NOT EXISTS wishlist_annotations (
+        id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, app_id INTEGER NOT NULL CHECK (app_id > 0),
+        report_date TEXT NOT NULL, note TEXT NOT NULL CHECK (length(note) BETWEEN 1 AND 200),
+        created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+        FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
+        UNIQUE (workspace_id, app_id, report_date))`),
+      db.prepare('CREATE INDEX IF NOT EXISTS idx_wishlist_annotations_workspace_app_date ON wishlist_annotations(workspace_id, app_id, report_date)'),
       db.prepare(`CREATE TABLE IF NOT EXISTS wishlist_intraday_snapshots (
         id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, app_id INTEGER NOT NULL CHECK (app_id > 0), report_date TEXT NOT NULL,
         adds INTEGER NOT NULL CHECK (adds >= 0), deletes INTEGER NOT NULL CHECK (deletes >= 0),
