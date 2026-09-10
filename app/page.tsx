@@ -679,6 +679,7 @@ function Overview({ data, progress, milestone }: { data:WishlistDashboardData; p
   const [editingAnnotationId, setEditingAnnotationId] = useState<string | null>(null);
   const [annotationError, setAnnotationError] = useState('');
   const [savingAnnotation, setSavingAnnotation] = useState(false);
+  const [showAnnotationLabels, setShowAnnotationLabels] = useState(false);
   const recent = data.daily.slice(-7);
   const previous = data.daily.slice(-14, -7);
   const latest = recent.at(-1);
@@ -711,6 +712,17 @@ function Overview({ data, progress, milestone }: { data:WishlistDashboardData; p
     });
     return () => { active = false; };
   }, [data.appId]);
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem(annotationDisplayStorageKey(data.appId));
+    const timer = window.setTimeout(() => setShowAnnotationLabels(saved === 'always'), 0);
+    return () => window.clearTimeout(timer);
+  }, [data.appId]);
+
+  function changeAnnotationDisplay(always: boolean) {
+    setShowAnnotationLabels(always);
+    window.localStorage.setItem(annotationDisplayStorageKey(data.appId), always ? 'always' : 'hover');
+  }
 
   function selectAnnotationDate(date: string) {
     const existing = annotations.find((annotation) => annotation.date === date);
@@ -763,7 +775,7 @@ function Overview({ data, progress, milestone }: { data:WishlistDashboardData; p
     </div>
     <article className="panel range-panel">
       <div className="range-head"><div><p className="panel-title">History by date range</p><p className="panel-subtitle">Daily net movement and estimated total progression</p></div><div className="date-range"><label>From<input type="date" min={firstDate} max={toDate || lastDate} value={fromDate} onChange={(event)=>setFromDate(event.target.value)} /></label><span>→</span><label>To<input type="date" min={fromDate || firstDate} max={lastDate} value={toDate} onChange={(event)=>setToDate(event.target.value)} /></label></div></div>
-      {selected.expectedDays ? <><div className={`range-coverage ${selected.complete ? 'complete' : 'incomplete'}`} role="status"><b>{selected.complete ? 'Complete coverage' : 'Incomplete coverage'}</b><span>{selected.complete ? `${selected.recordedDays} reported days` : `${selected.recordedDays} of ${selected.expectedDays} days have data · ${missingDetail}`}</span></div><div className="range-summary"><div><small>INCLUSIVE PERIOD</small><b>{selected.expectedDays} {selected.expectedDays === 1 ? 'day' : 'days'}</b></div><div><small>REPORTED ADDS</small><b className="green">+{formatCount(selected.adds)}</b></div><div><small>REPORTED DELETES</small><b>-{formatCount(selected.deletes)}</b></div><div><small>REPORTED NET GROWTH</small><b className={selected.net >= 0 ? 'green' : ''}>{signedCount(selected.net)}</b></div></div>{selected.recordedDays ? <WishlistRangeChart entries={selected.entries} annotations={annotations} onSelectDate={selectAnnotationDate} /> : <div className="empty-range">There are no records in this range. Days are shown as missing, not as zero activity.</div>}</> : <div className="empty-range">Choose a valid range within the available history.</div>}
+      {selected.expectedDays ? <><div className={`range-coverage ${selected.complete ? 'complete' : 'incomplete'}`} role="status"><b>{selected.complete ? 'Complete coverage' : 'Incomplete coverage'}</b><span>{selected.complete ? `${selected.recordedDays} reported days` : `${selected.recordedDays} of ${selected.expectedDays} days have data · ${missingDetail}`}</span></div><div className="range-summary"><div><small>INCLUSIVE PERIOD</small><b>{selected.expectedDays} {selected.expectedDays === 1 ? 'day' : 'days'}</b></div><div><small>REPORTED ADDS</small><b className="green">+{formatCount(selected.adds)}</b></div><div><small>REPORTED DELETES</small><b>-{formatCount(selected.deletes)}</b></div><div><small>REPORTED NET GROWTH</small><b className={selected.net >= 0 ? 'green' : ''}>{signedCount(selected.net)}</b></div></div>{selected.recordedDays ? <WishlistRangeChart entries={selected.entries} annotations={annotations} onSelectDate={selectAnnotationDate} showAnnotationLabels={showAnnotationLabels} onChangeAnnotationDisplay={changeAnnotationDisplay} /> : <div className="empty-range">There are no records in this range. Days are shown as missing, not as zero activity.</div>}</> : <div className="empty-range">Choose a valid range within the available history.</div>}
       <section className="annotation-manager" aria-labelledby="timeline-notes-title">
         <div className="annotation-heading"><div><p className="panel-title" id="timeline-notes-title">Timeline notes</p><p className="panel-subtitle">Explain campaigns, demos, launches, or other actions. Select any day in the chart or use the date field.</p></div><span>{annotations.length} {annotations.length === 1 ? 'NOTE' : 'NOTES'}</span></div>
         <form id="timeline-note-editor" className="annotation-form" onSubmit={saveAnnotation}>
@@ -783,7 +795,7 @@ function Overview({ data, progress, milestone }: { data:WishlistDashboardData; p
   </>;
 }
 
-function WishlistRangeChart({ entries, annotations, onSelectDate }: { entries: WishlistRangeEntry[]; annotations: WishlistAnnotation[]; onSelectDate: (date:string)=>void }) {
+function WishlistRangeChart({ entries, annotations, onSelectDate, showAnnotationLabels, onChangeAnnotationDisplay }: { entries: WishlistRangeEntry[]; annotations: WishlistAnnotation[]; onSelectDate: (date:string)=>void; showAnnotationLabels:boolean; onChangeAnnotationDisplay:(always:boolean)=>void }) {
   const width = 900;
   const height = 250;
   const padding = 28;
@@ -811,6 +823,11 @@ function WishlistRangeChart({ entries, annotations, onSelectDate }: { entries: W
 
   return (
     <div className="history-chart">
+      <div className="annotation-display-controls" role="group" aria-label="Annotation display">
+        <span>Notes</span>
+        <button type="button" aria-pressed={!showAnnotationLabels} onClick={() => onChangeAnnotationDisplay(false)}>On hover</button>
+        <button type="button" aria-pressed={showAnnotationLabels} onClick={() => onChangeAnnotationDisplay(true)}>Always visible</button>
+      </div>
       <div className="history-scale"><span>{formatCount(max)}</span><span>{formatCount(min)}</span></div>
       <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Wishlist progression over the selected period; striped blocks indicate dates without data">
         <defs>
@@ -836,12 +853,19 @@ function WishlistRangeChart({ entries, annotations, onSelectDate }: { entries: W
           const area = `${path} L ${segment.at(-1)?.x} ${height-padding} L ${segment[0]?.x} ${height-padding} Z`;
           return <g key={index}><path className="history-area" d={area}/><path className="history-line" d={path}/></g>;
         })}
-        {points.map((point) => <circle key={point.date} cx={point.x} cy={point.y} r="4"><title>{formatShortDate(point.date)} · {formatCount(point.total)} stored total · {signedCount(point.net)} net</title></circle>)}
+        {points.map((point) => <circle className="history-node" key={point.date} cx={point.x} cy={point.y} r="4" role="button" tabIndex={0} aria-label={`Select ${formatShortDate(point.date)} to add a note`} onClick={() => onSelectDate(point.date)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') onSelectDate(point.date); }}><title>{formatShortDate(point.date)} · {formatCount(point.total)} stored total · {signedCount(point.net)} net · select to add a note</title></circle>)}
         {entries.map((entry, index) => {
           const annotation = annotationsByDate.get(entry.date);
           if (!annotation) return null;
           const x = xForIndex(index);
           return <g className="annotation-marker" key={`annotation-${annotation.id}`} role="button" tabIndex={0} aria-label={`${formatShortDate(annotation.date)}: ${annotation.note}`} onClick={() => onSelectDate(annotation.date)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') onSelectDate(annotation.date); }}><line x1={x} y1={padding} x2={x} y2={height-padding}/><path d={`M ${x-9} ${padding-3} L ${x+9} ${padding-3} L ${x} ${padding+13} Z`}/><title>{formatShortDate(annotation.date)} · {annotation.note}</title></g>;
+        })}
+        {showAnnotationLabels && entries.flatMap((entry, index) => {
+          const annotation = annotationsByDate.get(entry.date);
+          if (!annotation) return [];
+          const x = Math.max(padding, Math.min(width - 168, xForIndex(index) - 78));
+          const y = 45 + (index % 3) * 35;
+          return [<foreignObject className="annotation-chart-label" key={`label-${annotation.id}`} x={x} y={y} width="168" height="31"><button type="button" title={annotation.note} onClick={() => onSelectDate(annotation.date)}><time>{formatChartDate(annotation.date)}</time><span>{annotation.note}</span></button></foreignObject>];
         })}
       </svg>
       <div className="history-dates">
@@ -1100,6 +1124,10 @@ function milestoneValue(value: string): number {
 
 function milestoneStorageKey(appId: number): string {
   return `wishline:milestone:${appId}`;
+}
+
+function annotationDisplayStorageKey(appId: number): string {
+  return `wishline:annotation-display:${appId}`;
 }
 
 function averageOf(values: number[]): number {

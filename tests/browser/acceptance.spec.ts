@@ -47,7 +47,11 @@ test('creates, edits, displays, and deletes a dated timeline note', async ({ pag
   await expect(page.locator('.annotation-list')).toContainText('Launched the demo on Steam');
   await expect(page.locator('.annotation-marker')).toHaveCount(1);
   await expect(page.locator('.annotation-marker')).toHaveAttribute('aria-label', /Launched the demo/);
-
+  await page.getByRole('button', { name: 'Always visible' }).click();
+  await expect(page.locator('.annotation-chart-label')).toContainText('Launched the demo on Steam');
+  await page.locator('.history-node').last().click();
+  await expect(page.getByRole('textbox', { name: 'Date' })).toHaveValue('2026-09-05');
+  await expect(page.getByLabel('What happened?')).toHaveValue('');
   await page.getByRole('button', { name: 'Edit', exact: true }).click();
   await page.getByLabel('What happened?').fill('Launched the demo and posted on Reddit');
   await page.getByRole('button', { name: 'Save note' }).click();

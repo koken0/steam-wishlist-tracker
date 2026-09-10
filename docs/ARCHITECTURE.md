@@ -61,6 +61,10 @@ reference is in `db/schema.ts`; forward-only D1 migrations are under
 workspace, App ID, and reporting date. Its free-form content is private product
 context, never audit telemetry. The chart renders a compact marker and exposes
 the full text through an interactive title and the accessible note manager.
+Every data node is also an accessible date-selection control for that editor.
+Owners may persist a per-App-ID browser preference for hover-only markers or
+compact always-visible labels; note content itself remains only in D1 and is
+never copied into browser storage.
 
 `wishlist_poll_samples` retains one normalized diagnostic result for every
 scheduled date request. It distinguishes current-day polling from next-day

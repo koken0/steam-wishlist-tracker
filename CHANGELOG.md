@@ -6,6 +6,8 @@ prefix for readability.
 
 ## Unreleased
 
+- Added direct chart-node date selection and a persistent choice between
+  hover-only annotation text and compact always-visible labels.
 - Changed partial scheduler failures to yellow warning badges while keeping
   total failures red.
 - Added private dated timeline notes with interactive chart markers and an

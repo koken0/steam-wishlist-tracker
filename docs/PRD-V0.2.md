@@ -280,6 +280,8 @@ Accepted when:
   brief explanatory note for that workspace and App ID;
 - dated notes use compact interactive markers plus an accessible manager so
   long text does not overlap the chart;
+- selecting any reported chart node sets that day in the note editor, and the
+  owner can switch between hover-only notes and compact always-visible labels;
 - missing dates and unavailable totals are distinguishable from zero;
 - missing dates distinguish pending bounded recovery from exhausted recovery;
 - late corrections recalculate every dependent metric; and
