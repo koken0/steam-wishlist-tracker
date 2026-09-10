@@ -6,6 +6,10 @@ prefix for readability.
 
 ## Unreleased
 
+## 0.0.2 - 2026-09-09
+
+Timeline annotations and operator-console clarity release.
+
 - Moved annotation display controls into the Timeline notes manager so they do
   not cover chart data.
 - Added direct chart-node date selection and a persistent choice between
