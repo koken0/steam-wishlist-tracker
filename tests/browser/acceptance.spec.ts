@@ -47,6 +47,8 @@ test('creates, edits, displays, and deletes a dated timeline note', async ({ pag
   await expect(page.locator('.annotation-list')).toContainText('Launched the demo on Steam');
   await expect(page.locator('.annotation-marker')).toHaveCount(1);
   await expect(page.locator('.annotation-marker')).toHaveAttribute('aria-label', /Launched the demo/);
+  await expect(page.locator('.annotation-manager .annotation-display-controls')).toHaveCount(1);
+  await expect(page.locator('.history-chart .annotation-display-controls')).toHaveCount(0);
   await page.getByRole('button', { name: 'Always visible' }).click();
   await expect(page.locator('.annotation-chart-label')).toContainText('Launched the demo on Steam');
   await page.locator('.history-node').last().click();

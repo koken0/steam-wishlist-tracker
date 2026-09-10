@@ -6,6 +6,8 @@ prefix for readability.
 
 ## Unreleased
 
+- Moved annotation display controls into the Timeline notes manager so they do
+  not cover chart data.
 - Added direct chart-node date selection and a persistent choice between
   hover-only annotation text and compact always-visible labels.
 - Changed partial scheduler failures to yellow warning badges while keeping

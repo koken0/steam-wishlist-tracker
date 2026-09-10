@@ -775,9 +775,9 @@ function Overview({ data, progress, milestone }: { data:WishlistDashboardData; p
     </div>
     <article className="panel range-panel">
       <div className="range-head"><div><p className="panel-title">History by date range</p><p className="panel-subtitle">Daily net movement and estimated total progression</p></div><div className="date-range"><label>From<input type="date" min={firstDate} max={toDate || lastDate} value={fromDate} onChange={(event)=>setFromDate(event.target.value)} /></label><span>→</span><label>To<input type="date" min={fromDate || firstDate} max={lastDate} value={toDate} onChange={(event)=>setToDate(event.target.value)} /></label></div></div>
-      {selected.expectedDays ? <><div className={`range-coverage ${selected.complete ? 'complete' : 'incomplete'}`} role="status"><b>{selected.complete ? 'Complete coverage' : 'Incomplete coverage'}</b><span>{selected.complete ? `${selected.recordedDays} reported days` : `${selected.recordedDays} of ${selected.expectedDays} days have data · ${missingDetail}`}</span></div><div className="range-summary"><div><small>INCLUSIVE PERIOD</small><b>{selected.expectedDays} {selected.expectedDays === 1 ? 'day' : 'days'}</b></div><div><small>REPORTED ADDS</small><b className="green">+{formatCount(selected.adds)}</b></div><div><small>REPORTED DELETES</small><b>-{formatCount(selected.deletes)}</b></div><div><small>REPORTED NET GROWTH</small><b className={selected.net >= 0 ? 'green' : ''}>{signedCount(selected.net)}</b></div></div>{selected.recordedDays ? <WishlistRangeChart entries={selected.entries} annotations={annotations} onSelectDate={selectAnnotationDate} showAnnotationLabels={showAnnotationLabels} onChangeAnnotationDisplay={changeAnnotationDisplay} /> : <div className="empty-range">There are no records in this range. Days are shown as missing, not as zero activity.</div>}</> : <div className="empty-range">Choose a valid range within the available history.</div>}
+      {selected.expectedDays ? <><div className={`range-coverage ${selected.complete ? 'complete' : 'incomplete'}`} role="status"><b>{selected.complete ? 'Complete coverage' : 'Incomplete coverage'}</b><span>{selected.complete ? `${selected.recordedDays} reported days` : `${selected.recordedDays} of ${selected.expectedDays} days have data · ${missingDetail}`}</span></div><div className="range-summary"><div><small>INCLUSIVE PERIOD</small><b>{selected.expectedDays} {selected.expectedDays === 1 ? 'day' : 'days'}</b></div><div><small>REPORTED ADDS</small><b className="green">+{formatCount(selected.adds)}</b></div><div><small>REPORTED DELETES</small><b>-{formatCount(selected.deletes)}</b></div><div><small>REPORTED NET GROWTH</small><b className={selected.net >= 0 ? 'green' : ''}>{signedCount(selected.net)}</b></div></div>{selected.recordedDays ? <WishlistRangeChart entries={selected.entries} annotations={annotations} onSelectDate={selectAnnotationDate} showAnnotationLabels={showAnnotationLabels} /> : <div className="empty-range">There are no records in this range. Days are shown as missing, not as zero activity.</div>}</> : <div className="empty-range">Choose a valid range within the available history.</div>}
       <section className="annotation-manager" aria-labelledby="timeline-notes-title">
-        <div className="annotation-heading"><div><p className="panel-title" id="timeline-notes-title">Timeline notes</p><p className="panel-subtitle">Explain campaigns, demos, launches, or other actions. Select any day in the chart or use the date field.</p></div><span>{annotations.length} {annotations.length === 1 ? 'NOTE' : 'NOTES'}</span></div>
+        <div className="annotation-heading"><div><p className="panel-title" id="timeline-notes-title">Timeline notes</p><p className="panel-subtitle">Explain campaigns, demos, launches, or other actions. Select any day in the chart or use the date field.</p></div><div className="annotation-heading-actions"><div className="annotation-display-controls" role="group" aria-label="Annotation display"><span>Notes</span><button type="button" aria-pressed={!showAnnotationLabels} onClick={() => changeAnnotationDisplay(false)}>On hover</button><button type="button" aria-pressed={showAnnotationLabels} onClick={() => changeAnnotationDisplay(true)}>Always visible</button></div><span className="annotation-count">{annotations.length} {annotations.length === 1 ? 'NOTE' : 'NOTES'}</span></div></div>
         <form id="timeline-note-editor" className="annotation-form" onSubmit={saveAnnotation}>
           <label>Date<input type="date" min={firstDate} max={lastDate} required value={annotationDate} onChange={(event) => selectAnnotationDate(event.target.value)} /></label>
           <label>What happened?<textarea maxLength={200} required rows={2} value={annotationNote} onChange={(event) => setAnnotationNote(event.target.value)} placeholder="Example: Launched the demo and shared it on Reddit"/><small>{annotationNote.length}/200</small></label>
@@ -795,7 +795,7 @@ function Overview({ data, progress, milestone }: { data:WishlistDashboardData; p
   </>;
 }
 
-function WishlistRangeChart({ entries, annotations, onSelectDate, showAnnotationLabels, onChangeAnnotationDisplay }: { entries: WishlistRangeEntry[]; annotations: WishlistAnnotation[]; onSelectDate: (date:string)=>void; showAnnotationLabels:boolean; onChangeAnnotationDisplay:(always:boolean)=>void }) {
+function WishlistRangeChart({ entries, annotations, onSelectDate, showAnnotationLabels }: { entries: WishlistRangeEntry[]; annotations: WishlistAnnotation[]; onSelectDate: (date:string)=>void; showAnnotationLabels:boolean }) {
   const width = 900;
   const height = 250;
   const padding = 28;
@@ -823,11 +823,6 @@ function WishlistRangeChart({ entries, annotations, onSelectDate, showAnnotation
 
   return (
     <div className="history-chart">
-      <div className="annotation-display-controls" role="group" aria-label="Annotation display">
-        <span>Notes</span>
-        <button type="button" aria-pressed={!showAnnotationLabels} onClick={() => onChangeAnnotationDisplay(false)}>On hover</button>
-        <button type="button" aria-pressed={showAnnotationLabels} onClick={() => onChangeAnnotationDisplay(true)}>Always visible</button>
-      </div>
       <div className="history-scale"><span>{formatCount(max)}</span><span>{formatCount(min)}</span></div>
       <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Wishlist progression over the selected period; striped blocks indicate dates without data">
         <defs>

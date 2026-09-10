@@ -282,6 +282,8 @@ Accepted when:
   long text does not overlap the chart;
 - selecting any reported chart node sets that day in the note editor, and the
   owner can switch between hover-only notes and compact always-visible labels;
+- annotation display controls live in the Timeline notes manager and never
+  overlay the chart or obscure wishlist data;
 - missing dates and unavailable totals are distinguishable from zero;
 - missing dates distinguish pending bounded recovery from exhausted recovery;
 - late corrections recalculate every dependent metric; and
