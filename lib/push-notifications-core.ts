@@ -28,6 +28,12 @@ type PushJobRow = {
   encrypted_subscription: string;
 };
 
+type CredentialAlertJobRow = {
+  alert_id: string;
+  subscription_id: string;
+  encrypted_subscription: string;
+};
+
 type StoredPushSubscriptionRow = {
   id: string;
   encrypted_subscription: string;
@@ -252,6 +258,100 @@ export async function hasPushSubscriptionsInDatabase(
   return Number(row?.count || 0) > 0;
 }
 
+export async function enqueueCredentialAlertInDatabase(
+  db: D1Database,
+  workspaceId: string,
+  appId: number,
+  reasonCode: string,
+  now = new Date(),
+): Promise<string> {
+  await ensurePushSchema(db);
+  const id = `credential_alert_${crypto.randomUUID().replaceAll('-', '')}`;
+  await db.prepare(
+    `INSERT INTO push_credential_alerts (id, workspace_id, app_id, reason_code, created_at)
+     VALUES (?, ?, ?, ?, ?)`,
+  ).bind(id, workspaceId, appId, sanitizeErrorCode(reasonCode), now.toISOString()).run();
+  return id;
+}
+
+export async function listWorkspacesWithPendingCredentialAlertsInDatabase(
+  db: D1Database,
+): Promise<string[]> {
+  await ensurePushSchema(db);
+  const rows = await db.prepare(
+    `SELECT DISTINCT a.workspace_id
+       FROM push_credential_alerts a
+       JOIN push_subscriptions s ON s.workspace_id = a.workspace_id
+       LEFT JOIN push_credential_alert_deliveries d
+         ON d.alert_id = a.id AND d.subscription_id = s.id
+      WHERE d.sent_at IS NULL AND COALESCE(d.attempts, 0) < ?
+      ORDER BY a.workspace_id`,
+  ).bind(MAX_DELIVERY_ATTEMPTS).all<{ workspace_id: string }>();
+  return (rows.results || []).map((row) => row.workspace_id);
+}
+
+export async function deliverPendingCredentialAlertsInDatabase(
+  db: D1Database,
+  workspaceId: string,
+  codec: SecretCodec,
+  send: (subscription: PushSubscription, alertId: string) => Promise<PushSendResult>,
+  now = new Date(),
+): Promise<PushDeliverySummary> {
+  await ensurePushSchema(db);
+  const summary: PushDeliverySummary = { attempted: 0, sent: 0, expired: 0, failed: 0 };
+  const jobs = await db.prepare(
+    `SELECT a.id AS alert_id, s.id AS subscription_id, s.encrypted_subscription
+       FROM push_credential_alerts a
+       JOIN push_subscriptions s ON s.workspace_id = a.workspace_id
+       LEFT JOIN push_credential_alert_deliveries d
+         ON d.alert_id = a.id AND d.subscription_id = s.id
+      WHERE a.workspace_id = ?
+        AND d.sent_at IS NULL
+        AND COALESCE(d.attempts, 0) < ?
+      ORDER BY a.created_at ASC, s.created_at ASC
+      LIMIT ?`,
+  ).bind(workspaceId, MAX_DELIVERY_ATTEMPTS, MAX_PENDING_DELIVERIES).all<CredentialAlertJobRow>();
+
+  const removedSubscriptions = new Set<string>();
+  for (const job of jobs.results || []) {
+    if (removedSubscriptions.has(job.subscription_id)) continue;
+    summary.attempted += 1;
+    let result: PushSendResult;
+    try {
+      const subscription = validatePushSubscription(JSON.parse(await codec.decrypt(job.encrypted_subscription)));
+      result = await send(subscription, job.alert_id);
+    } catch {
+      result = { status: 'failed', errorCode: 'PUSH_DELIVERY_ERROR' };
+    }
+    if (result.status === 'expired') {
+      await db.prepare('DELETE FROM push_subscriptions WHERE id = ?').bind(job.subscription_id).run();
+      removedSubscriptions.add(job.subscription_id);
+      summary.expired += 1;
+      continue;
+    }
+    const attemptedAt = now.toISOString();
+    await db.prepare(
+      `INSERT INTO push_credential_alert_deliveries (
+         alert_id, subscription_id, attempts, sent_at, last_attempt_at, last_error_code
+       ) VALUES (?, ?, 1, ?, ?, ?)
+       ON CONFLICT(alert_id, subscription_id) DO UPDATE SET
+         attempts = push_credential_alert_deliveries.attempts + 1,
+         sent_at = excluded.sent_at,
+         last_attempt_at = excluded.last_attempt_at,
+         last_error_code = excluded.last_error_code`,
+    ).bind(
+      job.alert_id,
+      job.subscription_id,
+      result.status === 'sent' ? attemptedAt : null,
+      attemptedAt,
+      result.status === 'failed' ? sanitizeErrorCode(result.errorCode) : null,
+    ).run();
+    if (result.status === 'sent') summary.sent += 1;
+    else summary.failed += 1;
+  }
+  return summary;
+}
+
 export async function deliverPendingPushNotificationsInDatabase(
   db: D1Database,
   workspaceId: string,
@@ -376,6 +476,27 @@ export async function ensurePushSchema(db: D1Database): Promise<void> {
       FOREIGN KEY (subscription_id) REFERENCES push_subscriptions(id) ON DELETE CASCADE
     )`),
     db.prepare('CREATE INDEX IF NOT EXISTS idx_push_test_receipts_workspace_created ON push_test_receipts(workspace_id, created_at)'),
+    db.prepare(`CREATE TABLE IF NOT EXISTS push_credential_alerts (
+      id TEXT PRIMARY KEY,
+      workspace_id TEXT NOT NULL,
+      app_id INTEGER NOT NULL,
+      reason_code TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+    )`),
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_push_credential_alerts_workspace ON push_credential_alerts(workspace_id, created_at)'),
+    db.prepare(`CREATE TABLE IF NOT EXISTS push_credential_alert_deliveries (
+      alert_id TEXT NOT NULL,
+      subscription_id TEXT NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+      sent_at TEXT,
+      last_attempt_at TEXT NOT NULL,
+      last_error_code TEXT,
+      PRIMARY KEY (alert_id, subscription_id),
+      FOREIGN KEY (alert_id) REFERENCES push_credential_alerts(id) ON DELETE CASCADE,
+      FOREIGN KEY (subscription_id) REFERENCES push_subscriptions(id) ON DELETE CASCADE
+    )`),
+    db.prepare('CREATE INDEX IF NOT EXISTS idx_push_credential_alert_deliveries_pending ON push_credential_alert_deliveries(subscription_id, sent_at, attempts)'),
   ]).then(() => undefined).catch((error) => {
     schemaReady.delete(db as object);
     throw error;

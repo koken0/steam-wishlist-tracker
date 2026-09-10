@@ -133,6 +133,11 @@ as suspended with its sanitized reason and timestamp. Suspended connections are
 excluded from subsequent hourly polling and appear as **Marcada** in
 `/admin/usuarios`. Saving a newly validated key reactivates the connection and
 clears the mark; disconnecting still deletes the credential and retained data.
+The suspension transition also queues one generic Web Push action notice for
+every device registered to that workspace. Provider failures remain retryable
+for up to five scheduled runs, including runs after the Steam connection has
+been suspended. A 401/403 can also mean permissions, App ID, or IP allowlisting,
+so the public notification does not claim which credential condition failed.
 
 The operator UI uses separate routes: `/admin` for the compact summary,
 `/admin/worker` for scheduler diagnostics, and `/admin/usuarios` for accounts.

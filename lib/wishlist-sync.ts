@@ -4,7 +4,11 @@ import { WishlistConnectorError } from '@/lib/wishlist-errors';
 import { enforceRetention, persistSyncRun, recordAuditEventSafely } from '@/lib/wishline-governance';
 import type { WishlistSyncActivity } from '@/lib/wishlist-server';
 import { classifySchedulerRun } from '@/lib/wishline-governance-core';
-import { deliverPendingPushNotifications } from '@/lib/push-notifications';
+import {
+  deliverPendingPushNotifications,
+  enqueueCredentialInvalidNotification,
+  listWorkspacesWithPendingCredentialNotifications,
+} from '@/lib/push-notifications';
 import type { PushDeliverySummary } from '@/lib/push-notifications-core';
 
 export type WishlistSyncSummary = {
@@ -41,6 +45,7 @@ export async function syncAllWishlistConnections(): Promise<WishlistSyncSummary>
   };
   const push: PushDeliverySummary = { attempted: 0, sent: 0, expired: 0, failed: 0 };
 
+  const deliveredWorkspaces = new Set<string>();
   for (const connection of connections) {
     const connectionActivity: WishlistSyncActivity = {
       reportDatesRequested: 0,
@@ -111,6 +116,7 @@ export async function syncAllWishlistConnections(): Promise<WishlistSyncSummary>
     }
     try {
       const delivery = await deliverPendingPushNotifications(connection.workspaceId);
+      deliveredWorkspaces.add(connection.workspaceId);
       push.attempted += delivery.attempted;
       push.sent += delivery.sent;
       push.expired += delivery.expired;
@@ -137,6 +143,20 @@ export async function syncAllWishlistConnections(): Promise<WishlistSyncSummary>
     }
   }
 
+  for (const workspaceId of await listWorkspacesWithPendingCredentialNotifications()) {
+    if (deliveredWorkspaces.has(workspaceId)) continue;
+    try {
+      const delivery = await deliverPendingPushNotifications(workspaceId);
+      push.attempted += delivery.attempted;
+      push.sent += delivery.sent;
+      push.expired += delivery.expired;
+      push.failed += delivery.failed;
+    } catch {
+      push.failed += 1;
+      console.error('wishline.push.failed', { reasonCode: 'PUSH_DELIVERY_FAILED' });
+    }
+  }
+
   const completedAt = new Date().toISOString();
   const run = {
     startedAt,
@@ -155,6 +175,7 @@ async function suspendIfAccessDenied(workspaceId: string, appId: number, reasonC
   if (reasonCode !== 'STEAM_ACCESS_DENIED') return;
   const suspended = await suspendSteamConnection(workspaceId, appId, reasonCode);
   if (suspended) {
+    await enqueueCredentialInvalidNotification(workspaceId, appId, reasonCode);
     await recordAuditEventSafely({
       workspaceId,
       appId,

@@ -5,8 +5,11 @@ import {
   acknowledgePushTestReceiptInDatabase,
   createPushTestReceiptInDatabase,
   deletePushSubscriptionInDatabase,
+  deliverPendingCredentialAlertsInDatabase,
   deliverPendingPushNotificationsInDatabase,
+  enqueueCredentialAlertInDatabase,
   hasPushSubscriptionsInDatabase,
+  listWorkspacesWithPendingCredentialAlertsInDatabase,
   readPushSubscriptionInDatabase,
   readPushTestReceiptInDatabase,
   recordPushTestProviderResultInDatabase,
@@ -94,7 +97,7 @@ export async function hasPushSubscriptions(workspaceId: string): Promise<boolean
 export async function deliverPendingPushNotifications(workspaceId: string): Promise<PushDeliverySummary> {
   const vapid = vapidKeys();
   if (!vapid) return { attempted: 0, sent: 0, expired: 0, failed: 0 };
-  return deliverPendingPushNotificationsInDatabase(
+  const observations = await deliverPendingPushNotificationsInDatabase(
     database(),
     workspaceId,
     codec,
@@ -105,6 +108,39 @@ export async function deliverPendingPushNotifications(workspaceId: string): Prom
       tag: `wishline-${observationId}`,
     }),
   );
+  const credentialAlerts = await deliverPendingCredentialAlertsInDatabase(
+    database(),
+    workspaceId,
+    codec,
+    (subscription, alertId) => sendPush(subscription, alertId, vapid, {
+      title: 'Action pending in Wishline',
+      body: 'There is a pending action on your account that needs review. Open Wishline to continue.',
+      url: '/',
+      tag: 'wishline-credential-action',
+    }),
+  );
+  return addDeliverySummaries(observations, credentialAlerts);
+}
+
+export async function enqueueCredentialInvalidNotification(
+  workspaceId: string,
+  appId: number,
+  reasonCode: string,
+): Promise<string> {
+  return enqueueCredentialAlertInDatabase(database(), workspaceId, appId, reasonCode);
+}
+
+export async function listWorkspacesWithPendingCredentialNotifications(): Promise<string[]> {
+  return listWorkspacesWithPendingCredentialAlertsInDatabase(database());
+}
+
+function addDeliverySummaries(a: PushDeliverySummary, b: PushDeliverySummary): PushDeliverySummary {
+  return {
+    attempted: a.attempted + b.attempted,
+    sent: a.sent + b.sent,
+    expired: a.expired + b.expired,
+    failed: a.failed + b.failed,
+  };
 }
 
 async function sendPush(

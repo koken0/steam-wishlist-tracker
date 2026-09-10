@@ -177,6 +177,12 @@ After each connection sync, the Worker selects intraday observations created
 after a device subscribed whose wishlist activity counters differ from their
 preceding same-day observation. `push_deliveries` provides one row per
 observation/device, five bounded attempts, and sent-state deduplication.
+When Steam returns 401/403, the transition to a suspended connection also
+creates one durable credential-action event. `push_credential_alert_deliveries`
+tracks that event per subscribed device with the same five-attempt policy. The
+scheduler continues those pending deliveries even though the suspended
+connection is no longer polled. Its lock-screen copy says only that the account
+has an action to review; the authenticated app provides the connection detail.
 Subscriptions are validated, encrypted with the same versioned envelope as the
 Steam credential, and stored in `push_subscriptions`; only an endpoint hash is
 queryable. HTTP 404/410 removes an expired capability. Push delivery failure is

@@ -5,8 +5,11 @@ import {
   acknowledgePushTestReceiptInDatabase,
   createPushTestReceiptInDatabase,
   deletePushSubscriptionInDatabase,
+  deliverPendingCredentialAlertsInDatabase,
   deliverPendingPushNotificationsInDatabase,
+  enqueueCredentialAlertInDatabase,
   hasPushSubscriptionsInDatabase,
+  listWorkspacesWithPendingCredentialAlertsInDatabase,
   readPushTestReceiptInDatabase,
   recordPushTestProviderResultInDatabase,
   savePushSubscriptionInDatabase,
@@ -129,6 +132,64 @@ test('new observations are delivered once and failed deliveries remain retryable
     );
     assert.deepEqual(fourth, { attempted: 1, sent: 1, expired: 0, failed: 0 });
     assert.equal(calls, 3);
+  } finally {
+    await dispose();
+  }
+});
+
+test('credential alerts reach each subscribed device once and remain retryable', async () => {
+  const { db, dispose } = await testDatabase();
+  try {
+    await createProductTables(db);
+    const workspaceId = 'ws_555555555555555555555555';
+    await createWorkspace(db, workspaceId);
+    await savePushSubscriptionInDatabase(
+      db,
+      workspaceId,
+      subscription('https://fcm.googleapis.com/fcm/send/credential-device'),
+      codec,
+      new Date('2026-09-06T15:00:00.000Z'),
+    );
+    const alertId = await enqueueCredentialAlertInDatabase(
+      db,
+      workspaceId,
+      123,
+      'STEAM_ACCESS_DENIED',
+      new Date('2026-09-06T15:01:00.000Z'),
+    );
+    assert.match(alertId, /^credential_alert_[0-9a-f]{32}$/);
+    assert.deepEqual(await listWorkspacesWithPendingCredentialAlertsInDatabase(db), [workspaceId]);
+
+    const first = await deliverPendingCredentialAlertsInDatabase(
+      db,
+      workspaceId,
+      codec,
+      async (_subscription, deliveredAlertId) => {
+        assert.equal(deliveredAlertId, alertId);
+        return { status: 'failed', errorCode: 'PUSH_HTTP_503' };
+      },
+      new Date('2026-09-06T15:02:00.000Z'),
+    );
+    assert.deepEqual(first, { attempted: 1, sent: 0, expired: 0, failed: 1 });
+
+    const second = await deliverPendingCredentialAlertsInDatabase(
+      db,
+      workspaceId,
+      codec,
+      async () => ({ status: 'sent' }),
+      new Date('2026-09-06T16:02:00.000Z'),
+    );
+    assert.deepEqual(second, { attempted: 1, sent: 1, expired: 0, failed: 0 });
+    assert.deepEqual(await listWorkspacesWithPendingCredentialAlertsInDatabase(db), []);
+
+    const third = await deliverPendingCredentialAlertsInDatabase(
+      db,
+      workspaceId,
+      codec,
+      async () => ({ status: 'sent' }),
+      new Date('2026-09-06T17:02:00.000Z'),
+    );
+    assert.deepEqual(third, { attempted: 0, sent: 0, expired: 0, failed: 0 });
   } finally {
     await dispose();
   }

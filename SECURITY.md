@@ -45,6 +45,8 @@ data. Treat both as sensitive even though the current product is an MVP.
   at rest, and stores only a one-way endpoint hash separately.
 - Push messages are generic and contain no App ID, wishlist value, credential,
   user identifier, or raw Steam field.
+- A Steam 401/403 notification states only that an account action needs review;
+  the lock-screen payload does not identify the key, project, or denial cause.
 - Test-delivery acknowledgements use a random per-message capability carried in
   the encrypted Push payload. D1 stores only its SHA-256 hash; the capability
   expires after 24 hours and cannot read workspace data.

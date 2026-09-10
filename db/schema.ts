@@ -13,4 +13,6 @@ export const schema = {
   pushSubscriptions: ['id', 'workspace_id', 'endpoint_hash', 'encrypted_subscription', 'expires_at', 'created_at', 'updated_at'],
   pushDeliveries: ['observation_id', 'subscription_id', 'attempts', 'sent_at', 'last_attempt_at', 'last_error_code'],
   pushTestReceipts: ['id', 'workspace_id', 'subscription_id', 'ack_token_hash', 'provider_status', 'received_at', 'clicked_at', 'expires_at', 'created_at'],
+  pushCredentialAlerts: ['id', 'workspace_id', 'app_id', 'reason_code', 'created_at'],
+  pushCredentialAlertDeliveries: ['alert_id', 'subscription_id', 'attempts', 'sent_at', 'last_attempt_at', 'last_error_code'],
 } as const;
