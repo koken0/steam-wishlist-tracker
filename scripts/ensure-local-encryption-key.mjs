@@ -28,6 +28,15 @@ if (!/^WISHLINE_ADMIN_SESSION_SECRET=.{32,}$/m.test(contents)) {
   console.log('The ignored local admin session secret is already configured.');
 }
 
+if (!/^WISHLINE_ADMIN_USER_IDS=.+$/m.test(contents)) {
+  const separator = contents && !contents.endsWith('\n') ? '\n' : '';
+  contents += `${separator}\n# Fixed loopback-only administrator used by local development.\nWISHLINE_ADMIN_USER_IDS=local:owner\n`;
+  changed = true;
+  console.log('Configured the loopback-only local administrator.');
+} else {
+  console.log('The local admin allowlist is already configured.');
+}
+
 if (changed) {
   await writeFile(path, contents, { mode: 0o600 });
   await chmod(path, 0o600);

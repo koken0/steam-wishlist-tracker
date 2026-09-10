@@ -151,11 +151,12 @@ npm install
 npm run dev
 ```
 
-`npm run dev` automatically prepares the ignored local server-protection key
-before Wishline starts. It creates the key only when missing and preserves an
-existing key so saved Steam connections remain readable. `npm run setup:local`
-remains available as an explicit repair/setup command but is not part of the
-normal onboarding path.
+`npm run dev` automatically prepares the ignored local server-protection key,
+admin-session secret, and loopback-only `local:owner` administrator before
+Wishline starts. It creates missing values only and preserves existing values
+so saved Steam connections remain readable and custom local access remains
+unchanged. `npm run setup:local` remains available as an explicit repair/setup
+command but is not part of the normal onboarding path.
 
 Open `http://localhost:3000`.
 
@@ -176,6 +177,8 @@ Other useful commands:
 ```bash
 npm run build   # Create a production bundle
 npm run db:migrate:cloudflare # Apply pending migrations to hosted D1
+npm run setup:cloudflare:admin-session # Generate/upload the admin session secret
+npx wrangler secret put WISHLINE_ADMIN_USER_IDS # Allowlist firebase:<UID> administrators
 npm run deploy:cloudflare # Build and deploy the Worker plus its cron
 npm run lint    # Run static code-quality checks
 npm run start   # Serve a completed production build

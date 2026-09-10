@@ -69,6 +69,10 @@ browser flow. Never record screenshots, traces, or request bodies containing the
 | `VAPID_SUBJECT` | VAPID contact/origin, currently the deployed HTTPS Worker URL | Required for Web Push |
 | `WISHLIST_DATA_SOURCE` | Selects fixture or legacy environment-driven Steam mode | Optional |
 | `STEAM_FINANCIAL_API_KEY` | Legacy connector and local acceptance script | Legacy/test only |
+
+Local `npm run dev` creates missing ignored values for the admin session and
+adds only the loopback-only `local:owner` identity when no local administrator
+allowlist exists. It never replaces an existing allowlist or signing secret.
 | `STEAM_APP_ID` | Legacy connector and local acceptance script | Legacy/test only |
 | `WISHLIST_ALLOWED_USER_IDS` | Production allowlist for legacy live mode | Legacy production only |
 
@@ -100,6 +104,21 @@ receives the signed, `HttpOnly`, `SameSite=Strict` page cookie. The cookie lasts
 eight hours, is limited to `/admin`, and is removed on sign-out. This page-level
 gate complements rather than replaces the independent bearer-token and
 allowlist check on every administrative data request.
+
+For a new or existing Cloudflare deployment, authenticate Wrangler and run:
+
+```bash
+npx wrangler secret put WISHLINE_ADMIN_USER_IDS
+npm run setup:cloudflare:admin-session
+npm run deploy:cloudflare
+```
+
+Enter one or more full `firebase:<Firebase UID>` values separated by commas for
+the first command. The second command generates a cryptographically random
+session secret in memory and pipes it directly to Wrangler; it never prints or
+writes the value. The deploy command checks that both secret names exist before
+building or publishing, and aborts safely when either is missing. Existing
+Worker secrets remain attached across normal Wrangler deployments.
 
 The separate `/admin/worker` page reads the latest 48 durable `sync_runs`,
 classifies the scheduler as healthy, degraded, stale, or unknown, and exposes
