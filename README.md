@@ -161,7 +161,10 @@ Open `http://localhost:3000`.
 
 The private operator console is available at `http://localhost:3000/admin`.
 It remains closed unless the signed-in immutable user ID appears in the
-server-only `WISHLINE_ADMIN_USER_IDS` allowlist.
+server-only `WISHLINE_ADMIN_USER_IDS` allowlist. Page navigation also requires
+an eight-hour signed session protected by the separate server-only
+`WISHLINE_ADMIN_SESSION_SECRET`; `npm run dev` creates the ignored local value
+when missing, while hosted deployments must configure it explicitly.
 Connections rejected by Steam are persistently marked in the operator console
 and excluded from later hourly polling. A newly validated key clears the mark
 and resumes synchronization.

@@ -11,6 +11,7 @@ project per authenticated workspace.
 ```text
 Browser / installed PWA
   |-- temporary beta access cookie (when configured)
+  |-- signed HttpOnly admin page session for /admin/*
   |-- passwordless platform session
   |-- POST /api/setup ---------> Steam credential validation
   |                               |-- protected credential storage

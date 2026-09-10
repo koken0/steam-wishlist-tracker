@@ -24,6 +24,10 @@ data. Treat both as sensitive even though the current product is an MVP.
 ## Security boundaries
 
 - Hosted identity comes from a server-verified Firebase ID token, never a client-provided user ID.
+- Every `/admin/*` page except the dedicated sign-in page requires an eight-hour,
+  server-signed `HttpOnly` cookie issued only after the Firebase identity is
+  matched against `WISHLINE_ADMIN_USER_IDS`. Administrative APIs independently
+  revalidate the Firebase bearer token and administrator allowlist.
 - Local development uses one fixed owner only for non-production loopback requests.
 - Every saved Steam connection belongs to one authenticated workspace.
 - The server restores a credential only for the current workspace and only when
@@ -57,6 +61,8 @@ Before using a real key outside local acceptance:
 
 - Require private authenticated Firebase access.
 - Configure server secrets through the hosting environment.
+- Configure a unique random `WISHLINE_ADMIN_SESSION_SECRET` of at least 32
+  characters. Never reuse a Steam, scheduler, monitor, rotation, or Firebase secret.
 - Restrict access to logs, D1 data, and deployment settings.
 - Protect `/api/internal/scheduler-health` with a dedicated
   `WISHLINE_MONITOR_SECRET`. Never reuse the sync or rotation secret; the route

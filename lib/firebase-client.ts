@@ -40,6 +40,7 @@ export async function signInToWishline(): Promise<User> {
 }
 
 export async function signOutOfWishline(): Promise<void> {
+  await fetch('/api/admin/session', { method: 'DELETE' }).catch(() => undefined);
   await signOut(auth);
 }
 

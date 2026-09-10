@@ -54,6 +54,7 @@ browser flow. Never record screenshots, traces, or request bodies containing the
 | --- | --- | --- |
 | `WISHLINE_BETA_PASSWORD` | Temporary shared password for private-beta enrollment and account linking | Private beta only |
 | `WISHLINE_ADMIN_USER_IDS` | Comma-separated immutable authenticated IDs allowed to read the private `/admin` console | Operator console |
+| `WISHLINE_ADMIN_SESSION_SECRET` | Random 32+ character HMAC secret for the eight-hour `HttpOnly` page session | Operator console |
 | `WISHLIST_ENCRYPTION_KEY` | Protects saved workspace credentials | Yes for app onboarding |
 | `WISHLIST_ENCRYPTION_KEY_ID` | Non-secret ID written into new credential envelopes | Yes; defaults to `primary` |
 | `WISHLIST_PREVIOUS_ENCRYPTION_KEY` | Temporarily reads old envelopes during a controlled rotation | Rotation window only |
@@ -91,6 +92,14 @@ encrypted secrets, push endpoints, wishlist totals, or raw Steam responses.
 Configure the allowlist as a server-side Worker secret and open `/admin` with
 that same Google/Firebase account. Removing the variable closes the console to
 everyone by default.
+
+Navigation to `/admin`, `/admin/usuarios`, or `/admin/worker` first passes
+through the shared server proxy. A dedicated `/admin/acceso` page sends the
+Firebase bearer token once to `/api/admin/session`; only an allowlisted identity
+receives the signed, `HttpOnly`, `SameSite=Strict` page cookie. The cookie lasts
+eight hours, is limited to `/admin`, and is removed on sign-out. This page-level
+gate complements rather than replaces the independent bearer-token and
+allowlist check on every administrative data request.
 
 The separate `/admin/worker` page reads the latest 48 durable `sync_runs`,
 classifies the scheduler as healthy, degraded, stale, or unknown, and exposes
