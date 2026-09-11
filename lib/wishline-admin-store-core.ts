@@ -21,6 +21,7 @@ export type AdminAccount = {
   pendingRepairs: number;
   exhaustedRepairs: number;
   pushSubscriptions: number;
+  pushSubscribedAt: string | null;
   lastFailureAt: string | null;
   lastFailureReason: string | null;
   notificationsEnabled: boolean;
@@ -53,6 +54,7 @@ type AdminAccountRow = {
   connection_updated_at: string | null;
   last_activity_at: string | null;
   push_count: number;
+  push_subscribed_at: string | null;
   sync_state: 'active' | 'suspended' | null;
   suspended_at: string | null;
   suspension_reason: string | null;
@@ -85,7 +87,8 @@ export async function readAdminOverviewInDatabase(db: D1Database, now = new Date
             (SELECT COUNT(*) FROM wishlist_history_repairs r WHERE r.workspace_id = w.id AND r.status = 'exhausted') AS exhausted_repairs,
             (SELECT a.occurred_at FROM audit_events a WHERE a.workspace_id = w.id AND a.event_type = 'sync.failure' ORDER BY a.occurred_at DESC LIMIT 1) AS last_failure_at,
             (SELECT a.reason_code FROM audit_events a WHERE a.workspace_id = w.id AND a.event_type = 'sync.failure' ORDER BY a.occurred_at DESC LIMIT 1) AS last_failure_reason,
-            (SELECT COUNT(*) FROM push_subscriptions s WHERE s.workspace_id = w.id) AS push_count
+            (SELECT COUNT(*) FROM push_subscriptions s WHERE s.workspace_id = w.id) AS push_count,
+            (SELECT MIN(s.created_at) FROM push_subscriptions s WHERE s.workspace_id = w.id) AS push_subscribed_at
        FROM workspaces w
        LEFT JOIN steam_connections c ON c.workspace_id = w.id
       ORDER BY w.created_at DESC
@@ -120,6 +123,7 @@ export async function readAdminOverviewInDatabase(db: D1Database, now = new Date
     pendingRepairs: Number(row.pending_repairs),
     exhaustedRepairs: Number(row.exhausted_repairs),
     pushSubscriptions: Number(row.push_count),
+    pushSubscribedAt: row.push_subscribed_at,
     lastFailureAt: row.last_failure_at,
     lastFailureReason: row.last_failure_reason,
     notificationsEnabled: Number(row.push_count) > 0,

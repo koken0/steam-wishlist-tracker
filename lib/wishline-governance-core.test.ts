@@ -46,6 +46,10 @@ test('admin account detail returns safe operational aggregates without internal 
     await db.prepare(`INSERT INTO wishlist_history_repairs
       (workspace_id, app_id, report_date, status, attempts, created_at, updated_at)
       VALUES (?, 123, '2026-08-30', 'pending', 0, '2026-09-03T00:00:00.000Z', '2026-09-03T00:00:00.000Z')`).bind(workspaceId).run();
+    await db.prepare(`INSERT INTO push_subscriptions
+      (id, workspace_id, endpoint_hash, encrypted_subscription, expires_at, created_at, updated_at)
+      VALUES ('push_safe', ?, 'endpoint-hash', 'encrypted-push-envelope', NULL,
+              '2026-09-04T08:15:00.000Z', '2026-09-04T08:15:00.000Z')`).bind(workspaceId).run();
 
     const overview = await readAdminOverviewInDatabase(db, new Date('2026-09-05T02:30:00.000Z'));
     assert.deepEqual(overview.accounts[0], {
@@ -54,11 +58,12 @@ test('admin account detail returns safe operational aggregates without internal 
       connectionUpdatedAt: '2026-01-01T00:00:00.000Z', lastActivityAt: '2026-09-03T01:00:00.000Z',
       historyStart: '2026-09-01', historyEnd: '2026-09-02', historyDays: 2,
       lastPollClassification: 'unchanged', lastPollReason: null, pendingRepairs: 1, exhaustedRepairs: 0,
-      pushSubscriptions: 0, lastFailureAt: null, lastFailureReason: null, notificationsEnabled: false,
+      pushSubscriptions: 1, pushSubscribedAt: '2026-09-04T08:15:00.000Z', lastFailureAt: null, lastFailureReason: null, notificationsEnabled: true,
     });
     const payload = JSON.stringify(overview);
     assert.equal(payload.includes(workspaceId), false);
     assert.equal(payload.includes('encrypted-secret-envelope'), false);
+    assert.equal(payload.includes('encrypted-push-envelope'), false);
   } finally {
     await dispose();
   }

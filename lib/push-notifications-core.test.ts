@@ -43,11 +43,14 @@ test('subscriptions are encrypted, workspace-scoped, and removable without expos
     const value = subscription('https://fcm.googleapis.com/fcm/send/device-one');
     await savePushSubscriptionInDatabase(db, workspaceId, value, codec, new Date('2026-09-06T10:00:00.000Z'));
 
+    await savePushSubscriptionInDatabase(db, workspaceId, value, codec, new Date('2026-09-07T11:00:00.000Z'));
     const row = await db.prepare(
-      'SELECT endpoint_hash, encrypted_subscription FROM push_subscriptions WHERE workspace_id = ?',
-    ).bind(workspaceId).first<{ endpoint_hash: string; encrypted_subscription: string }>();
+      'SELECT endpoint_hash, encrypted_subscription, created_at, updated_at FROM push_subscriptions WHERE workspace_id = ?',
+    ).bind(workspaceId).first<{ endpoint_hash: string; encrypted_subscription: string; created_at: string; updated_at: string }>();
     assert.equal(row?.endpoint_hash.length, 64);
     assert.equal(row?.encrypted_subscription.includes(value.endpoint), false);
+    assert.equal(row?.created_at, '2026-09-06T10:00:00.000Z');
+    assert.equal(row?.updated_at, '2026-09-07T11:00:00.000Z');
     assert.equal(await hasPushSubscriptionsInDatabase(db, workspaceId), true);
     assert.equal(await deletePushSubscriptionInDatabase(db, workspaceId, value.endpoint), true);
     assert.equal(await hasPushSubscriptionsInDatabase(db, workspaceId), false);

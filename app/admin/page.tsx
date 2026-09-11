@@ -131,7 +131,9 @@ export default function AdminPage() {
                       {account.syncState === 'suspended' && <small>{failureReasonLabel(account.suspensionReason)} · {formatDate(account.suspendedAt || '')}</small>}
                     </td>
                     <td>{formatDate(account.lastActivityAt || account.updatedAt)}</td>
-                    <td>{account.notificationsEnabled ? 'Activas' : '—'}</td>
+                    <td>{account.notificationsEnabled
+                      ? <><span className={styles.good}>Activas</span><small>Desde {formatDate(account.pushSubscribedAt || '')}</small></>
+                      : '—'}</td>
                   </tr>
                 ))}</tbody>
               </table>
@@ -181,6 +183,7 @@ function AccountDrawer({ account, onClose }: { account: AdminAccount; onClose: (
       <DetailSection title="Notificaciones">
         <Detail label="Suscripciones push" value={String(account.pushSubscriptions)} />
         <Detail label="Estado" value={account.notificationsEnabled ? 'Activas' : 'Sin suscripciones'} />
+        <Detail label="Suscripción desde" value={account.pushSubscribedAt ? formatDate(account.pushSubscribedAt) : '—'} />
       </DetailSection>
       <p className={styles.privacyNote}>Esta ficha contiene sólo metadatos operativos sanitizados. No incluye credenciales, tokens, endpoints ni identificadores internos.</p>
     </aside>
